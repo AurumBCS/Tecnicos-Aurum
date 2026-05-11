@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<!-- saved from url=(0080)file:///C:/Users/Viatek/Desktop/Mi%20Panel%20%C2%B7%20Aurum%20BC%20Security.html -->
+<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>Mi Panel · Aurum BC Security</title>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link href="file:///C:/Users/Viatek/Desktop/Mi%20Panel%20%C2%B7%20Aurum%20BC%20Security_files/css2" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--s1:#111;--s2:#181818;
+  --border:#2a2200;--border2:#3d3300;
+  --gold:#c9a84c;--gold2:#e8c96a;--gold3:#a07830;
+  --red:#c0392b;--orange:#d4831a;--yellow:#c9a020;
+  --green:#2e7d52;--green2:#3daa6e;
+  --text:#f0e6c8;--muted:#7a6840;--dim:#1c1800;
+  --font:'Outfit',sans-serif;--display:'Cinzel',serif;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 100% 50% at 50% 0%,rgba(201,168,76,.05) 0%,transparent 60%)}
+
+/* LOGIN */
+#loginScreen{min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:20px;position:relative;z-index:1}
+#loginScreen::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.025;
+  background-image:linear-gradient(rgba(201,168,76,1) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(201,168,76,1) 1px,transparent 1px);background-size:48px 48px}
+.login-box{position:relative;z-index:1;width:100%;max-width:400px;background:var(--s1);
+  border:1px solid var(--border2);border-radius:22px;overflow:hidden;
+  box-shadow:0 40px 80px rgba(0,0,0,.8),0 0 0 1px rgba(201,168,76,.1)}
+.login-box::before{content:'';display:block;height:3px;
+  background:linear-gradient(90deg,transparent,var(--gold),var(--gold2),var(--gold),transparent)}
+.login-header{text-align:center;padding:30px 28px 22px;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,rgba(201,168,76,.05) 0%,transparent 100%)}
+.login-logo-img{width:90px;height:90px;border-radius:50%;object-fit:cover;
+  border:2px solid var(--gold3);box-shadow:0 0 28px rgba(201,168,76,.2),0 8px 24px rgba(0,0,0,.5);
+  display:block;margin:0 auto 14px}
+.login-header h1{font-family:var(--display);font-size:1.05rem;font-weight:700;
+  color:var(--gold2);letter-spacing:.08em;text-transform:uppercase}
+.login-header p{font-size:.72rem;color:var(--muted);margin-top:4px;letter-spacing:.04em}
+.login-body{padding:24px 28px 28px}
+.login-label{font-size:.63rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.12em;color:var(--muted);margin-bottom:7px;display:block}
+.login-input{width:100%;background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;
+  padding:13px 16px;font-size:1rem;font-family:var(--font);color:var(--text);
+  letter-spacing:.06em;text-align:center;transition:border-color .2s,box-shadow .2s}
+.login-input::placeholder{color:var(--muted);letter-spacing:0;font-size:.85rem}
+.login-input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,.1)}
+.login-btn{width:100%;margin-top:13px;
+  background:linear-gradient(135deg,#7a5c10,#c9a84c,#e8c96a,#c9a84c,#7a5c10);
+  background-size:200% 100%;background-position:100% 0;
+  color:#0a0a0a;border:none;border-radius:10px;padding:13px;
+  font-size:.88rem;font-weight:700;font-family:var(--display);cursor:pointer;
+  letter-spacing:.1em;text-transform:uppercase;
+  transition:background-position .4s,transform .1s,box-shadow .2s;
+  box-shadow:0 4px 20px rgba(201,168,76,.2)}
+.login-btn:hover{background-position:0 0;box-shadow:0 6px 28px rgba(201,168,76,.35)}
+.login-btn:active{transform:scale(.98)}
+.login-error{margin-top:10px;text-align:center;font-size:.78rem;color:#e05a4a;display:none}
+.login-footer{margin-top:18px;text-align:center;font-size:.67rem;color:var(--muted);
+  border-top:1px solid var(--border);padding-top:14px;letter-spacing:.03em;line-height:1.7}
+.spinner{display:none;width:20px;height:20px;border:2px solid var(--border2);
+  border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;margin:10px auto 0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* APP */
+#appScreen{display:none;min-height:100vh;position:relative;z-index:1}
+.topbar{background:var(--s1);border-bottom:1px solid var(--border2);
+  padding:11px 14px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,.5)}
+.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold3),transparent)}
+.topbar-left{display:flex;align-items:center;gap:9px}
+.topbar-logo{width:34px;height:34px;border-radius:50%;object-fit:cover;
+  border:1.5px solid var(--gold3);flex-shrink:0}
+.topbar-name{font-size:.83rem;font-weight:600;color:var(--text);line-height:1.2}
+.topbar-id{font-size:.63rem;color:var(--muted);font-family:monospace;letter-spacing:.04em}
+.topbar-logout{background:transparent;border:1px solid var(--border2);color:var(--muted);
+  border-radius:8px;padding:6px 11px;font-size:.7rem;cursor:pointer;font-family:var(--font);transition:all .2s}
+.topbar-logout:hover{border-color:var(--gold3);color:var(--gold)}
+
+.month-banner{padding:12px 16px;background:linear-gradient(135deg,#111100 0%,#0d0d0d 100%);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;
+  justify-content:space-between;flex-wrap:wrap;gap:8px}
+.month-label{font-family:var(--display);font-size:.58rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.16em;color:var(--gold3)}
+.month-title{font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--gold2)}
+.score-pill{background:var(--dim);border:1px solid var(--border2);border-radius:20px;
+  padding:5px 13px;font-size:.73rem;font-weight:600}
+
+/* MAIN PANEL */
+#mainPanel{padding:14px 13px 48px;max-width:680px;margin:0 auto}
+.section-head{font-family:var(--display);font-size:.58rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.18em;color:var(--gold3);
+  margin:20px 0 9px;padding-bottom:6px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px}
+.section-head::before{content:'';width:14px;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}
+
+/* HERO cards ML-V / MA+B — 4 levels */
+/* ≥8=best(green) | ≥7.5=good(gold) | ≥7=ok(orange) | <7=bad(red) */
+.hero-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+.hero-card{background:var(--s1);border-radius:16px;padding:18px 16px 14px;position:relative;
+  overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s;border:1px solid var(--border2)}
+.hero-card:active{transform:scale(.97)}
+.hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.hero-card.g-best{border-color:#1a3d2a}.hero-card.g-best::before{background:linear-gradient(90deg,transparent,var(--green2),transparent)}
+.hero-card.g-good{border-color:#3d3300}.hero-card.g-good::before{background:linear-gradient(90deg,transparent,var(--gold2),transparent)}
+.hero-card.g-ok  {border-color:#3d2800}.hero-card.g-ok::before  {background:linear-gradient(90deg,transparent,var(--orange),transparent)}
+.hero-card.g-bad {border-color:#3d1a1a}.hero-card.g-bad::before {background:linear-gradient(90deg,transparent,#e05a4a,transparent)}
+.hero-label{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:4px}
+.hero-val{font-family:var(--display);font-size:2rem;font-weight:700;line-height:1}
+.hero-val.g-best{color:var(--green2)}.hero-val.g-good{color:var(--gold2)}
+.hero-val.g-ok{color:var(--orange)}.hero-val.g-bad{color:#e05a4a}
+.hero-badge{display:inline-block;margin-top:6px;font-size:.6rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.07em;padding:2px 8px;border-radius:4px}
+.hero-badge.g-best{background:rgba(61,170,110,.15);color:var(--green2)}
+.hero-badge.g-good{background:rgba(232,201,106,.12);color:var(--gold2)}
+.hero-badge.g-ok  {background:rgba(212,131,26,.15);color:var(--orange)}
+.hero-badge.g-bad {background:rgba(192,57,43,.15);color:#e05a4a}
+.hero-scale{margin-top:10px;display:flex;gap:3px}
+.hero-scale-item{flex:1;height:3px;border-radius:2px}
+.hero-tap{position:absolute;bottom:8px;right:10px;font-size:.58rem;color:var(--muted);opacity:.6}
+
+/* SUMMARY */
+.summary-card{background:var(--s1);border:1px solid var(--border2);border-radius:16px;
+  padding:16px;display:flex;align-items:center;gap:14px;
+  box-shadow:0 4px 24px rgba(0,0,0,.4);position:relative;overflow:hidden}
+.summary-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.summary-ring{flex-shrink:0;width:74px;height:74px;position:relative}
+.summary-ring svg{transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:var(--dim);stroke-width:6}
+.ring-fg{fill:none;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .8s cubic-bezier(.4,0,.2,1)}
+.ring-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--display);font-size:1.05rem;font-weight:700;color:var(--gold2)}
+.summary-info h3{font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--gold2)}
+.summary-info p{font-size:.74rem;color:var(--muted);margin-top:5px;line-height:1.6}
+.ok-txt{color:var(--green2);font-weight:600}.bad-txt{color:#e05a4a;font-weight:600}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+@media(max-width:340px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi-card{background:var(--s1);border:1px solid var(--border);border-radius:13px;
+  padding:13px 11px 10px;position:relative;overflow:hidden;
+  cursor:pointer;transition:transform .15s,box-shadow .15s}
+.kpi-card:active{transform:scale(.96)}
+.kpi-card.ok{border-color:#1a3d2a}.kpi-card.bad{border-color:#3d1a1a}.kpi-card.warn{border-color:#3d2a10}
+.kpi-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px}
+.kpi-card.ok::after{background:linear-gradient(90deg,#1a5c35,var(--green2))}
+.kpi-card.bad::after{background:linear-gradient(90deg,#7a1515,#e05a4a)}
+.kpi-card.warn::after{background:linear-gradient(90deg,#7a4010,var(--orange))}
+.kpi-icon{font-size:.95rem;margin-bottom:4px;display:block}
+.kpi-name{font-size:.58rem;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:2px}
+.kpi-val{font-family:var(--display);font-size:1.3rem;font-weight:700;line-height:1;color:var(--text)}
+.kpi-val.ok{color:var(--green2)}.kpi-val.bad{color:#e05a4a}.kpi-val.warn{color:var(--orange)}
+.kpi-unit{font-size:.68rem;font-weight:400}
+.kpi-target{font-size:.56rem;color:var(--muted);margin-top:3px}
+.kpi-status{font-size:.56rem;font-weight:700;margin-top:2px;text-transform:uppercase;letter-spacing:.07em}
+.kpi-status.ok{color:var(--green2)}.kpi-status.bad{color:#e05a4a}.kpi-status.warn{color:var(--orange)}
+.kpi-bar{margin-top:7px;background:var(--dim);border-radius:3px;height:3px;overflow:hidden}
+.kpi-bar-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.kpi-bar-fill.ok{background:linear-gradient(90deg,#1a5c35,var(--green2))}
+.kpi-bar-fill.bad{background:linear-gradient(90deg,#7a1515,#e05a4a)}
+.kpi-bar-fill.warn{background:linear-gradient(90deg,#7a4010,var(--orange))}
+.kpi-tap{position:absolute;bottom:6px;right:8px;font-size:.55rem;color:var(--muted);opacity:.5}
+
+/* OTHER */
+.other-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+@media(max-width:380px){.other-grid{grid-template-columns:repeat(2,1fr)}}
+.other-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center}
+.other-name{font-size:.56rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:3px}
+.other-val{font-family:var(--display);font-size:.92rem;font-weight:600;color:var(--text)}
+
+.data-banner{background:var(--dim);border:1px solid var(--border);border-radius:8px;
+  padding:8px 12px;margin-bottom:2px;font-size:.67rem;color:var(--muted);
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green2);
+  animation:pulse 2s ease infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* DETAIL */
+#detailPanel{display:none;padding:14px 13px 48px;max-width:680px;margin:0 auto}
+.detail-back{display:flex;align-items:center;gap:8px;background:transparent;
+  border:1px solid var(--border2);color:var(--gold);border-radius:10px;
+  padding:8px 14px;font-size:.8rem;font-family:var(--display);cursor:pointer;
+  letter-spacing:.06em;margin-bottom:16px;transition:all .2s}
+.detail-back:hover{border-color:var(--gold);background:rgba(201,168,76,.06)}
+.detail-hero{background:var(--s1);border:1px solid var(--border2);border-radius:16px;
+  padding:18px;margin-bottom:16px;position:relative;overflow:hidden}
+.detail-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.detail-hero-title{font-family:var(--display);font-size:.6rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.14em;color:var(--gold3);margin-bottom:8px}
+.detail-hero-val{font-family:var(--display);font-size:2.2rem;font-weight:700}
+.detail-hero-sub{font-size:.76rem;color:var(--muted);margin-top:4px;line-height:1.5}
+.detail-section{font-family:var(--display);font-size:.58rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.16em;color:var(--gold3);
+  margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px}
+.detail-section::before{content:'';width:12px;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}
+.stat-row{display:flex;gap:8px;margin-bottom:14px}
+.stat-box{flex:1;background:var(--dim);border:1px solid var(--border);
+  border-radius:10px;padding:10px 8px;text-align:center}
+.stat-box .n{font-family:var(--display);font-size:1.4rem;font-weight:700;color:var(--gold2)}
+.stat-box .l{font-size:.62rem;color:var(--muted);margin-top:3px;line-height:1.3}
+.grade-legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.grade-pill{font-size:.65rem;font-weight:600;padding:3px 10px;border-radius:12px;letter-spacing:.04em}
+.grade-pill.best{background:rgba(61,170,110,.15);color:var(--green2);border:1px solid #1a3d2a}
+.grade-pill.good{background:rgba(232,201,106,.1);color:var(--gold2);border:1px solid #3d3300}
+.grade-pill.ok  {background:rgba(212,131,26,.12);color:var(--orange);border:1px solid #3d2800}
+.grade-pill.bad {background:rgba(192,57,43,.12);color:#e05a4a;border:1px solid #3d1a1a}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp .35s ease both}
+.fade-up:nth-child(1){animation-delay:.04s}.fade-up:nth-child(2){animation-delay:.08s}
+.fade-up:nth-child(3){animation-delay:.12s}.fade-up:nth-child(4){animation-delay:.16s}
+.fade-up:nth-child(5){animation-delay:.20s}.fade-up:nth-child(6){animation-delay:.24s}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" style="display: none;">
+  <div class="login-box">
+    <div class="login-header">
+      <img class="login-logo-img" src="data:image/jpeg;base64,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" alt="Aurum BC Security">
+      <h1>Aurum BC Security</h1>
+      <p>Portal del Técnico · Acceso privado</p>
+    </div>
+    <div class="login-body">
+      <label class="login-label" for="matInput">Matrícula de técnico</label>
+      <input class="login-input" id="matInput" type="text" placeholder="Introduce tu matrícula…" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="text">
+      <button class="login-btn" id="loginBtn" style="opacity: 1;">Acceder</button>
+      <div class="spinner" id="spinner" style="display: none;"></div>
+      <div class="login-error" id="loginError" style="display: none;">❌ Matrícula no encontrada. Comprueba el número.</div>
+      <div class="login-footer">Datos desde Google Sheets · Aurum BC Security<br>Confidencial · Solo para uso interno</div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appScreen" style="display: block;">
+  <div class="topbar">
+    <div class="topbar-left">
+      <img class="topbar-logo" src="data:image/jpeg;base64,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" alt="logo">
+      <div>
+        <div class="topbar-name" id="topbarName">Ezequiel Pugliese</div>
+        <div class="topbar-id" id="topbarId">286800 · BCN</div>
+      </div>
+    </div>
+    <button class="topbar-logout" id="logoutBtn">Salir</button>
+  </div>
+  <div class="month-banner">
+    <div>
+      <div class="month-label">Periodo activo</div>
+      <div class="month-title">Abril 2026</div>
+    </div>
+    <div class="score-pill" id="scorePill"><span style="color:#3daa6e;font-weight:700">5/6</span>&nbsp;<span style="color:#7a6840">objetivos</span></div>
+  </div>
+
+  <div id="mainPanel">
+    <div class="data-banner">
+      <div class="sync-dot"></div>
+      Sincronizado desde Google Sheets · <span id="lastUpdate">11 de mayo de 2026</span>
+    </div>
+
+    <div class="section-head">Indicadores de calidad</div>
+    <div class="hero-metrics" id="heroMetrics">
+    <div class="hero-card g-best" onclick="showDetail(&#39;mlv&#39;)">
+      <div class="hero-label">ML-V · Mant. extra</div>
+      <div class="hero-val g-best">8.14</div>
+      <div style="margin-top:8px;font-size:1rem;font-weight:800;color:var(--gold2)">💶 20€ / excedente o sáb.</div>
+                <div style="font-size:.65rem;color:var(--muted);margin-top:3px">ML-V ≥ 8</div>
+      <div class="hero-tap">→ detalle</div>
+    </div>
+    <div class="hero-card g-best" onclick="showDetail(&#39;mab&#39;)">
+      <div class="hero-label">MA+B</div>
+      <div class="hero-val g-best">8.42</div>
+      <span class="hero-badge g-best">En objetivo ≥7</span>
+      <div class="hero-scale"><div class="hero-scale-item" style="background:#c0392b28"></div><div class="hero-scale-item" style="background:#d4831a28"></div><div class="hero-scale-item" style="background:#c9a84c28"></div><div class="hero-scale-item" style="background:#3daa6e"></div></div>
+      <div class="hero-tap">→ detalle</div>
+    </div></div>
+
+    <div class="section-head">Resumen de objetivos</div>
+    <div class="summary-card fade-up" id="summaryCard">
+    <div class="summary-ring">
+      <svg width="74" height="74" viewBox="0 0 74 74">
+        <circle class="ring-bg" cx="37" cy="37" r="30"></circle>
+        <circle class="ring-fg" cx="37" cy="37" r="30" stroke="#3daa6e" stroke-dasharray="188.5" stroke-dashoffset="32.0"></circle>
+      </svg>
+      <div class="ring-text">83%</div>
+    </div>
+    <div class="summary-info">
+      <h3>¡Excelente trabajo!</h3>
+      <p><span class="ok-txt">5 objetivos cumplidos</span>
+       · <span class="bad-txt">1 por debajo</span>
+      <br>18 laborables · Ezequiel</p>
+    </div></div>
+
+    <div class="section-head">KPIs con objetivo</div>
+    <div class="kpi-grid" id="kpiGrid"><div class="kpi-card ok fade-up" onclick="showDetail(&#39;rm&#39;)">
+      <span class="kpi-icon">🛠️</span>
+      <div class="kpi-name">%RM</div>
+      <div class="kpi-val ok">93.86<span class="kpi-unit">%</span></div>
+      <div class="kpi-target">Obj: ≥ 89.5%</div>
+      <div class="kpi-status ok">✓ Objetivo cumplido</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:94%"></div></div>
+      <div class="kpi-tap">→ detalle</div>
+    </div><div class="kpi-card ok fade-up" onclick="showDetail(&#39;cum&#39;)">
+      <span class="kpi-icon">✅</span>
+      <div class="kpi-name">%Cumplimiento</div>
+      <div class="kpi-val ok">95.10<span class="kpi-unit">%</span></div>
+      <div class="kpi-target">Obj: ≥ 90%</div>
+      <div class="kpi-status ok">✓ Objetivo cumplido</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:94%"></div></div>
+      <div class="kpi-tap">→ detalle</div>
+    </div><div class="kpi-card ok fade-up" onclick="showDetail(&#39;ventas&#39;)">
+      <span class="kpi-icon">💰</span>
+      <div class="kpi-name">Conv/Ventas</div>
+      <div class="kpi-val ok">29.46<span class="kpi-unit">%</span></div>
+      <div class="kpi-target">Obj: ≥ 15%</div>
+      <div class="kpi-status ok">✓ Objetivo cumplido</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
+      <div class="kpi-tap">→ detalle</div>
+    </div><div class="kpi-card ok fade-up" onclick="showDetail(&#39;ventas&#39;)">
+      <span class="kpi-icon">💵</span>
+      <div class="kpi-name">Cobro 20%</div>
+      <div class="kpi-val ok">29.46<span class="kpi-unit">%</span></div>
+      <div class="kpi-target">Obj: ≥ 15%</div>
+      <div class="kpi-status ok">✓ Objetivo cumplido</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
+      <div class="kpi-tap">→ detalle</div>
+    </div><div class="kpi-card ok fade-up">
+        <span class="kpi-icon">💶</span>
+        <div class="kpi-name">Tu 20% €</div>
+        <div class="kpi-val ok">€197.44</div>
+        <div class="kpi-target">20% de €987.20</div>
+        <div class="kpi-status ok">Informativo</div>
+        <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
+      </div><div class="kpi-card ok fade-up">
+      <span class="kpi-icon">⭐</span>
+      <div class="kpi-name">PPA</div>
+      <div class="kpi-val ok">10<span class="kpi-unit">%</span></div>
+      <div class="kpi-target">Obj: ≥ 0%</div>
+      <div class="kpi-status ok">✓ Objetivo cumplido</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
+      
+    </div></div>
+
+    <div class="section-head">Resto de indicadores</div>
+    <div class="other-grid" id="otherGrid"><div class="other-card fade-up">
+      <div class="other-name">Faltantes</div>
+      <div class="other-val" style="color:var(--text)">0</div>
+    </div><div class="other-card fade-up">
+      <div class="other-name">Lab</div>
+      <div class="other-val" style="color:var(--text)">18</div>
+    </div><div class="other-card fade-up">
+      <div class="other-name">Palito</div>
+      <div class="other-val" style="color:var(--text)">130</div>
+    </div><div class="other-card fade-up">
+      <div class="other-name">MPal</div>
+      <div class="other-val" style="color:var(--text)">7.22</div>
+    </div><div class="other-card fade-up">
+      <div class="other-name">Nec</div>
+      <div class="other-val" style="color:var(--text)">126</div>
+    </div><div class="other-card fade-up">
+      <div class="other-name">UVen</div>
+      <div class="other-val" style="color:var(--text)">38.30</div>
+    </div><div class="other-card fade-up">
+      <div class="other-name">A+B</div>
+      <div class="other-val" style="color:var(--text)">151.60</div>
+    </div><div class="other-card fade-up">
+      <div class="other-name">Incum</div>
+      <div class="other-val" style="color:var(--text)">5</div>
+    </div><div class="other-card fade-up">
+      <div class="other-name">Dev</div>
+      <div class="other-val" style="color:#c05040">-0.80</div>
+    </div><div class="other-card fade-up">
+      <div class="other-name">Dev€</div>
+      <div class="other-val" style="color:#c05040">€-100</div>
+    </div></div>
+  </div>
+
+  <div id="detailPanel">
+    <button class="detail-back" id="backBtn">← Volver al panel</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<script>
+const SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2C6LbbD8ovpTC26ZT-hQZfbGQOWTydMWkQ0d8BiyvDrzgRlN1I1kvaJ0k2Cyl37aeQAXPK2JAjaVC/pub?output=csv";
+const FALLBACK_DATA  = {"tecnicos": [{"id": "273371", "nombre": "Armando Jose Madrid", "provincia": "MD", "raw": "JE-MD-273371-Armando Jose Madrid", "lab": 4, "palito": 37, "mpal": 9.25, "mlv": 9.45, "mab": 10.45, "ab": 41.8, "nec": 28, "uven": 4.0, "ventas": 112.0, "p20": 10.81, "conv": 10.81, "falt": 0.0, "rm": 7.0, "pRM": 89.86, "pCum": 91.2, "incum": 3, "ppa": 20.0, "dev": -0.5, "devE": -60.0, "cfl": 0}, {"id": "293800", "nombre": "Luis Jose Rovario", "provincia": "MD", "raw": "E-MD-293800-Luis Jose Rovario", "lab": 18, "palito": 145, "mpal": 8.05555556, "mlv": 9.07777778, "mab": 9.59, "ab": 172.6, "nec": 126, "uven": 37.1, "ventas": 1224.0, "p20": 25.59, "conv": 25.59, "falt": 0.0, "rm": 16.0, "pRM": 84.31, "pCum": 95.4, "incum": 5, "ppa": 15.0, "dev": -1.6, "devE": -200.0, "cfl": 0}, {"id": "312756", "nombre": "Victor Gabriel Morales López", "provincia": "MD", "raw": "E-MD-312756-Victor Gabriel Morales López", "lab": 19, "palito": 135, "mpal": 7.10526316, "mlv": 8.41052632, "mab": 8.62, "ab": 163.8, "nec": 133, "uven": 55.3, "ventas": 1572.0, "p20": 40.96, "conv": 40.96, "falt": 0.0, "rm": 12.0, "pRM": 89.66, "pCum": 95.7, "incum": 4, "ppa": 16.67, "dev": -11.0, "devE": -148.0, "cfl": 0}, {"id": "333528", "nombre": "Irving Daniel Villalobos Gon", "provincia": "MD", "raw": "E-MD-333528-Irving Daniel Villalobos Gon", "lab": 19, "palito": 143, "mpal": 7.52631579, "mlv": 8.41052632, "mab": 8.79, "ab": 167.0, "nec": 133, "uven": 43.2, "ventas": 1176.0, "p20": 30.21, "conv": 30.21, "falt": 0.0, "rm": 11.0, "pRM": 90.35, "pCum": 96.2, "incum": 4, "ppa": 0.0, "dev": -0.5, "devE": -60.0, "cfl": 0}, {"id": "339886", "nombre": "Rafael Carmelo Sainz", "provincia": "MD", "raw": "E-MD-339886-Rafael Carmelo Sainz", "lab": 19, "palito": 141, "mpal": 7.42105263, "mlv": 8.35789474, "mab": 8.68, "ab": 165.0, "nec": 133, "uven": 51.6, "ventas": 1916.0, "p20": 36.6, "conv": 36.6, "falt": 0.0, "rm": 13.0, "pRM": 90.3, "pCum": 96.4, "incum": 4, "ppa": 28.57, "dev": -4.6, "devE": -780.0, "cfl": 0}, {"id": "247472", "nombre": "Carlos Enrique Marcano Moral", "provincia": "MD", "raw": "E-MD-247472-Carlos Enrique Marcano Moral", "lab": 16, "palito": 119, "mpal": 7.4375, "mlv": 8.3125, "mab": 8.56, "ab": 137.0, "nec": 112, "uven": 25.9, "ventas": 760.0, "p20": 21.76, "conv": 21.76, "falt": 0.0, "rm": 9.0, "pRM": 91.18, "pCum": 97.6, "incum": 2, "ppa": 22.22, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "310656", "nombre": "Eliyau Chocron Perez", "provincia": "MD", "raw": "E5-MD-310656-Eliyau Chocron Perez", "lab": 17, "palito": 128, "mpal": 7.52941176, "mlv": 8.27058824, "mab": 8.8, "ab": 149.6, "nec": 119, "uven": 37.1, "ventas": 1000.0, "p20": 28.98, "conv": 28.98, "falt": 0.0, "rm": 11.0, "pRM": 83.08, "pCum": 97.8, "incum": 2, "ppa": 20.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "333156", "nombre": "Brian Anthony Torres Fernán", "provincia": "MD", "raw": "E5-MD-333156-Brian Anthony Torres Fernán", "lab": 18, "palito": 133, "mpal": 7.38888889, "mlv": 8.18888889, "mab": 8.59, "ab": 154.6, "nec": 126, "uven": 28.3, "ventas": 752.0, "p20": 21.28, "conv": 21.28, "falt": 0.0, "rm": 11.0, "pRM": 90.27, "pCum": 92.4, "incum": 8, "ppa": 18.18, "dev": -3.4, "devE": -440.0, "cfl": 0}, {"id": "290754", "nombre": "Ericsson Misael Pereira", "provincia": "MD", "raw": "E-MD-290754-Ericsson Misael Pereira", "lab": 19, "palito": 137, "mpal": 7.21052632, "mlv": 8.14736842, "mab": 8.41, "ab": 159.8, "nec": 133, "uven": 22.2, "ventas": 583.8, "p20": 16.2, "conv": 16.2, "falt": 0.0, "rm": 8.0, "pRM": 89.04, "pCum": 93.1, "incum": 7, "ppa": 20.0, "dev": -1.0, "devE": -140.0, "cfl": 0}, {"id": "286800", "nombre": "Ezequiel Pugliese", "provincia": "BCN", "raw": "JE-BCN-286800-Ezequiel Pugliese", "lab": 18, "palito": 130, "mpal": 7.22222222, "mlv": 8.14444444, "mab": 8.42, "ab": 151.6, "nec": 126, "uven": 38.3, "ventas": 987.2, "p20": 29.46, "conv": 29.46, "falt": 0.0, "rm": 7.0, "pRM": 93.86, "pCum": 95.1, "incum": 5, "ppa": 10.0, "dev": -0.8, "devE": -100.0, "cfl": 0}, {"id": "294898", "nombre": " Bogdan Sebastian Alves", "provincia": "V", "raw": "E-V-294898- Bogdan Sebastian Alves", "lab": 19, "palito": 140, "mpal": 7.36842105, "mlv": 8.12631579, "mab": 8.51, "ab": 161.6, "nec": 133, "uven": 54.0, "ventas": 1452.0, "p20": 38.57, "conv": 38.57, "falt": 0.0, "rm": 15.0, "pRM": 86.49, "pCum": 91.6, "incum": 8, "ppa": 0.0, "dev": -4.9, "devE": -660.0, "cfl": 0}, {"id": "276085", "nombre": "Natasha Adobbato Rojas", "provincia": "MD", "raw": "E-MD-276085-Natasha Adobbato Rojas", "lab": 19, "palito": 135, "mpal": 7.10526316, "mlv": 8.10526316, "mab": 8.37, "ab": 159.0, "nec": 133, "uven": 29.5, "ventas": 929.6, "p20": 21.85, "conv": 21.85, "falt": 0.0, "rm": 11.0, "pRM": 90.0, "pCum": 100.0, "incum": 0, "ppa": 21.05, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "338851", "nombre": "Daniel Alfonso Kolman Go", "provincia": "V", "raw": "E-V-338851-Daniel Alfonso Kolman Go", "lab": 13, "palito": 97, "mpal": 7.46153846, "mlv": 8.07692308, "mab": 8.38, "ab": 109.0, "nec": 91, "uven": 22.8, "ventas": 596.6, "p20": 23.51, "conv": 23.51, "falt": 0.0, "rm": 6.0, "pRM": 88.68, "pCum": 94.4, "incum": 4, "ppa": 0.0, "dev": -1.6, "devE": -200.0, "cfl": 0}, {"id": "274629", "nombre": "Fernando David Alves", "provincia": "V", "raw": "JE-V-274629-Fernando David Alves", "lab": 19, "palito": 153, "mpal": 8.05263158, "mlv": 8.07368421, "mab": 8.49, "ab": 161.4, "nec": 133, "uven": 28.0, "ventas": 677.2, "p20": 18.3, "conv": 18.3, "falt": 0.0, "rm": 16.0, "pRM": 86.21, "pCum": 89.6, "incum": 13, "ppa": 0.0, "dev": -1.8, "devE": -179.0, "cfl": 0}, {"id": "317024", "nombre": "Luis Alejandro Carmona", "provincia": "BCN", "raw": "E-BCN-317024-Luis Alejandro Carmona", "lab": 19, "palito": 133, "mpal": 7.0, "mlv": 8.05263158, "mab": 8.58, "ab": 163.0, "nec": 133, "uven": 30.7, "ventas": 796.4, "p20": 23.08, "conv": 23.08, "falt": 0.0, "rm": 10.0, "pRM": 85.71, "pCum": 93.3, "incum": 8, "ppa": 0.0, "dev": -0.8, "devE": -100.0, "cfl": 0}, {"id": "337583", "nombre": "Yelwuinger Yonfrander Rodríg", "provincia": "MD", "raw": "E-MD-337583-Yelwuinger Yonfrander Rodríg", "lab": 19, "palito": 126, "mpal": 6.63157895, "mlv": 7.95789474, "mab": 8.34, "ab": 158.4, "nec": 133, "uven": 32.7, "ventas": 900.0, "p20": 25.95, "conv": 25.95, "falt": 0.0, "rm": 7.0, "pRM": 93.07, "pCum": 89.6, "incum": 11, "ppa": 6.45, "dev": -2.8, "devE": -380.0, "cfl": 0}, {"id": "340320", "nombre": "Ronaldo José Shigueto Franco", "provincia": "MD", "raw": "E-MD-340320-Ronaldo José Shigueto Franco", "lab": 19, "palito": 136, "mpal": 7.15789474, "mlv": 7.94736842, "mab": 8.48, "ab": 161.2, "nec": 133, "uven": 75.7, "ventas": 2035.8, "p20": 55.66, "conv": 55.66, "falt": 0.0, "rm": 8.0, "pRM": 91.21, "pCum": 93.5, "incum": 6, "ppa": 7.69, "dev": -9.2, "devE": -124.0, "cfl": 0}, {"id": "301193", "nombre": "Arturo Enrique Briceño", "provincia": "MD", "raw": "E-MD-301193-Arturo Enrique Briceño", "lab": 19, "palito": 140, "mpal": 7.36842105, "mlv": 7.91578947, "mab": 8.19, "ab": 155.6, "nec": 133, "uven": 27.2, "ventas": 683.8, "p20": 19.43, "conv": 19.43, "falt": 0.0, "rm": 6.0, "pRM": 85.71, "pCum": 96.0, "incum": 4, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "247470", "nombre": "Bernardo Antonio Marquez", "provincia": "MALL", "raw": "E-MALL-247470-Bernardo Antonio Marquez", "lab": 16, "palito": 111, "mpal": 6.9375, "mlv": 7.8875, "mab": 8.14, "ab": 130.2, "nec": 112, "uven": 15.2, "ventas": 424.0, "p20": 13.69, "conv": 13.69, "falt": 0.0, "rm": 9.0, "pRM": 92.24, "pCum": 84.0, "incum": 15, "ppa": 0.0, "dev": -1.0, "devE": -140.0, "cfl": 0}, {"id": "338071", "nombre": "Luis Enrique Goncalves Benco", "provincia": "MD", "raw": "E-MD-338071-Luis Enrique Goncalves Benco", "lab": 14, "palito": 99, "mpal": 7.07142857, "mlv": 7.84285714, "mab": 8.27, "ab": 115.8, "nec": 98, "uven": 17.9, "ventas": 444.6, "p20": 18.08, "conv": 18.08, "falt": 0.0, "rm": 13.0, "pRM": 85.71, "pCum": 92.5, "incum": 6, "ppa": 14.29, "dev": -4.0, "devE": -437.0, "cfl": 0}, {"id": "302786", "nombre": "Christian Alexander Reyna", "provincia": "BCN", "raw": "E-BCN-302786-Christian Alexander Reyna", "lab": 19, "palito": 127, "mpal": 6.68421053, "mlv": 7.78947368, "mab": 7.95, "ab": 151.0, "nec": 133, "uven": 44.7, "ventas": 1496.0, "p20": 35.2, "conv": 35.2, "falt": 0.0, "rm": 3.0, "pRM": 95.52, "pCum": 93.1, "incum": 7, "ppa": 6.25, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "306055", "nombre": "Luis Augusto Nuñez", "provincia": "MD", "raw": "E-MD-306055-Luis Augusto Nuñez", "lab": 17, "palito": 138, "mpal": 8.11764706, "mlv": 7.65882353, "mab": 9.32, "ab": 158.4, "nec": 119, "uven": 30.3, "ventas": 859.8, "p20": 21.96, "conv": 21.96, "falt": 0.0, "rm": 9.0, "pRM": 91.96, "pCum": 94.5, "incum": 6, "ppa": 11.11, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "318921", "nombre": "Junior Robert Moreno", "provincia": "V", "raw": "E-V-318921-Junior Robert Moreno", "lab": 19, "palito": 128, "mpal": 6.73684211, "mlv": 7.62105263, "mab": 7.62, "ab": 144.8, "nec": 133, "uven": 22.3, "ventas": 780.0, "p20": 17.42, "conv": 17.42, "falt": 0.0, "rm": 11.0, "pRM": 89.22, "pCum": 93.1, "incum": 7, "ppa": 11.11, "dev": -1.8, "devE": -380.0, "cfl": 0}, {"id": "315166", "nombre": "Adrian Arribas Garcia", "provincia": "MD", "raw": "E-MD-315166-Adrian Arribas Garcia", "lab": 19, "palito": 128, "mpal": 6.73684211, "mlv": 7.58947368, "mab": 7.81, "ab": 148.4, "nec": 133, "uven": 35.0, "ventas": 936.0, "p20": 27.34, "conv": 27.34, "falt": 0.0, "rm": 15.0, "pRM": 83.33, "pCum": 96.9, "incum": 3, "ppa": 8.7, "dev": -3.6, "devE": -700.0, "cfl": 0}, {"id": "339251", "nombre": " Luis Antonio De Azevedo Mend", "provincia": "V", "raw": "E-V-339251- Luis Antonio De Azevedo Mend", "lab": 19, "palito": 135, "mpal": 7.10526316, "mlv": 7.56842105, "mab": 8.12, "ab": 154.2, "nec": 133, "uven": 34.0, "ventas": 956.0, "p20": 25.19, "conv": 25.19, "falt": 0.0, "rm": 10.0, "pRM": 90.2, "pCum": 94.1, "incum": 6, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "312440", "nombre": "Yonathan Yoel Diaz", "provincia": "MD", "raw": "E-MD-312440-Yonathan Yoel Diaz", "lab": 19, "palito": 137, "mpal": 7.21052632, "mlv": 7.55789474, "mab": 8.09, "ab": 153.8, "nec": 133, "uven": 23.3, "ventas": 672.0, "p20": 17.01, "conv": 17.01, "falt": 0.0, "rm": 5.0, "pRM": 94.85, "pCum": 91.5, "incum": 8, "ppa": 14.29, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "DY9618", "nombre": "Darwing José Ojeda Castill", "provincia": "MD", "raw": "E5-MD-DY9618-Darwing José Ojeda Castill", "lab": 18, "palito": 127, "mpal": 7.05555556, "mlv": 7.55555556, "mab": 8.19, "ab": 147.4, "nec": 126, "uven": 40.0, "ventas": 1068.0, "p20": 31.5, "conv": 31.5, "falt": 0.0, "rm": 19.0, "pRM": 82.88, "pCum": 91.4, "incum": 9, "ppa": 8.33, "dev": -2.4, "devE": -300.0, "cfl": 0}, {"id": "307113", "nombre": "Jose David Vergara", "provincia": "BCN", "raw": "E-BCN-307113-Jose David Vergara", "lab": 18, "palito": 124, "mpal": 6.88888889, "mlv": 7.47777778, "mab": 7.82, "ab": 140.8, "nec": 126, "uven": 23.3, "ventas": 608.0, "p20": 18.79, "conv": 18.79, "falt": 0.0, "rm": 10.0, "pRM": 89.13, "pCum": 88.3, "incum": 12, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "297373", "nombre": "Jose Daniel Spatuzzi", "provincia": "MD", "raw": "E5-MD-297373-Jose Daniel Spatuzzi", "lab": 19, "palito": 130, "mpal": 6.84210526, "mlv": 7.42105263, "mab": 7.79, "ab": 148.0, "nec": 133, "uven": 25.4, "ventas": 725.8, "p20": 19.54, "conv": 19.54, "falt": 0.0, "rm": 11.0, "pRM": 90.43, "pCum": 87.3, "incum": 13, "ppa": 6.67, "dev": -1.6, "devE": -200.0, "cfl": 0}, {"id": "343017", "nombre": "Hugo Alejandro Ledezma Sanll", "provincia": " V", "raw": "E- V-343017-Hugo Alejandro Ledezma Sanll", "lab": 18, "palito": 124, "mpal": 6.88888889, "mlv": 7.4, "mab": 7.62, "ab": 137.2, "nec": 126, "uven": 23.4, "ventas": 624.0, "p20": 18.87, "conv": 18.87, "falt": 0.0, "rm": 20.0, "pRM": 77.78, "pCum": 88.5, "incum": 12, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "279300", "nombre": "Alexander Xavier Hernandez", "provincia": "V", "raw": "E-V-279300-Alexander Xavier Hernandez", "lab": 14, "palito": 84, "mpal": 6.0, "mlv": 7.38571429, "mab": 7.46, "ab": 104.4, "nec": 98, "uven": 17.2, "ventas": 439.8, "p20": 20.48, "conv": 20.48, "falt": 0.0, "rm": 11.0, "pRM": 88.78, "pCum": 89.9, "incum": 7, "ppa": 0.0, "dev": -2.0, "devE": -239.0, "cfl": 0}, {"id": "356434", "nombre": "Carlos José Vargas Alvarez", "provincia": "MD", "raw": "E-MD-356434-Carlos José Vargas Alvarez", "lab": 14, "palito": 93, "mpal": 6.64285714, "mlv": 7.37142857, "mab": 7.67, "ab": 107.4, "nec": 98, "uven": 15.6, "ventas": 457.6, "p20": 16.77, "conv": 16.77, "falt": 0.0, "rm": 0, "pRM": 100.0, "pCum": 93.8, "incum": 4, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "339887", "nombre": "Manuel Antonio Márquez Cale", "provincia": "MD", "raw": "E-MD-339887-Manuel Antonio Márquez Cale", "lab": 19, "palito": 126, "mpal": 6.63157895, "mlv": 7.36842105, "mab": 7.58, "ab": 144.0, "nec": 133, "uven": 36.8, "ventas": 1088.0, "p20": 29.21, "conv": 29.21, "falt": 0.0, "rm": 8.0, "pRM": 85.96, "pCum": 93.4, "incum": 7, "ppa": 4.35, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "334204", "nombre": "Robert Armando Martínez Garc", "provincia": "MD", "raw": "E-MD-334204-Robert Armando Martínez Garc", "lab": 17, "palito": 123, "mpal": 7.23529412, "mlv": 7.31764706, "mab": 8.22, "ab": 139.8, "nec": 119, "uven": 19.0, "ventas": 487.8, "p20": 15.45, "conv": 15.45, "falt": 0.0, "rm": 8.0, "pRM": 91.58, "pCum": 93.1, "incum": 7, "ppa": 0.0, "dev": -0.8, "devE": -100.0, "cfl": 0}, {"id": "334203", "nombre": "Giancarlo Izquierdo Mireles", "provincia": "MD", "raw": "E-MD-334203-Giancarlo Izquierdo Mireles", "lab": 19, "palito": 133, "mpal": 7.0, "mlv": 7.28421053, "mab": 7.82, "ab": 148.6, "nec": 133, "uven": 37.5, "ventas": 969.6, "p20": 28.2, "conv": 28.2, "falt": 0.0, "rm": 13.0, "pRM": 78.69, "pCum": 90.6, "incum": 11, "ppa": 11.11, "dev": -3.6, "devE": -480.0, "cfl": 0}, {"id": "338045", "nombre": "Vincenzo Agostinho Velard", "provincia": "ALIC", "raw": "E5-ALIC-338045-Vincenzo Agostinho Velard", "lab": 18, "palito": 116, "mpal": 6.44444444, "mlv": 7.24444444, "mab": 7.24, "ab": 130.4, "nec": 126, "uven": 19.7, "ventas": 672.0, "p20": 16.98, "conv": 16.98, "falt": 0.0, "rm": 17.0, "pRM": 83.0, "pCum": 89.7, "incum": 10, "ppa": 0.0, "dev": -2.8, "devE": -456.0, "cfl": 0}, {"id": "239831", "nombre": "Pablo Marques Peñalver", "provincia": "MUR", "raw": "JE-MUR-239831-Pablo Marques Peñalver", "lab": 17, "palito": 106, "mpal": 6.23529412, "mlv": 7.22352941, "mab": 7.22, "ab": 122.8, "nec": 119, "uven": 18.5, "ventas": 504.0, "p20": 17.45, "conv": 17.45, "falt": 0.0, "rm": 14.0, "pRM": 84.27, "pCum": 94.1, "incum": 5, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "296625", "nombre": "Daniel Alejandro Laynez", "provincia": "MUR", "raw": "E-MUR-296625-Daniel Alejandro Laynez", "lab": 18, "palito": 112, "mpal": 6.22222222, "mlv": 7.22222222, "mab": 7.22, "ab": 130.0, "nec": 126, "uven": 19.9, "ventas": 565.6, "p20": 17.77, "conv": 17.77, "falt": 0.0, "rm": 2.0, "pRM": 92.59, "pCum": 96.5, "incum": 3, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356431", "nombre": "Armando José Martínez Castil", "provincia": "MD", "raw": "E-MD-356431-Armando José Martínez Castil", "lab": 19, "palito": 128, "mpal": 6.73684211, "mlv": 7.21052632, "mab": 7.87, "ab": 149.6, "nec": 133, "uven": 41.2, "ventas": 1124.0, "p20": 32.19, "conv": 32.19, "falt": 0.0, "rm": 0, "pRM": 100.0, "pCum": 90.7, "incum": 8, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "295342", "nombre": " Roberto Gonzalez Guerrero", "provincia": "V", "raw": "E-V-295342- Roberto Gonzalez Guerrero", "lab": 19, "palito": 124, "mpal": 6.52631579, "mlv": 7.11578947, "mab": 7.54, "ab": 143.2, "nec": 133, "uven": 19.7, "ventas": 516.0, "p20": 15.89, "conv": 15.89, "falt": 0.0, "rm": 8.0, "pRM": 85.19, "pCum": 94.8, "incum": 5, "ppa": 0.0, "dev": -0.8, "devE": -100.0, "cfl": 0}, {"id": "313824", "nombre": "Alexis Alejandro Silva", "provincia": "MD", "raw": "E-MD-313824-Alexis Alejandro Silva", "lab": 19, "palito": 121, "mpal": 6.36842105, "mlv": 7.07368421, "mab": 7.51, "ab": 142.6, "nec": 133, "uven": 30.4, "ventas": 836.0, "p20": 25.12, "conv": 25.12, "falt": 0.0, "rm": 9.0, "pRM": 75.0, "pCum": 94.9, "incum": 5, "ppa": 0.0, "dev": -0.8, "devE": -100.0, "cfl": 0}, {"id": "277029", "nombre": "Juan Victor Gonzalez", "provincia": "ALIC", "raw": "E5-ALIC-277029-Juan Victor Gonzalez", "lab": 18, "palito": 108, "mpal": 6.0, "mlv": 7.06666667, "mab": 7.07, "ab": 127.2, "nec": 126, "uven": 13.2, "ventas": 344.0, "p20": 12.22, "conv": 12.22, "falt": 0.0, "rm": 12.0, "pRM": 85.54, "pCum": 84.5, "incum": 15, "ppa": 0.0, "dev": -1.6, "devE": -200.0, "cfl": 0}, {"id": "308264", "nombre": "Jose Antonio Valero", "provincia": "V", "raw": "E-V-308264-Jose Antonio Valero", "lab": 16, "palito": 104, "mpal": 6.5, "mlv": 7.0625, "mab": 7.25, "ab": 116.0, "nec": 112, "uven": 19.8, "ventas": 532.0, "p20": 19.04, "conv": 19.04, "falt": 0.0, "rm": 8.0, "pRM": 90.7, "pCum": 89.2, "incum": 10, "ppa": 0.0, "dev": -2.0, "devE": -280.0, "cfl": 0}, {"id": "353969", "nombre": "Carlos Luis Sánchez Rus", "provincia": "MD", "raw": "E-MD-353969-Carlos Luis Sánchez Rus", "lab": 19, "palito": 119, "mpal": 6.26315789, "mlv": 7.04210526, "mab": 7.46, "ab": 141.8, "nec": 133, "uven": 22.3, "ventas": 619.6, "p20": 18.74, "conv": 18.74, "falt": 0.0, "rm": 13.0, "pRM": 86.73, "pCum": 92.5, "incum": 7, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "303760", "nombre": "Jose Vicente Toro", "provincia": "BCN", "raw": "E-BCN-303760-Jose Vicente Toro", "lab": 16, "palito": 102, "mpal": 6.375, "mlv": 7.025, "mab": 7.73, "ab": 123.6, "nec": 112, "uven": 24.9, "ventas": 712.0, "p20": 24.41, "conv": 24.41, "falt": 0.0, "rm": 11.0, "pRM": 87.5, "pCum": 92.0, "incum": 7, "ppa": 0.0, "dev": -0.5, "devE": -60.0, "cfl": 0}, {"id": "299538", "nombre": "Amado Rafael Lopez", "provincia": "MD", "raw": "E-MD-299538-Amado Rafael Lopez", "lab": 19, "palito": 130, "mpal": 6.84210526, "mlv": 7.02105263, "mab": 7.66, "ab": 145.6, "nec": 133, "uven": 35.3, "ventas": 913.4, "p20": 27.15, "conv": 27.15, "falt": 0.0, "rm": 10.0, "pRM": 89.58, "pCum": 95.5, "incum": 4, "ppa": 7.69, "dev": -2.6, "devE": -340.0, "cfl": 0}, {"id": "336919", "nombre": " Jeyson Daniel Gainza Jaure", "provincia": "BCN", "raw": "E-BCN-336919- Jeyson Daniel Gainza Jaure", "lab": 16, "palito": 105, "mpal": 6.5625, "mlv": 7.0125, "mab": 7.39, "ab": 118.2, "nec": 112, "uven": 22.0, "ventas": 559.8, "p20": 20.95, "conv": 20.95, "falt": 0.0, "rm": 6.0, "pRM": 93.02, "pCum": 96.3, "incum": 3, "ppa": 0.0, "dev": -0.5, "devE": -60.0, "cfl": 0}, {"id": "Q14001", "nombre": "Carlos Enrique Pernas", "provincia": "BCN", "raw": "E5-BCN-Q14001-Carlos Enrique Pernas", "lab": 15, "palito": 95, "mpal": 6.33333333, "mlv": 6.97333333, "mab": 7.45, "ab": 111.8, "nec": 105, "uven": 18.9, "ventas": 524.0, "p20": 19.89, "conv": 19.89, "falt": 0.0, "rm": 12.0, "pRM": 84.62, "pCum": 92.3, "incum": 6, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "333158", "nombre": "Paloma Vélez González", "provincia": "MUR", "raw": "E-MUR-333158-Paloma Vélez González", "lab": 18, "palito": 123, "mpal": 6.83333333, "mlv": 6.9, "mab": 7.63, "ab": 137.4, "nec": 126, "uven": 18.7, "ventas": 492.0, "p20": 15.2, "conv": 15.2, "falt": 0.0, "rm": 2.0, "pRM": 92.0, "pCum": 97.0, "incum": 3, "ppa": 0.0, "dev": -0.5, "devE": -60.0, "cfl": 0}, {"id": "JC5863", "nombre": "Jesus Marques Peñalver", "provincia": "MUR", "raw": "E-MUR-JC5863-Jesus Marques Peñalver", "lab": 18, "palito": 106, "mpal": 5.88888889, "mlv": 6.87777778, "mab": 7.16, "ab": 128.8, "nec": 126, "uven": 17.5, "ventas": 435.2, "p20": 16.51, "conv": 16.51, "falt": 0.0, "rm": 14.0, "pRM": 83.13, "pCum": 89.9, "incum": 9, "ppa": 0.0, "dev": -0.8, "devE": -100.0, "cfl": 0}, {"id": "301653", "nombre": "Juan Manuel Rodriguez", "provincia": "MD", "raw": "E5-MD-301653-Juan Manuel Rodriguez", "lab": 19, "palito": 128, "mpal": 6.73684211, "mlv": 6.83157895, "mab": 7.37, "ab": 140.0, "nec": 133, "uven": 20.6, "ventas": 556.0, "p20": 16.09, "conv": 16.09, "falt": 0.0, "rm": 7.0, "pRM": 92.13, "pCum": 95.4, "incum": 4, "ppa": 0.0, "dev": -0.5, "devE": -60.0, "cfl": 0}, {"id": "314303", "nombre": "Marco Cavallera Carvalho", "provincia": "MD", "raw": "E-MD-314303-Marco Cavallera Carvalho", "lab": 17, "palito": 109, "mpal": 6.41176471, "mlv": 6.82352941, "mab": 7.19, "ab": 122.2, "nec": 119, "uven": 20.0, "ventas": 503.8, "p20": 18.35, "conv": 18.35, "falt": 0.0, "rm": 21.0, "pRM": 77.42, "pCum": 88.2, "incum": 11, "ppa": 0.0, "dev": -1.8, "devE": -240.0, "cfl": 0}, {"id": "286106", "nombre": "Enzo Guccione Kert", "provincia": "V", "raw": "E-V-286106-Enzo Guccione Kert", "lab": 16, "palito": 97, "mpal": 6.0625, "mlv": 6.7875, "mab": 7.11, "ab": 113.8, "nec": 112, "uven": 15.6, "ventas": 403.8, "p20": 16.08, "conv": 16.08, "falt": 0.0, "rm": 0, "pRM": 100.0, "pCum": 90.6, "incum": 8, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356432", "nombre": "Carlos Augusto Chipman Brice", "provincia": "MD", "raw": "E-MD-356432-Carlos Augusto Chipman Brice", "lab": 19, "palito": 127, "mpal": 6.68421053, "mlv": 6.75789474, "mab": 7.19, "ab": 136.6, "nec": 133, "uven": 20.1, "ventas": 584.0, "p20": 15.83, "conv": 15.83, "falt": 0.0, "rm": 0, "pRM": 100.0, "pCum": 92.8, "incum": 6, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "314302", "nombre": "Ramon Varela", "provincia": "MD", "raw": "E-MD-314302-Ramon Varela", "lab": 19, "palito": 123, "mpal": 6.47368421, "mlv": 6.74736842, "mab": 7.55, "ab": 143.4, "nec": 133, "uven": 22.6, "ventas": 680.0, "p20": 18.37, "conv": 18.37, "falt": 0.0, "rm": 16.0, "pRM": 84.91, "pCum": 93.1, "incum": 7, "ppa": 27.27, "dev": -0.5, "devE": -60.0, "cfl": 0}, {"id": "310306", "nombre": "Christopher Hamilton Moria", "provincia": "MD", "raw": "E-MD-310306-Christopher Hamilton Moria", "lab": 19, "palito": 117, "mpal": 6.15789474, "mlv": 6.71578947, "mab": 7.36, "ab": 139.8, "nec": 133, "uven": 22.8, "ventas": 615.8, "p20": 19.49, "conv": 19.49, "falt": 0.0, "rm": 21.0, "pRM": 76.4, "pCum": 88.9, "incum": 10, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "317492", "nombre": "Edwin Giovanny Tituaña", "provincia": "BCN", "raw": "E-BCN-317492-Edwin Giovanny Tituaña", "lab": 19, "palito": 106, "mpal": 5.57894737, "mlv": 6.68421053, "mab": 6.91, "ab": 131.2, "nec": 133, "uven": 14.8, "ventas": 403.8, "p20": 13.96, "conv": 13.96, "falt": 1.8, "rm": 3.0, "pRM": 92.68, "pCum": 88.7, "incum": 11, "ppa": 8.33, "dev": -2.0, "devE": -280.0, "cfl": 0}, {"id": "337588", "nombre": "Carvic Ordóñez Salas", "provincia": "V", "raw": "E-V-337588-Carvic Ordóñez Salas", "lab": 7, "palito": 43, "mpal": 6.14285714, "mlv": 6.6, "mab": 7.34, "ab": 51.4, "nec": 49, "uven": 9.8, "ventas": 288.0, "p20": 22.79, "conv": 22.79, "falt": 0.0, "rm": 0, "pRM": 100.0, "pCum": 92.6, "incum": 2, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "286596", "nombre": "Henry Adrian Garcia", "provincia": "V", "raw": "E-V-286596-Henry Adrian Garcia", "lab": 19, "palito": 121, "mpal": 6.36842105, "mlv": 6.58947368, "mab": 7.51, "ab": 142.6, "nec": 133, "uven": 30.9, "ventas": 873.6, "p20": 25.54, "conv": 25.54, "falt": 0.0, "rm": 9.0, "pRM": 89.66, "pCum": 91.8, "incum": 8, "ppa": 0.0, "dev": -1.5, "devE": -220.0, "cfl": 0}, {"id": "356458", "nombre": "Rodrigo Ignacio Fusco Zeiden", "provincia": "MD", "raw": "E-MD-356458-Rodrigo Ignacio Fusco Zeiden", "lab": 19, "palito": 117, "mpal": 6.15789474, "mlv": 6.55789474, "mab": 6.98, "ab": 132.6, "nec": 133, "uven": 20.3, "ventas": 556.0, "p20": 17.35, "conv": 17.35, "falt": 0.4, "rm": 0, "pRM": 100.0, "pCum": 87.6, "incum": 12, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "301652", "nombre": "Blas Alejandro Rojas", "provincia": "MD", "raw": "E-MD-301652-Blas Alejandro Rojas", "lab": 19, "palito": 120, "mpal": 6.31578947, "mlv": 6.53684211, "mab": 7.01, "ab": 133.2, "nec": 133, "uven": 20.2, "ventas": 454.8, "p20": 16.83, "conv": 16.83, "falt": 0.0, "rm": 8.0, "pRM": 90.59, "pCum": 87.7, "incum": 13, "ppa": 6.67, "dev": -1.0, "devE": -140.0, "cfl": 0}, {"id": "Q30909", "nombre": "Daniel Enrique Gonzalez", "provincia": "MD", "raw": "E-MD-Q30909-Daniel Enrique Gonzalez", "lab": 17, "palito": 100, "mpal": 5.88235294, "mlv": 6.50588235, "mab": 6.8, "ab": 115.6, "nec": 119, "uven": 30.3, "ventas": 787.8, "p20": 30.3, "conv": 30.3, "falt": 3.4, "rm": 12.0, "pRM": 85.37, "pCum": 90.5, "incum": 8, "ppa": 0.0, "dev": -2.3, "devE": -259.0, "cfl": 0}, {"id": "310655", "nombre": "Joan Francisco Valero", "provincia": "V", "raw": "E-V-310655-Joan Francisco Valero", "lab": 19, "palito": 121, "mpal": 6.36842105, "mlv": 6.47368421, "mab": 7.19, "ab": 136.6, "nec": 133, "uven": 22.6, "ventas": 597.2, "p20": 18.68, "conv": 18.68, "falt": 0.0, "rm": 8.0, "pRM": 91.3, "pCum": 91.2, "incum": 9, "ppa": 0.0, "dev": -0.8, "devE": -100.0, "cfl": 0}, {"id": "336469", "nombre": "José Manuel Larez Salazar", "provincia": "V", "raw": "E-V-336469-José Manuel Larez Salazar", "lab": 16, "palito": 105, "mpal": 6.5625, "mlv": 6.4625, "mab": 7.09, "ab": 113.4, "nec": 112, "uven": 21.8, "ventas": 609.33, "p20": 20.76, "conv": 20.76, "falt": 0.0, "rm": 16.0, "pRM": 80.72, "pCum": 92.0, "incum": 7, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "336070", "nombre": "Edixon José González Muñoz", "provincia": "MUR", "raw": "E-MUR-336070-Edixon José González Muñoz", "lab": 18, "palito": 119, "mpal": 6.61111111, "mlv": 6.45555556, "mab": 7.48, "ab": 134.6, "nec": 126, "uven": 19.1, "ventas": 524.0, "p20": 16.05, "conv": 16.05, "falt": 0.0, "rm": 10.0, "pRM": 88.1, "pCum": 93.9, "incum": 6, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356426", "nombre": "Abraham José Pérez Naborre", "provincia": "MD", "raw": "E-MD-356426-Abraham José Pérez Naborre", "lab": 19, "palito": 109, "mpal": 5.73684211, "mlv": 6.4, "mab": 7.0, "ab": 133.0, "nec": 133, "uven": 9.9, "ventas": 252.0, "p20": 9.08, "conv": 9.08, "falt": 0.0, "rm": 0, "pRM": 100.0, "pCum": 97.6, "incum": 2, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356442", "nombre": "Iker Xavier Urizarbarrena Fe", "provincia": "MD", "raw": "E-MD-356442-Iker Xavier Urizarbarrena Fe", "lab": 19, "palito": 109, "mpal": 5.73684211, "mlv": 6.4, "mab": 6.56, "ab": 124.6, "nec": 133, "uven": 6.7, "ventas": 180.0, "p20": 6.15, "conv": 6.15, "falt": 8.4, "rm": 0, "pRM": 100.0, "pCum": 95.2, "incum": 4, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356440", "nombre": "Hadid José Alvarez Flautes", "provincia": "MD", "raw": "E-MD-356440-Hadid José Alvarez Flautes", "lab": 19, "palito": 107, "mpal": 5.63157895, "mlv": 6.13684211, "mab": 6.52, "ab": 123.8, "nec": 133, "uven": 9.2, "ventas": 252.0, "p20": 8.6, "conv": 8.6, "falt": 9.2, "rm": 0, "pRM": 100.0, "pCum": 91.3, "incum": 9, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "338399", "nombre": "Egler José Cadena Serpa", "provincia": "MA", "raw": "E-MA-338399-Egler José Cadena Serpa", "lab": 3, "palito": 18, "mpal": 6.0, "mlv": 6.0, "mab": 6.0, "ab": 18.0, "nec": 21, "uven": 1.0, "ventas": 28.0, "p20": 5.56, "conv": 5.56, "falt": 3.0, "rm": 0, "pRM": 100.0, "pCum": 100.0, "incum": 0, "ppa": 0.0, "dev": -3.0, "devE": -660.0, "cfl": 0}, {"id": "356461", "nombre": "Wilmer José Chávez Brito", "provincia": "MD", "raw": "E-MD-356461-Wilmer José Chávez Brito", "lab": 11, "palito": 59, "mpal": 5.36363636, "mlv": 5.98181818, "mab": 6.45, "ab": 71.0, "nec": 77, "uven": 5.3, "ventas": 168.0, "p20": 8.98, "conv": 8.98, "falt": 6.0, "rm": 0, "pRM": 100.0, "pCum": 88.7, "incum": 6, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356441", "nombre": "Hector Rafael Pérez García", "provincia": "MD", "raw": "E-MD-356441-Hector Rafael Pérez García", "lab": 17, "palito": 87, "mpal": 5.11764706, "mlv": 5.97647059, "mab": 6.04, "ab": 102.6, "nec": 119, "uven": 18.4, "ventas": 512.0, "p20": 21.15, "conv": 21.15, "falt": 16.4, "rm": 0, "pRM": 100.0, "pCum": 93.2, "incum": 5, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356980", "nombre": "Reyner Jesús González Valder", "provincia": "MD", "raw": "E-MD-356980-Reyner Jesús González Valder", "lab": 16, "palito": 90, "mpal": 5.625, "mlv": 5.925, "mab": 6.38, "ab": 102.0, "nec": 112, "uven": 13.7, "ventas": 360.0, "p20": 15.22, "conv": 15.22, "falt": 10.0, "rm": 0, "pRM": 100.0, "pCum": 96.8, "incum": 2, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "E-V- 356427- Andrés Enrique Riccio Par", "nombre": "E-V- 356427- Andrés Enrique Riccio Par", "provincia": "", "raw": "E-V- 356427- Andrés Enrique Riccio Par", "lab": 19, "palito": 115, "mpal": 6.05263158, "mlv": 5.89473684, "mab": 6.37, "ab": 121.0, "nec": 133, "uven": 11.6, "ventas": 376.0, "p20": 10.09, "conv": 10.09, "falt": 12.0, "rm": 0, "pRM": 100.0, "pCum": 91.8, "incum": 7, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "357636", "nombre": " Franco Maximiliano Maffioni", "provincia": "V", "raw": "E-V-357636- Franco Maximiliano Maffioni", "lab": 12, "palito": 63, "mpal": 5.25, "mlv": 5.61666667, "mab": 5.95, "ab": 71.4, "nec": 84, "uven": 3.6, "ventas": 96.0, "p20": 5.71, "conv": 5.71, "falt": 12.6, "rm": 0, "pRM": 100.0, "pCum": 92.0, "incum": 2, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356429", "nombre": "Angelo Manuel Rizzuti Rengif", "provincia": "MD", "raw": "E-MD-356429-Angelo Manuel Rizzuti Rengif", "lab": 16, "palito": 83, "mpal": 5.1875, "mlv": 5.6, "mab": 5.86, "ab": 93.8, "nec": 112, "uven": 18.9, "ventas": 516.0, "p20": 22.77, "conv": 22.77, "falt": 18.2, "rm": 0, "pRM": 100.0, "pCum": 88.9, "incum": 9, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "342074", "nombre": "Mario Jesús Coba Rodríguez", "provincia": "BCN", "raw": "E-BCN-342074-Mario Jesús Coba Rodríguez", "lab": 3, "palito": 13, "mpal": 4.33333333, "mlv": 5.53333333, "mab": 5.53, "ab": 16.6, "nec": 21, "uven": 0, "ventas": 0.0, "p20": 0.0, "conv": 0.0, "falt": 4.4, "rm": 0, "pRM": 100.0, "pCum": 66.7, "incum": 1, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "357633", "nombre": "Krystiam José Maicabare Fran", "provincia": "MD", "raw": "E-MD-357633-Krystiam José Maicabare Fran", "lab": 12, "palito": 61, "mpal": 5.08333333, "mlv": 5.38333333, "mab": 5.38, "ab": 64.6, "nec": 84, "uven": 10.3, "ventas": 265.6, "p20": 16.89, "conv": 16.89, "falt": 19.4, "rm": 0, "pRM": 100.0, "pCum": 93.8, "incum": 2, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356463", "nombre": "María Alejandra Pérez Reyes", "provincia": "MD", "raw": "E-MD-356463-María Alejandra Pérez Reyes", "lab": 19, "palito": 100, "mpal": 5.26315789, "mlv": 5.34736842, "mab": 5.77, "ab": 109.6, "nec": 133, "uven": 9.3, "ventas": 264.0, "p20": 9.3, "conv": 9.3, "falt": 23.4, "rm": 0, "pRM": 100.0, "pCum": 92.1, "incum": 6, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356445", "nombre": "José Manuel Casas Vilchez", "provincia": "MD", "raw": "E-MD-356445-José Manuel Casas Vilchez", "lab": 19, "palito": 98, "mpal": 5.15789474, "mlv": 5.30526316, "mab": 5.73, "ab": 108.8, "nec": 133, "uven": 15.0, "ventas": 396.0, "p20": 15.31, "conv": 15.31, "falt": 24.2, "rm": 0, "pRM": 100.0, "pCum": 87.5, "incum": 10, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356444", "nombre": " Johann Alejandro Dean Vilc", "provincia": " V", "raw": "E- V-356444- Johann Alejandro Dean Vilc", "lab": 19, "palito": 98, "mpal": 5.15789474, "mlv": 5.26315789, "mab": 5.47, "ab": 104.0, "nec": 133, "uven": 9.9, "ventas": 247.0, "p20": 10.1, "conv": 10.1, "falt": 29.0, "rm": 0, "pRM": 100.0, "pCum": 95.9, "incum": 3, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356448", "nombre": "Juan Carlos Hernández Villeg", "provincia": "MD", "raw": "E-MD-356448-Juan Carlos Hernández Villeg", "lab": 19, "palito": 89, "mpal": 4.68421053, "mlv": 5.12631579, "mab": 5.44, "ab": 103.4, "nec": 133, "uven": 10.0, "ventas": 284.0, "p20": 11.24, "conv": 11.24, "falt": 29.6, "rm": 0, "pRM": 100.0, "pCum": 84.1, "incum": 14, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356452", "nombre": "Luis Alfredo Peña Camacaro", "provincia": "MD", "raw": "E-MD-356452-Luis Alfredo Peña Camacaro", "lab": 19, "palito": 86, "mpal": 4.52631579, "mlv": 4.97894737, "mab": 5.41, "ab": 102.8, "nec": 133, "uven": 5.0, "ventas": 124.0, "p20": 5.81, "conv": 5.81, "falt": 30.2, "rm": 0, "pRM": 100.0, "pCum": 90.1, "incum": 9, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356460", "nombre": "William Alexander Nieto Garc", "provincia": "MD", "raw": "E-MD-356460-William Alexander Nieto Garc", "lab": 19, "palito": 93, "mpal": 4.89473684, "mlv": 4.72631579, "mab": 5.15, "ab": 97.8, "nec": 133, "uven": 13.4, "ventas": 400.0, "p20": 14.41, "conv": 14.41, "falt": 35.2, "rm": 0, "pRM": 100.0, "pCum": 92.5, "incum": 5, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "357641", "nombre": "Matheo Ghio", "provincia": "ALIC", "raw": "E-ALIC-357641-Matheo Ghio", "lab": 11, "palito": 45, "mpal": 4.09090909, "mlv": 4.63636364, "mab": 4.64, "ab": 51.0, "nec": 77, "uven": 0.8, "ventas": 20.0, "p20": 1.78, "conv": 1.78, "falt": 26.0, "rm": 0, "pRM": 100.0, "pCum": 86.1, "incum": 5, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "359193", "nombre": "Ricardo Alberto De Jesus Sar", "provincia": "MD", "raw": "E-MD-359193-Ricardo Alberto De Jesus Sar", "lab": 2, "palito": 9, "mpal": 4.5, "mlv": 4.5, "mab": 4.5, "ab": 9.0, "nec": 14, "uven": 0, "ventas": 0.0, "p20": 0.0, "conv": 0.0, "falt": 5.0, "rm": 0, "pRM": 100.0, "pCum": 0.0, "incum": 0, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356455", "nombre": " Robert Xavier Tamayo Herná", "provincia": "V", "raw": "E-V-356455- Robert Xavier Tamayo Herná", "lab": 19, "palito": 89, "mpal": 4.68421053, "mlv": 4.49473684, "mab": 4.81, "ab": 91.4, "nec": 133, "uven": 7.9, "ventas": 200.0, "p20": 8.88, "conv": 8.88, "falt": 41.6, "rm": 0, "pRM": 100.0, "pCum": 93.4, "incum": 5, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "356443", "nombre": "Jesús Eduardo Monzón Oviedo", "provincia": "MUR", "raw": "E-MUR-356443-Jesús Eduardo Monzón Oviedo", "lab": 17, "palito": 70, "mpal": 4.11764706, "mlv": 4.4, "mab": 4.4, "ab": 74.8, "nec": 119, "uven": 7.1, "ventas": 180.0, "p20": 10.14, "conv": 10.14, "falt": 44.2, "rm": 0, "pRM": 100.0, "pCum": 82.1, "incum": 14, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "358717", "nombre": "José Francisco Martínez Rub", "provincia": "BCN", "raw": "E-BCN-358717-José Francisco Martínez Rub", "lab": 7, "palito": 26, "mpal": 3.71428571, "mlv": 4.11428571, "mab": 4.4, "ab": 30.8, "nec": 49, "uven": 5.4, "ventas": 132.0, "p20": 20.77, "conv": 20.77, "falt": 18.2, "rm": 0, "pRM": 100.0, "pCum": 75.0, "incum": 6, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "316650", "nombre": "Alex Gabriel Pereira", "provincia": "MALL", "raw": "E-MALL-316650-Alex Gabriel Pereira", "lab": 1, "palito": 4, "mpal": 4.0, "mlv": 4.0, "mab": 4.0, "ab": 4.0, "nec": 7, "uven": 0, "ventas": 0.0, "p20": 0.0, "conv": 0.0, "falt": 3.0, "rm": 4.0, "pRM": 89.47, "pCum": 100.0, "incum": 0, "ppa": 0.0, "dev": -1.0, "devE": -140.0, "cfl": 0}, {"id": "358721", "nombre": "José Alexander García Rojas", "provincia": "MUR", "raw": "E-MUR-358721-José Alexander García Rojas", "lab": 3, "palito": 10, "mpal": 3.33333333, "mlv": 3.73333333, "mab": 3.73, "ab": 11.2, "nec": 21, "uven": 0, "ventas": 0.0, "p20": 0.0, "conv": 0.0, "falt": 9.8, "rm": 0, "pRM": 100.0, "pCum": 75.0, "incum": 1, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "359189", "nombre": "Ricardo Nunes Blanco", "provincia": "BCN", "raw": "E-BCN-359189-Ricardo Nunes Blanco", "lab": 2, "palito": 7, "mpal": 3.5, "mlv": 3.5, "mab": 3.5, "ab": 7.0, "nec": 14, "uven": 2.4, "ventas": 60.0, "p20": 34.29, "conv": 34.29, "falt": 7.0, "rm": 0, "pRM": 100.0, "pCum": 0.0, "incum": 0, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}, {"id": "Q30910", "nombre": "Claudio Febres DeMartini", "provincia": "", "raw": "Q30910-Claudio Febres DeMartini", "lab": 2, "palito": 6, "mpal": 3.0, "mlv": 3.0, "mab": 3.0, "ab": 6.0, "nec": 14, "uven": 1.0, "ventas": 24.0, "p20": 16.67, "conv": 16.67, "falt": 8.0, "rm": 0, "pRM": 100.0, "pCum": 0.0, "incum": 0, "ppa": 0.0, "dev": 0.0, "devE": 0.0, "cfl": 0}]};
+let CURRENT_DATA = FALLBACK_DATA;
+let CURRENT_TEC  = null;
+
+// ── Grade logic: ≥8 best | ≥7.5 good | ≥7 ok | <7 bad ──
+function getGrade(val){
+  if(val>=8)   return 'best';
+  if(val>=7.5) return 'best';
+  if(val>=7)   return 'best';
+  if(val>=6.5) return 'ok';
+  return 'bad';
+}
+function gradeLabel(g){
+  return g==='best'?'En objetivo ≥7':g==='ok'?'Cerca ≥6.5':'Mejorable <6.5';
+}
+function gradeColor(g){
+  return g==='best'?'var(--green2)':g==='good'?'var(--gold2)':g==='ok'?'var(--orange)':'#e05a4a';
+}
+
+// ── KPI status ──
+const KPI_CONFIG=[
+  {key:'pRM',  label:'%RM',          icon:'🛠️',unit:'%',min:89.5,detail:'rm'},
+  {key:'pCum', label:'%Cumplimiento',icon:'✅', unit:'%',min:90.0,detail:'cum'},
+  {key:'conv', label:'Conv/Ventas',  icon:'💰', unit:'%',min:15.0,detail:'ventas'},
+  {key:'p20',  label:'Cobro 20%',    icon:'💵', unit:'%', min:15.0, detail:'ventas'},
+  {key:'ventas20', label:'Tu 20% €', icon:'💶', unit:'€', info:true},
+  {key:'ppa',  label:'PPA',          icon:'⭐', unit:'%',min:0,   detail:null},
+  // CFL: no disponible en este periodo
+];
+const OTHER_KEYS=[
+  {key:'falt',label:'Faltantes'},{key:'lab',label:'Lab'},{key:'palito',label:'Palito'},
+  {key:'mpal',label:'MPal'},{key:'nec',label:'Nec'},
+  {key:'uven',label:'UVen'},{key:'ab',label:'A+B'},
+  {key:'incum',label:'Incum'},
+  {key:'dev',label:'Dev'},{key:'devE',label:'Dev€',prefix:'€'},
+];
+
+function getStatus(cfg,val){
+  if(cfg.max!==undefined) return val<=cfg.max?'ok':'bad';
+  return val>=cfg.min?'ok':val>=cfg.min*.96?'warn':'bad';
+}
+function getBarPct(cfg,val){
+  if(cfg.max!==undefined) return val===0?100:0;
+  return Math.min(100,Math.round((val/(cfg.min*1.12))*100));
+}
+function statusLabel(s){
+  return s==='ok'?'✓ Objetivo cumplido':s==='warn'?'⚠ Cerca del objetivo':'✗ Por debajo';
+}
+
+// ── CSV loader ──
+function parseCSV(text){
+  const lines=text.trim().split('\n');
+  const hdrs=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+  return lines.slice(1).map(line=>{
+    const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));
+    const o={};hdrs.forEach((h,i)=>o[h]=vals[i]||'');return o;
+  });
+}
+function cleanPct(v){return parseFloat(String(v||'0').replace(/%|€|\s/g,'').replace(',','.').trim())||0}
+function cleanNum(v){
+  const s=String(v||'0').trim(),p=s.split('.');
+  if(p.length===3)try{return parseFloat(p[0][0]+'.'+p[0].slice(1)+p[1]+p[2])}catch(e){}
+  return parseFloat(s.replace(',','.'))||0;
+}
+function cleanMoney(v){
+  // "€ 1,224.00" → comma=thousands, dot=decimal → strip comma
+  const s=String(v||'0').replace(/€|\s/g,'').trim();
+  const neg=s.startsWith('-');
+  const n=parseFloat(s.replace('-','').replace(',',''))||0;
+  return neg?-n:n;
+}
+function csvRow(r){
+  const parts=r['Técnico'].split('-');let idx=null;
+  for(let i=0;i<parts.length;i++)
+    if(/^\d{5,}$/.test(parts[i])||/^[A-Z]{1,2}\d{4,}$/.test(parts[i])){idx=i;break}
+  const info=idx!==null
+    ?{id:parts[idx],nombre:parts.slice(idx+1).join(' '),provincia:idx>=1?parts[idx-1]:''}
+    :{id:r['Técnico'],nombre:r['Técnico'],provincia:''};
+  return{...info,raw:r['Técnico'],
+    lab:parseInt(r['Lab'])||0,palito:parseInt(r['Palito'])||0,
+    mpal:cleanNum(r['MPal']),mlv:cleanNum(r['ML-V']),
+    mab:parseFloat((r['MA+B']||'0').replace(',','.'))||0,
+    ab:parseFloat((r['A+B']||'0').replace(',','.'))||0,
+    nec:parseInt(r['Nec'])||0,
+    uven:parseFloat((r['Ventas']||'0').replace(',','.'))||0,  // unidades
+    ventas:cleanMoney(r['20%']),   // euros reales
+    conv:cleanPct(r['Conv']),p20:cleanPct(r['Conv']),
+    falt:parseFloat((r['Falt']||'0').replace(',','.'))||0,
+    rm:parseFloat((r['RM']||'0').replace(',','.'))||0,
+    pRM:cleanPct(r['%RM']),pCum:cleanPct(r['%Cum']),
+    incum:parseInt(r['Incum'])||0,ppa:cleanPct(r['PPA']),
+    dev:parseFloat((r['Dev']||'0').replace(',','.'))||0,
+    devE:cleanMoney(r['Dev.1']||'0'),
+    cfl:parseFloat((r['CFL']||'0').replace(',','.'))||0,
+  };
+}
+async function loadSheets(){
+  if(!SHEETS_CSV_URL.includes('docs.google.com'))return;
+  try{
+    const res=await fetch(SHEETS_CSV_URL);
+    const tecs=parseCSV(await res.text()).filter(r=>r['Técnico']).map(csvRow);
+    if(tecs.length)CURRENT_DATA={tecnicos:tecs};
+  }catch(e){console.log('Usando datos locales')}
+}
+
+// ── RENDER MAIN ──
+function renderMain(tec){
+  CURRENT_TEC=tec;
+  document.getElementById('topbarName').textContent=tec.nombre;
+  document.getElementById('topbarId').textContent=tec.id+' · '+tec.provincia;
+  document.getElementById('lastUpdate').textContent=
+    new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
+
+  const results=KPI_CONFIG.map(k=>getStatus(k,tec[k.key]));
+  const okN=results.filter(r=>r==='ok').length;
+  const badN=results.filter(r=>r==='bad').length;
+  const pct=Math.round(okN/KPI_CONFIG.length*100);
+  const rc=pct>=80?'#3daa6e':pct>=50?'#d4831a':'#c0392b';
+  document.getElementById('scorePill').innerHTML=
+    `<span style="color:${rc};font-weight:700">${okN}/${KPI_CONFIG.length}</span>&nbsp;<span style="color:#7a6840">objetivos</span>`;
+
+  // HERO: ML-V arriba, MA+B abajo — ambos con 4 niveles
+  const mlvG=getGrade(tec.mlv),mabG=getGrade(tec.mab);
+  const scaleColors=['#c0392b','#d4831a','#c9a84c','#3daa6e'];
+  const scaleGrades=['bad','ok','good','best'];
+  function heroScale(g){
+    return scaleGrades.map((gr,i)=>
+      `<div class="hero-scale-item" style="background:${gr===g?scaleColors[i]:scaleColors[i]+'28'}"></div>`
+    ).join('');
+  }
+  document.getElementById('heroMetrics').innerHTML=`
+    <div class="hero-card g-${mlvG}" onclick="showDetail('mlv')">
+      <div class="hero-label">ML-V · Mant. extra</div>
+      <div class="hero-val g-${mlvG}">${tec.mlv.toFixed(2)}</div>
+      ${(()=>{
+        const m=tec.mlv, c=tec.conv;
+        let rate=m>=8?20:m>=7.5?17.5:m>=7?15:null;
+        if(rate!==null&&c<10) rate=5;
+        else if(rate!==null&&c<13) rate=10;
+        else if(rate!==null&&c<15) rate=12.5;
+        if(rate===null) return `<div style="font-size:.75rem;color:#e05a4a;margin-top:6px">Sin tarifa — ML-V menor de 7</div>`;
+        const why=m>=8?'ML-V ≥ 8':m>=7.5?'ML-V 7.5–7.99':'ML-V 7–7.49';
+        const convNote=c<15?` · Conv ${c.toFixed(1)}%`:'';
+        return `<div style="margin-top:8px;font-size:1rem;font-weight:800;color:var(--gold2)">💶 ${rate}€ / excedente o sáb.</div>
+                <div style="font-size:.65rem;color:var(--muted);margin-top:3px">${why}${convNote}</div>`;
+      })()}
+      <div class="hero-tap">→ detalle</div>
+    </div>
+    <div class="hero-card g-${mabG}" onclick="showDetail('mab')">
+      <div class="hero-label">MA+B</div>
+      <div class="hero-val g-${mabG}">${tec.mab.toFixed(2)}</div>
+      <span class="hero-badge g-${mabG}">${gradeLabel(mabG)}</span>
+      <div class="hero-scale">${heroScale(mabG)}</div>
+      <div class="hero-tap">→ detalle</div>
+    </div>`;
+
+  // Summary ring
+  const circ=2*Math.PI*30,offset=circ-(pct/100)*circ;
+  const msg=pct>=80?'¡Excelente trabajo!':pct>=50?'Sigue mejorando':'Requiere atención';
+  document.getElementById('summaryCard').innerHTML=`
+    <div class="summary-ring">
+      <svg width="74" height="74" viewBox="0 0 74 74">
+        <circle class="ring-bg" cx="37" cy="37" r="30"/>
+        <circle class="ring-fg" cx="37" cy="37" r="30"
+          stroke="${rc}" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
+      </svg>
+      <div class="ring-text">${pct}%</div>
+    </div>
+    <div class="summary-info">
+      <h3>${msg}</h3>
+      <p><span class="ok-txt">${okN} objetivo${okN!==1?'s':''} cumplido${okN!==1?'s':''}</span>
+      ${badN>0?` · <span class="bad-txt">${badN} por debajo</span>`:''}
+      <br>${tec.lab} laborables · ${tec.nombre.split(' ')[0]}</p>
+    </div>`;
+
+  // KPI cards
+  document.getElementById('kpiGrid').innerHTML=KPI_CONFIG.map(k=>{
+    if(k.info){
+      const val=(tec.ventas*0.2).toFixed(2);
+      return`<div class="kpi-card ok fade-up">
+        <span class="kpi-icon">${k.icon}</span>
+        <div class="kpi-name">${k.label}</div>
+        <div class="kpi-val ok">€${val}</div>
+        <div class="kpi-target">20% de €${tec.ventas.toFixed(2)}</div>
+        <div class="kpi-status ok">Informativo</div>
+        <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
+      </div>`;
+    }
+    const val=tec[k.key],s=getStatus(k,val),bp=getBarPct(k,val);
+    const tgt=k.max!==undefined?`Obj: = ${k.max}`:`Obj: ≥ ${k.min}${k.unit}`;
+    const disp=typeof val==='number'&&!Number.isInteger(val)?val.toFixed(2):val;
+    const clickFn=k.detail?`onclick="showDetail('${k.detail}')"` : '';
+    const tapHint=k.detail?'<div class="kpi-tap">→ detalle</div>':'';
+    return`<div class="kpi-card ${s} fade-up" ${clickFn}>
+      <span class="kpi-icon">${k.icon}</span>
+      <div class="kpi-name">${k.label}</div>
+      <div class="kpi-val ${s}">${disp}<span class="kpi-unit">${k.unit}</span></div>
+      <div class="kpi-target">${tgt}</div>
+      <div class="kpi-status ${s}">${statusLabel(s)}</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill ${s}" style="width:${bp}%"></div></div>
+      ${tapHint}
+    </div>`;
+  }).join('');
+
+  // Other
+  document.getElementById('otherGrid').innerHTML=OTHER_KEYS.map(k=>{
+    const val=tec[k.key],pre=k.prefix||'';
+    const disp=typeof val==='number'&&!Number.isInteger(val)?val.toFixed(2):val;
+    const col=(k.key==='dev'||k.key==='devE')?(val<0?'#c05040':val>0?'#3daa6e':'#7a6840'):'var(--text)';
+    return`<div class="other-card fade-up">
+      <div class="other-name">${k.label}</div>
+      <div class="other-val" style="color:${col}">${pre}${disp}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── DETAIL PANELS ──
+function showDetail(type){
+  const tec=CURRENT_TEC;
+  document.getElementById('mainPanel').style.display='none';
+  document.getElementById('detailPanel').style.display='block';
+  window.scrollTo(0,0);
+  let html='';
+
+  if(type==='rm'){
+    const pct=tec.pRM,s=getStatus({min:89.5},pct);
+    const col=s==='ok'?'var(--green2)':s==='warn'?'var(--orange)':'#e05a4a';
+    html=`<div class="detail-hero">
+      <div class="detail-hero-title">🛠️ Ratio de Mantenimiento (%RM)</div>
+      <div class="detail-hero-val" style="color:${col}">${pct.toFixed(2)}%</div>
+      <div class="detail-hero-sub">Objetivo ≥ 89.5% · ${tec.rm} repeticiones de ${tec.palito} mantenimientos</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="n">${tec.palito}</div><div class="l">Mantenimientos<br>realizados</div></div>
+      <div class="stat-box"><div class="n" style="color:#e05a4a">${tec.rm}</div><div class="l">Con<br>repetición</div></div>
+      <div class="stat-box"><div class="n" style="color:${col}">${pct.toFixed(1)}%</div><div class="l">Tu %RM<br>actual</div></div>
+    </div>
+    <div class="detail-section">¿Qué significa?</div>
+    <div style="font-size:.8rem;color:var(--muted);line-height:1.7;padding:4px 0">
+      El <strong style="color:var(--text)">%RM</strong> mide cuántos mantenimientos 
+      <strong style="color:#e05a4a">no se resolvieron en la primera visita</strong> y tuvieron que repetirse.<br><br>
+      Con <strong style="color:var(--text)">${tec.rm} repeticiones</strong> sobre 
+      <strong style="color:var(--text)">${tec.palito} mantenimientos</strong>, 
+      tu ratio es <strong style="color:${col}">${pct.toFixed(2)}%</strong>.<br><br>
+      ${s==='ok'
+        ?`<span style="color:var(--green2)">✓ Por encima del objetivo (89.5%). ¡Buen trabajo!</span>`
+        :`<span style="color:#e05a4a">✗ Necesitas reducir las repeticiones para superar el 89.5%.</span>`}
+    </div>`;
+  }
+  else if(type==='cum'){
+    const pct=tec.pCum,s=getStatus({min:90},pct);
+    const col=s==='ok'?'var(--green2)':s==='warn'?'var(--orange)':'#e05a4a';
+    html=`<div class="detail-hero">
+      <div class="detail-hero-title">✅ Cumplimiento de visitas (%Cum)</div>
+      <div class="detail-hero-val" style="color:${col}">${pct.toFixed(2)}%</div>
+      <div class="detail-hero-sub">Objetivo ≥ 90% · ${tec.incum} incumplimientos registrados</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="n">${tec.nec}</div><div class="l">Necesarios<br>(Nec)</div></div>
+      <div class="stat-box"><div class="n">${tec.palito}</div><div class="l">Realizados<br>(Palito)</div></div>
+      <div class="stat-box"><div class="n" style="color:#e05a4a">${tec.incum}</div><div class="l">Incumpli-<br>mientos</div></div>
+    </div>
+    <div class="detail-section">¿Qué significa?</div>
+    <div style="font-size:.8rem;color:var(--muted);line-height:1.7;padding:4px 0">
+      Tienes <strong style="color:#e05a4a">${tec.incum} incumplimientos</strong> sobre 
+      <strong style="color:var(--text)">${tec.nec} visitas necesarias</strong>.<br><br>
+      ${s==='ok'
+        ?`<span style="color:var(--green2)">✓ Cumplimiento por encima del 90%. ¡Sigue así!</span>`
+        :`<span style="color:#e05a4a">✗ Cumplimiento por debajo del objetivo. Cada visita no realizada en plazo cuenta como incumplimiento.</span>`}
+    </div>`;
+  }
+  else if(type==='ventas'){
+    const pct=tec.conv,s=getStatus({min:15},pct);
+    const col=s==='ok'?'var(--green2)':s==='warn'?'var(--orange)':'#e05a4a';
+    const euros=tec.ventas.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
+    html=`<div class="detail-hero">
+      <div class="detail-hero-title">💰 Conversión y Ventas</div>
+      <div class="detail-hero-val" style="color:${col}">${pct.toFixed(2)}%</div>
+      <div class="detail-hero-sub">Conversión objetivo ≥ 15% · ${tec.uven} unidades vendidas · €${euros} · <strong style="color:var(--gold2)">Tu 20%: €${(tec.ventas*0.2).toFixed(2)}</strong></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="n">${tec.uven}</div><div class="l">Unidades<br>vendidas</div></div>
+      <div class="stat-box"><div class="n" style="color:var(--gold2)">€${euros}</div><div class="l">Importe<br>total</div></div>
+      <div class="stat-box"><div class="n" style="color:${col}">${pct.toFixed(1)}%</div><div class="l">Conversión<br>actual</div></div>
+    </div>
+    <div class="detail-section">Desglose</div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="n">${tec.palito}</div><div class="l">Mantenimientos<br>realizados</div></div>
+      <div class="stat-box"><div class="n" style="color:${col}">${pct.toFixed(1)}%</div><div class="l">% con<br>venta</div></div>
+      <div class="stat-box"><div class="n" style="color:var(--gold2)">€${(tec.uven>0?(tec.ventas/tec.uven).toFixed(0):0)}</div><div class="l">Ticket<br>medio</div></div>
+    </div>
+    <div class="detail-section">¿Qué significa?</div>
+    <div style="font-size:.8rem;color:var(--muted);line-height:1.7;padding:4px 0">
+      Realizaste <strong style="color:var(--gold2)">${tec.uven} ventas</strong> por 
+      <strong style="color:var(--gold2)">€${euros}</strong> con un ticket medio de 
+      <strong style="color:var(--gold2)">€${tec.uven>0?(tec.ventas/tec.uven).toFixed(0):0}</strong>.<br><br>
+      ${s==='ok'
+        ?`<span style="color:var(--green2)">✓ Conversión por encima del 15%. ¡Excelente!</span>`
+        :`<span style="color:#e05a4a">✗ Conversión por debajo del 15%. Busca oportunidades en cada visita.</span>`}
+    </div>`;
+  }
+  else if(type==='falt'){
+    const val=tec.falt,col=val===0?'var(--green2)':'#e05a4a';
+    html=`<div class="detail-hero">
+      <div class="detail-hero-title">📅 Faltas de asistencia</div>
+      <div class="detail-hero-val" style="color:${col}">${val}</div>
+      <div class="detail-hero-sub">Objetivo = 0 faltas · ${val>0?'⚠ Hay faltas registradas':'✓ Sin faltas este periodo'}</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="n">${tec.lab}</div><div class="l">Días<br>laborables</div></div>
+      <div class="stat-box"><div class="n" style="color:${col}">${val}</div><div class="l">Faltas<br>registradas</div></div>
+      <div class="stat-box"><div class="n" style="color:var(--green2)">${tec.lab-val}</div><div class="l">Días<br>trabajados</div></div>
+    </div>
+    <div style="font-size:.8rem;color:var(--muted);line-height:1.7;margin-top:12px">
+      ${val===0
+        ?`<span style="color:var(--green2)">✓ Asistencia perfecta este periodo. Sin faltas registradas.</span>`
+        :`<span style="color:#e05a4a">✗ Tienes ${val} falta${val!==1?'s':''} registrada${val!==1?'s':''}. El objetivo es 0.</span>`}
+    </div>`;
+  }
+  else if(type==='mlv'||type==='mab'){
+    const isMlv=type==='mlv';
+    const val=isMlv?tec.mlv:tec.mab;
+    const g=getGrade(val);
+    const col=gradeColor(g);
+    const label=isMlv?'ML-V':'MA+B';
+    const desc=isMlv
+      ?'Media de letra V — calidad de visitas largas de mantenimiento'
+      :'Media A+B — calidad global de visitas de mantenimiento';
+    const levels=[
+      ['best','≥ 8.0','Excelente — nivel máximo','#3daa6e'],
+      ['good','≥ 7.5','Bueno — por encima del estándar','#e8c96a'],
+      ['ok',  '≥ 7.0','Aceptable — cumple el mínimo','#d4831a'],
+      ['bad', '< 7.0','Mejorable — por debajo del mínimo','#e05a4a'],
+    ];
+    html=`<div class="detail-hero">
+      <div class="detail-hero-title">${isMlv?'📈':'📊'} ${label} — Calidad de visitas</div>
+      <div class="detail-hero-val" style="color:${col}">${val.toFixed(2)}</div>
+      <div class="detail-hero-sub">${desc}</div>
+    </div>
+    <div class="grade-legend">
+      <span class="grade-pill best">≥ 8.0 Excelente</span>
+      <span class="grade-pill good">≥ 7.5 Bueno</span>
+      <span class="grade-pill ok">≥ 7.0 Aceptable</span>
+      <span class="grade-pill bad">< 7.0 Mejorable</span>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="n" style="color:${col}">${val.toFixed(2)}</div><div class="l">Tu valor<br>actual</div></div>
+      <div class="stat-box"><div class="n">${tec.palito}</div><div class="l">Mantenimientos<br>base</div></div>
+      <div class="stat-box"><div class="n" style="color:${col};font-size:1rem">${gradeLabel(g).split(' ')[0]}</div><div class="l">Nivel<br>actual</div></div>
+    </div>
+    <div class="detail-section">Escala de niveles</div>
+    <div style="display:flex;flex-direction:column;gap:7px;margin-top:4px">
+      ${levels.map(([gr,rng,lbl,c])=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
+          background:${gr===g?'rgba(201,168,76,.07)':'var(--dim)'};
+          border:1px solid ${gr===g?'var(--border2)':'transparent'}">
+          <div style="width:8px;height:8px;border-radius:50%;background:${c};flex-shrink:0"></div>
+          <div style="font-size:.73rem;color:${gr===g?'var(--text)':'var(--muted)'}">
+            <strong style="color:${c}">${rng}</strong> — ${lbl}
+            ${gr===g?`<span style="color:var(--gold3);font-size:.65rem"> ← Tu nivel</span>`:''}
+          </div>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  document.getElementById('detailContent').innerHTML=html;
+}
+
+document.getElementById('backBtn').addEventListener('click',()=>{
+  document.getElementById('detailPanel').style.display='none';
+  document.getElementById('mainPanel').style.display='block';
+  window.scrollTo(0,0);
+});
+
+// ── LOGIN ──
+function findTec(q){
+  q=q.trim().toUpperCase();
+  return CURRENT_DATA.tecnicos.find(t=>
+    t.id.toUpperCase()===q||t.raw.toUpperCase().includes(q)||t.nombre.toUpperCase().includes(q));
+}
+async function doLogin(){
+  const val=document.getElementById('matInput').value;
+  if(!val.trim())return;
+  document.getElementById('spinner').style.display='block';
+  document.getElementById('loginBtn').style.opacity='.5';
+  await loadSheets();
+  document.getElementById('spinner').style.display='none';
+  document.getElementById('loginBtn').style.opacity='1';
+  const tec=findTec(val);
+  if(!tec){
+    document.getElementById('loginError').style.display='block';
+    document.getElementById('matInput').style.borderColor='#c0392b';
+    return;
+  }
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('appScreen').style.display='block';
+  renderMain(tec);
+}
+document.getElementById('loginBtn').addEventListener('click',doLogin);
+document.getElementById('matInput').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('matInput').addEventListener('input',()=>{
+  document.getElementById('loginError').style.display='none';
+  document.getElementById('matInput').style.borderColor='';
+});
+document.getElementById('logoutBtn').addEventListener('click',()=>{
+  document.getElementById('appScreen').style.display='none';
+  document.getElementById('detailPanel').style.display='none';
+  document.getElementById('mainPanel').style.display='block';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('matInput').value='';
+});
+</script>
+
+</body></html>
