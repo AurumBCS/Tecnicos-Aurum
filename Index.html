@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0080)file:///C:/Users/Viatek/Desktop/Mi%20Panel%20%C2%B7%20Aurum%20BC%20Security.html -->
+<!-- saved from url=(0046)file:///C:/Users/Viatek/Downloads/index_6.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0a0a0a">
 <title>Mi Panel · Aurum BC Security</title>
 <link rel="preconnect" href="https://fonts.googleapis.com/">
-<link href="file:///C:/Users/Viatek/Desktop/Mi%20Panel%20%C2%B7%20Aurum%20BC%20Security_files/css2" rel="stylesheet">
+<link href="./Index_files/css2" rel="stylesheet">
 <style>
 :root{
   --bg:#0a0a0a;--s1:#111;--s2:#181818;
@@ -264,7 +264,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div class="score-pill" id="scorePill"><span style="color:#3daa6e;font-weight:700">5/6</span>&nbsp;<span style="color:#7a6840">objetivos</span></div>
   </div>
 
-  <div id="mainPanel">
+  <div id="mainPanel" style="display: none;">
     <div class="data-banner">
       <div class="sync-dot"></div>
       Sincronizado desde Google Sheets · <span id="lastUpdate">11 de mayo de 2026</span>
@@ -339,8 +339,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     </div><div class="kpi-card ok fade-up">
         <span class="kpi-icon">💶</span>
         <div class="kpi-name">Tu 20% €</div>
-        <div class="kpi-val ok">€197.44</div>
-        <div class="kpi-target">20% de €987.20</div>
+        <div class="kpi-val ok">€987.20</div>
+        <div class="kpi-target">Comisión del periodo</div>
         <div class="kpi-status ok">Informativo</div>
         <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
       </div><div class="kpi-card ok fade-up">
@@ -364,9 +364,6 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="other-name">Palito</div>
       <div class="other-val" style="color:var(--text)">130</div>
     </div><div class="other-card fade-up">
-      <div class="other-name">MPal</div>
-      <div class="other-val" style="color:var(--text)">7.22</div>
-    </div><div class="other-card fade-up">
       <div class="other-name">Nec</div>
       <div class="other-val" style="color:var(--text)">126</div>
     </div><div class="other-card fade-up">
@@ -376,9 +373,6 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="other-name">A+B</div>
       <div class="other-val" style="color:var(--text)">151.60</div>
     </div><div class="other-card fade-up">
-      <div class="other-name">Incum</div>
-      <div class="other-val" style="color:var(--text)">5</div>
-    </div><div class="other-card fade-up">
       <div class="other-name">Dev</div>
       <div class="other-val" style="color:#c05040">-0.80</div>
     </div><div class="other-card fade-up">
@@ -387,9 +381,31 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     </div></div>
   </div>
 
-  <div id="detailPanel">
+  <div id="detailPanel" style="display: block;">
     <button class="detail-back" id="backBtn">← Volver al panel</button>
-    <div id="detailContent"></div>
+    <div id="detailContent"><div class="detail-hero">
+      <div class="detail-hero-title">💰 Conversión y Ventas</div>
+      <div class="detail-hero-val" style="color:var(--green2)">29.46%</div>
+      <div class="detail-hero-sub">Conversión objetivo ≥ 15% · 38.3 unidades vendidas</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="n">38.3</div><div class="l">Unidades<br>vendidas</div></div>
+      <div class="stat-box"><div class="n" style="color:var(--gold2)">€987,20</div><div class="l">Tu 20%<br>(comisión)</div></div>
+      <div class="stat-box"><div class="n" style="color:var(--green2)">29.5%</div><div class="l">Conversión<br>actual</div></div>
+    </div>
+    <div class="detail-section">Desglose</div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="n">130</div><div class="l">Mantenimientos<br>realizados</div></div>
+      <div class="stat-box"><div class="n" style="color:var(--green2)">29.5%</div><div class="l">% con<br>venta</div></div>
+      <div class="stat-box"><div class="n" style="color:var(--gold2)">€26</div><div class="l">Ticket<br>medio</div></div>
+    </div>
+    <div class="detail-section">¿Qué significa?</div>
+    <div style="font-size:.8rem;color:var(--muted);line-height:1.7;padding:4px 0">
+      Realizaste <strong style="color:var(--gold2)">38.3 ventas</strong> por 
+      <strong style="color:var(--gold2)">€987,20</strong> con un ticket medio de 
+      <strong style="color:var(--gold2)">€26</strong>.<br><br>
+      <span style="color:var(--green2)">✓ Conversión por encima del 15%. ¡Excelente!</span>
+    </div></div>
   </div>
 </div>
 
@@ -426,9 +442,8 @@ const KPI_CONFIG=[
 ];
 const OTHER_KEYS=[
   {key:'falt',label:'Faltantes'},{key:'lab',label:'Lab'},{key:'palito',label:'Palito'},
-  {key:'mpal',label:'MPal'},{key:'nec',label:'Nec'},
+  {key:'nec',label:'Nec'},
   {key:'uven',label:'UVen'},{key:'ab',label:'A+B'},
-  {key:'incum',label:'Incum'},
   {key:'dev',label:'Dev'},{key:'devE',label:'Dev€',prefix:'€'},
 ];
 
@@ -573,12 +588,12 @@ function renderMain(tec){
   // KPI cards
   document.getElementById('kpiGrid').innerHTML=KPI_CONFIG.map(k=>{
     if(k.info){
-      const val=(tec.ventas*0.2).toFixed(2);
+      const val=tec.ventas.toFixed(2);
       return`<div class="kpi-card ok fade-up">
         <span class="kpi-icon">${k.icon}</span>
         <div class="kpi-name">${k.label}</div>
         <div class="kpi-val ok">€${val}</div>
-        <div class="kpi-target">20% de €${tec.ventas.toFixed(2)}</div>
+        <div class="kpi-target">Comisión del periodo</div>
         <div class="kpi-status ok">Informativo</div>
         <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
       </div>`;
@@ -673,11 +688,11 @@ function showDetail(type){
     html=`<div class="detail-hero">
       <div class="detail-hero-title">💰 Conversión y Ventas</div>
       <div class="detail-hero-val" style="color:${col}">${pct.toFixed(2)}%</div>
-      <div class="detail-hero-sub">Conversión objetivo ≥ 15% · ${tec.uven} unidades vendidas · €${euros} · <strong style="color:var(--gold2)">Tu 20%: €${(tec.ventas*0.2).toFixed(2)}</strong></div>
+      <div class="detail-hero-sub">Conversión objetivo ≥ 15% · ${tec.uven} unidades vendidas</div>
     </div>
     <div class="stat-row">
       <div class="stat-box"><div class="n">${tec.uven}</div><div class="l">Unidades<br>vendidas</div></div>
-      <div class="stat-box"><div class="n" style="color:var(--gold2)">€${euros}</div><div class="l">Importe<br>total</div></div>
+      <div class="stat-box"><div class="n" style="color:var(--gold2)">€${euros}</div><div class="l">Tu 20%<br>(comisión)</div></div>
       <div class="stat-box"><div class="n" style="color:${col}">${pct.toFixed(1)}%</div><div class="l">Conversión<br>actual</div></div>
     </div>
     <div class="detail-section">Desglose</div>
@@ -795,6 +810,22 @@ async function doLogin(){
 }
 document.getElementById('loginBtn').addEventListener('click',doLogin);
 document.getElementById('matInput').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+// Auto-logout después de 5 minutos
+let autoLogout;
+function resetTimer(){
+  clearTimeout(autoLogout);
+  autoLogout=setTimeout(()=>{
+    document.getElementById('appScreen').style.display='none';
+    document.getElementById('detailPanel').style.display='none';
+    document.getElementById('mainPanel').style.display='block';
+    document.getElementById('loginScreen').style.display='flex';
+    document.getElementById('matInput').value='';
+    alert('Sesión cerrada por inactividad. Vuelve a introducir tu matrícula.');
+  }, 5*60*1000);
+}
+document.addEventListener('click', resetTimer);
+document.addEventListener('touchstart', resetTimer);
 document.getElementById('matInput').addEventListener('input',()=>{
   document.getElementById('loginError').style.display='none';
   document.getElementById('matInput').style.borderColor='';
