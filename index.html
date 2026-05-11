@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0046)file:///C:/Users/Viatek/Downloads/index_7.html -->
+<!-- saved from url=(0046)file:///C:/Users/Viatek/Downloads/index_8.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -389,11 +389,12 @@ function csvRow(r){
 async function loadSheets(){
   if(!SHEETS_CSV_URL.includes('docs.google.com'))return;
   try{
-    const proxy='https://corsproxy.io/?'+encodeURIComponent(SHEETS_CSV_URL);
+    const proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(SHEETS_CSV_URL);
     const res=await fetch(proxy);
-    const tecs=parseCSV(await res.text()).filter(r=>r['Técnico']).map(csvRow);
-    if(tecs.length)CURRENT_DATA={tecnicos:tecs};
-  }catch(e){console.log('Usando datos locales')}
+    const text=await res.text();
+    const tecs=parseCSV(text).filter(r=>r['Técnico']).map(csvRow);
+    if(tecs.length){CURRENT_DATA={tecnicos:tecs};console.log('Sheets OK:',tecs.length);}
+  }catch(e){console.log('Usando datos locales',e)}
 }
 
 // ── RENDER MAIN ──
