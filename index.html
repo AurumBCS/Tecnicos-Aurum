@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0052)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_2.html -->
+<!-- saved from url=(0052)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_5.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -461,7 +461,7 @@ const JE_NAMES = {
   'JR9426': 'Coordinador Regional'
 };
 
-const SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2C6LbbD8ovpTC26ZT-hQZfbGQOWTydMWkQ0d8BiyvDrzgRlN1I1kvaJ0k2Cyl37aeQAXPK2JAjaVC/pub?output=csv";
+const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbwApepSGJI6dSW9xOIBq42iGHdBHNVSuOJQOy8KWna_WM1VSYetKUnYm0K3Xjtxk650/exec";
 let _datosActualizados = false;
 
 // ── Fallback mínimo (se rellena con los datos del CSV real) ──
@@ -583,14 +583,13 @@ function csvRow(r){
   };
 }
 async function loadSheets(){
-  if(!SHEETS_CSV_URL.includes('docs.google.com')) return;
+  if(!SHEETS_CSV_URL) return;
 
-  // Intentar carga directa primero (funciona si la hoja es pública y no hay CORS)
+  // Con Apps Script propio no necesitamos proxy — llamada directa
   const proxies = [
-    url => url, // directo (funciona en algunos entornos)
+    url => url, // directo (Apps Script ya resuelve el CORS)
     url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
     url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   ];
 
   for(const proxyFn of proxies){
@@ -599,22 +598,21 @@ async function loadSheets(){
       const res = await fetch(fetchUrl, {cache: 'no-store'});
       if(!res.ok) continue;
       const text = await res.text();
-      // Verificar que es un CSV válido (tiene la cabecera esperada)
       if(!text.includes('Técnico') && !text.includes('ecnico')) continue;
       const tecs = parseCSV(text).filter(r=>r['Técnico']).map(r=>{
         const t=csvRow(r); t.ventas20=t.ventas; return t;
       });
       if(tecs.length > 0){
         CURRENT_DATA = {tecnicos: tecs};
-        console.log(`Sheets cargado OK (${fetchUrl.substring(0,40)}...): ${tecs.length} técnicos`);
         _datosActualizados = true;
-        return; // éxito, salir
+        console.log(`Sheets OK: ${tecs.length} técnicos`);
+        return;
       }
     } catch(e){
-      console.log(`Proxy falló, probando siguiente...`, e.message);
+      console.log(`Intento fallido, probando siguiente...`, e.message);
     }
   }
-  console.log('Todos los proxies fallaron — usando datos locales embebidos');
+  console.log('No se pudo conectar — usando datos locales embebidos');
 }
 
 // ══════════════════════════════════════════════
