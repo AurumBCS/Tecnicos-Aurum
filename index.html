@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0052)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_6.html -->
+<!-- saved from url=(0052)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_7.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -324,7 +324,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <div class="month-banner">
     <div>
       <div class="month-label">Periodo activo</div>
-      <div class="month-title">Abril 2026</div>
+      <div class="month-title" id="monthTitle">—</div>
     </div>
     <div class="score-pill" id="scorePill">—</div>
   </div>
@@ -461,7 +461,7 @@ const JE_NAMES = {
   'JR9426': 'Coordinador Regional'
 };
 
-const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbwApepSGJI6dSW9xOIBq42iGHdBHNVSuOJQOy8KWna_WM1VSYetKUnYm0K3Xjtxk650/exec";
+const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbwODYI3k0SrHRfFEQhBDAJdTlTCTcffl7ylpCIbPJUlzB0SgagFuc5c1c0BdRhflsSo/exec";
 let _datosActualizados = false;
 
 // ── Fallback mínimo (se rellena con los datos del CSV real) ──
@@ -649,16 +649,21 @@ function renderMain(tec, returnToEquipo=false){
   CURRENT_TEC=tec;
   document.getElementById('topbarName').textContent=tec.nombre.trim();
   document.getElementById('topbarId').textContent=tec.id+' · '+tec.provincia;
-  document.getElementById('lastUpdate').textContent=
-    new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
+
+  // Mes dinámico — detectar desde los datos del CSV cuál es el periodo activo
+  const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const ahora = new Date();
+  const mesActual = meses[ahora.getMonth()];
+  const anioActual = ahora.getFullYear();
+  document.getElementById('monthTitle').textContent = mesActual + ' ' + anioActual;
 
   // Actualizar banner de sincronización
   const banner = document.querySelector('.data-banner');
   if(banner){
     if(_datosActualizados){
-      banner.innerHTML=`<div class="sync-dot"></div>Datos actualizados desde Google Sheets · <span id="lastUpdate2">${new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'})}</span>`;
+      banner.innerHTML=`<div class="sync-dot"></div>Datos actualizados desde Google Sheets · ${mesActual} ${anioActual}`;
     } else {
-      banner.innerHTML=`<div style="width:6px;height:6px;border-radius:50%;background:var(--orange);flex-shrink:0"></div><span style="color:var(--orange)">Datos locales</span> · No se pudo conectar con Sheets`;
+      banner.innerHTML=`<div style="width:6px;height:6px;border-radius:50%;background:var(--orange);flex-shrink:0"></div><span style="color:var(--orange)">Datos locales (sin conexión)</span> · Última actualización conocida`;
     }
   }
 
