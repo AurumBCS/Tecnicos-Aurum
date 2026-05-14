@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_10.html -->
+<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_12.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -355,6 +355,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div class="kpi-grid" id="kpiGrid"></div>
     <div class="section-head">Resto de indicadores</div>
     <div class="other-grid" id="otherGrid"></div>
+    <div id="docsPendientesMain"></div>
   </div>
 
   <!-- Panel equipo JE -->
@@ -375,6 +376,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 
       <!-- RM global del equipo (se rellena dinámicamente) -->
       <div id="equipoRMGlobal"></div>
+
+      <!-- Docs pendientes del equipo -->
+      <div id="equipoDocsContainer"></div>
 
       <!-- Lista técnicos -->
       <div class="section-head">Técnicos del equipo</div>
@@ -474,7 +478,9 @@ const JE_NAMES = {
 
 const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbwODYI3k0SrHRfFEQhBDAJdTlTCTcffl7ylpCIbPJUlzB0SgagFuc5c1c0BdRhflsSo/exec";
 const AUTH_URL = "https://script.google.com/macros/s/AKfycbzpbQ4SvoodiZY_GJjx7LhFphWZlSpcLeeZlh5OLETq1-SjykZvceHkk-wo7xjYl4Q9/exec";
-let AUTH_DATA = {}; // matrícula → DNI
+const DOCS_URL = "https://script.google.com/macros/s/AKfycbwaI6zxrwJorv-UPFMyDN-EYru0aYOCSZD1p0YSVl032irsxL87Nn49Lmry65YVEUNK/exec";
+let AUTH_DATA = {};
+let DOCS_DATA = [];
 let _datosActualizados = false;
 
 // ── Fallback mínimo (se rellena con los datos del CSV real) ──
@@ -671,6 +677,18 @@ async function loadAuth(){
   }catch(e){console.log('Auth no disponible, acceso sin validación',e.message);}
 }
 
+async function loadDocs(){
+  try{
+    const res=await fetch(DOCS_URL,{cache:'no-store'});
+    if(!res.ok) return;
+    const data=await res.json();
+    if(Array.isArray(data) && data.length>0){
+      DOCS_DATA=data;
+      console.log('Docs cargados:',DOCS_DATA.length,'pendientes');
+    }
+  }catch(e){console.log('Docs no disponible',e.message);}
+}
+
 async function loadSheets(){
   if(!SHEETS_CSV_URL) return;
 
@@ -865,6 +883,7 @@ function renderMain(tec, returnToEquipo=false){
     </div>`;
   }).join('');
 
+  renderDocsPendientes(tec.id,'docsPendientesMain');
   showPanel('mainPanel');
 }
 
@@ -993,8 +1012,10 @@ function renderEquipoPanel(jeId){
 
     // Inyectar en contenedor dedicado
     document.getElementById('equipoRMGlobal').innerHTML=rmSection;
+  renderDocsEquipo(jeId,'equipoDocsContainer');
   } else {
     document.getElementById('equipoRMGlobal').innerHTML='';
+    if(document.getElementById('equipoDocsContainer')) renderDocsEquipo(jeId,'equipoDocsContainer');
   }
 
   // Lista de técnicos ordenados por ML-V desc — mejor con estrella
@@ -1655,6 +1676,82 @@ function showEquipoDash(type, jeId){
   window.scrollTo(0,0);
 }
 
+
+// ══════════════════════════════════════════════
+//  DOCUMENTACIÓN PENDIENTE
+// ══════════════════════════════════════════════
+function renderDocsPendientes(tecId, containerId){
+  const id = String(tecId).trim().toUpperCase();
+  const docs = DOCS_DATA.filter(d=>String(d.mat).trim().toUpperCase()===id);
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  if(!docs.length){
+    container.innerHTML='';
+    return;
+  }
+  const rows = docs.map(d=>`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:.65rem;font-weight:700;color:var(--text)">${d.tipo||'—'}</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${d.origen||'—'}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:.65rem;font-weight:700;color:var(--gold2)">${d.nMant||'—'}</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${d.fecha||'—'}</div>
+      </div>
+    </div>`).join('');
+
+  container.innerHTML=`
+    <div class="section-head" style="margin-top:20px">📋 Documentación pendiente · ${docs.length} elemento${docs.length!==1?'s':''}</div>
+    <div style="background:var(--s1);border:1px solid #3d2800;border-radius:14px;overflow:hidden;position:relative">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--orange),transparent)"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 12px;background:var(--dim)">
+        <div style="font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">Tipo · Origen</div>
+        <div style="font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:right">Nº Mant · Fecha</div>
+      </div>
+      ${rows}
+    </div>`;
+}
+
+function renderDocsEquipo(jeId, containerId){
+  const ids = (JERARQUIA[jeId]||[]).map(id=>id.toUpperCase());
+  // Agrupar por técnico
+  const byTec = {};
+  DOCS_DATA.forEach(d=>{
+    const mat = String(d.mat).trim().toUpperCase();
+    if(ids.includes(mat)){
+      if(!byTec[mat]) byTec[mat]=[];
+      byTec[mat].push(d);
+    }
+  });
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  const tecsConDocs = Object.keys(byTec);
+  if(!tecsConDocs.length){ container.innerHTML=''; return; }
+
+  const tecs = CURRENT_DATA.tecnicos;
+  const rows = tecsConDocs.map(mat=>{
+    const tec = tecs.find(t=>t.id.toUpperCase()===mat);
+    const nombre = tec ? tec.nombre.trim().split(' ').slice(0,2).join(' ') : mat;
+    const n = byTec[mat].length;
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text)">${nombre}</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${mat}</div>
+      </div>
+      <div style="background:rgba(212,131,26,.15);border:1px solid #3d2800;border-radius:20px;padding:3px 12px;font-size:.72rem;font-weight:700;color:var(--orange)">${n} pendiente${n!==1?'s':''}</div>
+    </div>`;
+  }).join('');
+
+  const total = DOCS_DATA.filter(d=>ids.includes(String(d.mat).trim().toUpperCase())).length;
+  container.innerHTML=`
+    <div class="section-head" style="margin-top:20px">📋 Documentación pendiente del equipo · ${total} elemento${total!==1?'s':''}</div>
+    <div style="background:var(--s1);border:1px solid #3d2800;border-radius:14px;overflow:hidden;position:relative">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--orange),transparent)"></div>
+      ${rows}
+    </div>`;
+}
+
 // ══════════════════════════════════════════════
 //  LOGIN
 // ══════════════════════════════════════════════
@@ -1679,7 +1776,7 @@ async function doLogin(){
   document.getElementById('loginBtn').style.opacity='.5';
 
   // Cargar datos CSV y autenticación en paralelo
-  await Promise.all([loadSheets(), loadAuth()]);
+  await Promise.all([loadSheets(), loadAuth(), loadDocs()]);
 
   document.getElementById('spinner').style.display='none';
   document.getElementById('loginBtn').style.opacity='1';
