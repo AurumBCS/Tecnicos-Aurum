@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0052)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_9.html -->
+<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_10.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -17,7 +17,7 @@
   --red:#c0392b;--orange:#d4831a;--yellow:#c9a020;
   --green:#2e7d52;--green2:#3daa6e;
   --text:#f0e6c8;--muted:#7a6840;--dim:#1c1800;
-  --font:'Outfit',sans-serif;--display:'Cinzel',serif;
+  --font:'Outfit',sans-serif;--display:'Outfit',sans-serif;
 }
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overscroll-behavior:none}
@@ -41,7 +41,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .login-logo-img{width:90px;height:90px;border-radius:50%;object-fit:cover;
   border:2px solid var(--gold3);box-shadow:0 0 28px rgba(201,168,76,.2),0 8px 24px rgba(0,0,0,.5);
   display:block;margin:0 auto 14px}
-.login-header h1{font-family:var(--display);font-size:1.05rem;font-weight:700;
+.login-header h1{font-family:var(--font);font-size:1.05rem;font-weight:700;
   color:var(--gold2);letter-spacing:.08em;text-transform:uppercase}
 .login-header p{font-size:.72rem;color:var(--muted);margin-top:4px;letter-spacing:.04em}
 .login-body{padding:24px 28px 28px}
@@ -56,7 +56,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   background:linear-gradient(135deg,#7a5c10,#c9a84c,#e8c96a,#c9a84c,#7a5c10);
   background-size:200% 100%;background-position:100% 0;
   color:#0a0a0a;border:none;border-radius:10px;padding:13px;
-  font-size:.88rem;font-weight:700;font-family:var(--display);cursor:pointer;
+  font-size:.88rem;font-weight:700;font-family:var(--font);cursor:pointer;
   letter-spacing:.1em;text-transform:uppercase;
   transition:background-position .4s,transform .1s,box-shadow .2s;
   box-shadow:0 4px 20px rgba(201,168,76,.2)}
@@ -88,15 +88,15 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .month-banner{padding:12px 16px;background:linear-gradient(135deg,#111100 0%,#0d0d0d 100%);
   border-bottom:1px solid var(--border);display:flex;align-items:center;
   justify-content:space-between;flex-wrap:wrap;gap:8px}
-.month-label{font-family:var(--display);font-size:.58rem;font-weight:600;
+.month-label{font-family:var(--font);font-size:.58rem;font-weight:600;
   text-transform:uppercase;letter-spacing:.16em;color:var(--gold3)}
-.month-title{font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--gold2)}
+.month-title{font-family:var(--font);font-size:.95rem;font-weight:700;color:var(--gold2)}
 .score-pill{background:var(--dim);border:1px solid var(--border2);border-radius:20px;
   padding:5px 13px;font-size:.73rem;font-weight:600}
 
 /* ── TABS (para JE y JR) ── */
 .tabs-bar{display:flex;background:var(--s1);border-bottom:1px solid var(--border);padding:0 14px}
-.tab-btn{flex:1;padding:11px 8px;font-size:.72rem;font-weight:700;font-family:var(--display);
+.tab-btn{flex:1;padding:11px 8px;font-size:.72rem;font-weight:700;font-family:var(--font);
   text-transform:uppercase;letter-spacing:.1em;color:var(--muted);background:transparent;
   border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .2s;text-align:center}
 .tab-btn.active{color:var(--gold2);border-bottom-color:var(--gold)}
@@ -104,7 +104,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 
 /* ── MAIN PANEL ── */
 #mainPanel{padding:14px 13px 48px;max-width:680px;margin:0 auto}
-.section-head{font-family:var(--display);font-size:.58rem;font-weight:600;
+.section-head{font-family:var(--font);font-size:.58rem;font-weight:600;
   text-transform:uppercase;letter-spacing:.18em;color:var(--gold3);
   margin:20px 0 9px;padding-bottom:6px;border-bottom:1px solid var(--border);
   display:flex;align-items:center;gap:8px}
@@ -121,7 +121,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .hero-card.g-ok  {border-color:#3d2800}.hero-card.g-ok::before  {background:linear-gradient(90deg,transparent,var(--orange),transparent)}
 .hero-card.g-bad {border-color:#3d1a1a}.hero-card.g-bad::before {background:linear-gradient(90deg,transparent,#e05a4a,transparent)}
 .hero-label{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:4px}
-.hero-val{font-family:var(--display);font-size:2rem;font-weight:700;line-height:1}
+.hero-val{font-family:var(--font);font-size:2rem;font-weight:700;line-height:1}
 .hero-val.g-best{color:var(--green2)}.hero-val.g-good{color:var(--gold2)}
 .hero-val.g-ok{color:var(--orange)}.hero-val.g-bad{color:#e05a4a}
 .hero-badge{display:inline-block;margin-top:6px;font-size:.6rem;font-weight:700;
@@ -145,8 +145,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .ring-bg{fill:none;stroke:var(--dim);stroke-width:6}
 .ring-fg{fill:none;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .8s cubic-bezier(.4,0,.2,1)}
 .ring-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-family:var(--display);font-size:1.05rem;font-weight:700;color:var(--gold2)}
-.summary-info h3{font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--gold2)}
+  font-family:var(--font);font-size:1.05rem;font-weight:700;color:var(--gold2)}
+.summary-info h3{font-family:var(--font);font-size:.88rem;font-weight:700;color:var(--gold2)}
 .summary-info p{font-size:.74rem;color:var(--muted);margin-top:5px;line-height:1.6}
 .ok-txt{color:var(--green2);font-weight:600}.bad-txt{color:#e05a4a;font-weight:600}
 
@@ -164,7 +164,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .kpi-card.warn::after{background:linear-gradient(90deg,#7a4010,var(--orange))}
 .kpi-icon{font-size:.95rem;margin-bottom:4px;display:block}
 .kpi-name{font-size:.58rem;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:2px}
-.kpi-val{font-family:var(--display);font-size:1.3rem;font-weight:700;line-height:1;color:var(--text)}
+.kpi-val{font-family:var(--font);font-size:1.3rem;font-weight:700;line-height:1;color:var(--text)}
 .kpi-val.ok{color:var(--green2)}.kpi-val.bad{color:#e05a4a}.kpi-val.warn{color:var(--orange)}
 .kpi-unit{font-size:.68rem;font-weight:400}
 .kpi-target{font-size:.56rem;color:var(--muted);margin-top:3px}
@@ -182,7 +182,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 @media(max-width:380px){.other-grid{grid-template-columns:repeat(2,1fr)}}
 .other-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center}
 .other-name{font-size:.56rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:3px}
-.other-val{font-family:var(--display);font-size:.92rem;font-weight:600;color:var(--text)}
+.other-val{font-family:var(--font);font-size:.92rem;font-weight:600;color:var(--text)}
 
 .data-banner{background:var(--dim);border:1px solid var(--border);border-radius:8px;
   padding:8px 12px;margin-bottom:2px;font-size:.67rem;color:var(--muted);
@@ -195,18 +195,18 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 #detailPanel{display:none;padding:14px 13px 48px;max-width:680px;margin:0 auto}
 .detail-back{display:flex;align-items:center;gap:8px;background:transparent;
   border:1px solid var(--border2);color:var(--gold);border-radius:10px;
-  padding:8px 14px;font-size:.8rem;font-family:var(--display);cursor:pointer;
+  padding:8px 14px;font-size:.8rem;font-family:var(--font);cursor:pointer;
   letter-spacing:.06em;margin-bottom:16px;transition:all .2s}
 .detail-back:hover{border-color:var(--gold);background:rgba(201,168,76,.06)}
 .detail-hero{background:var(--s1);border:1px solid var(--border2);border-radius:16px;
   padding:18px;margin-bottom:16px;position:relative;overflow:hidden}
 .detail-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
   background:linear-gradient(90deg,transparent,var(--gold),transparent)}
-.detail-hero-title{font-family:var(--display);font-size:.6rem;font-weight:600;
+.detail-hero-title{font-family:var(--font);font-size:.6rem;font-weight:600;
   text-transform:uppercase;letter-spacing:.14em;color:var(--gold3);margin-bottom:8px}
-.detail-hero-val{font-family:var(--display);font-size:2.2rem;font-weight:700}
+.detail-hero-val{font-family:var(--font);font-size:2.2rem;font-weight:700}
 .detail-hero-sub{font-size:.76rem;color:var(--muted);margin-top:4px;line-height:1.5}
-.detail-section{font-family:var(--display);font-size:.58rem;font-weight:600;
+.detail-section{font-family:var(--font);font-size:.58rem;font-weight:600;
   text-transform:uppercase;letter-spacing:.16em;color:var(--gold3);
   margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border);
   display:flex;align-items:center;gap:8px}
@@ -214,7 +214,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .stat-row{display:flex;gap:8px;margin-bottom:14px}
 .stat-box{flex:1;background:var(--dim);border:1px solid var(--border);
   border-radius:10px;padding:10px 8px;text-align:center}
-.stat-box .n{font-family:var(--display);font-size:1.4rem;font-weight:700;color:var(--gold2)}
+.stat-box .n{font-family:var(--font);font-size:1.4rem;font-weight:700;color:var(--gold2)}
 .stat-box .l{font-size:.62rem;color:var(--muted);margin-top:3px;line-height:1.3}
 .grade-legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .grade-pill{font-size:.65rem;font-weight:600;padding:3px 10px;border-radius:12px;letter-spacing:.04em}
@@ -233,7 +233,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .equipo-kpi{background:var(--dim);border:1px solid var(--border);border-radius:11px;
   padding:11px 8px;text-align:center}
 .equipo-kpi-name{font-size:.55rem;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:3px}
-.equipo-kpi-val{font-family:var(--display);font-size:1.15rem;font-weight:700}
+.equipo-kpi-val{font-family:var(--font);font-size:1.15rem;font-weight:700}
 
 /* Tecnico list */
 .tec-list{display:flex;flex-direction:column;gap:9px}
@@ -246,12 +246,12 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .tec-row.g-good{border-color:#3d3300}.tec-row.g-good::before{background:var(--gold2)}
 .tec-row.g-ok  {border-color:#3d2800}.tec-row.g-ok::before  {background:var(--orange)}
 .tec-row.g-bad {border-color:#3d1a1a}.tec-row.g-bad::before {background:#e05a4a}
-.tec-rank{font-family:var(--display);font-size:.65rem;color:var(--muted);width:18px;text-align:center;flex-shrink:0}
+.tec-rank{font-family:var(--font);font-size:.65rem;color:var(--muted);width:18px;text-align:center;flex-shrink:0}
 .tec-info{flex:1;min-width:0}
 .tec-name{font-size:.82rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tec-sub{font-size:.62rem;color:var(--muted);margin-top:2px}
 .tec-vals{display:flex;gap:8px;align-items:center;flex-shrink:0}
-.tec-mlv{font-family:var(--display);font-size:.95rem;font-weight:700}
+.tec-mlv{font-family:var(--font);font-size:.95rem;font-weight:700}
 .tec-mab{font-size:.7rem;color:var(--muted)}
 .tec-arrow{font-size:.7rem;color:var(--muted)}
 
@@ -268,12 +268,12 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .je-card.g-ok::before  {background:linear-gradient(90deg,transparent,var(--orange),transparent)}
 .je-card.g-bad::before {background:linear-gradient(90deg,transparent,#e05a4a,transparent)}
 .je-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-.je-card-name{font-family:var(--display);font-size:.85rem;font-weight:700;color:var(--gold2)}
+.je-card-name{font-family:var(--font);font-size:.85rem;font-weight:700;color:var(--gold2)}
 .je-card-id{font-size:.62rem;color:var(--muted);font-family:monospace}
-.je-card-mlv{font-family:var(--display);font-size:1.5rem;font-weight:700}
+.je-card-mlv{font-family:var(--font);font-size:1.5rem;font-weight:700}
 .je-mini-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
 .je-mini{text-align:center;background:var(--dim);border-radius:7px;padding:6px 4px}
-.je-mini-n{font-family:var(--display);font-size:.85rem;font-weight:700;color:var(--text)}
+.je-mini-n{font-family:var(--font);font-size:.85rem;font-weight:700;color:var(--text)}
 .je-mini-l{font-size:.52rem;color:var(--muted);margin-top:1px}
 .je-arrow{font-size:.7rem;color:var(--muted);margin-top:10px;text-align:right}
 
@@ -951,10 +951,10 @@ function renderEquipoPanel(jeId){
               cx="37" cy="37" r="30"
               stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
           </svg>
-          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:1rem;font-weight:700;color:${rmCol}">${pctRMequipo.toFixed(1)}%</div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:1rem;font-weight:700;color:${rmCol}">${pctRMequipo.toFixed(1)}%</div>
         </div>
         <div style="flex:1">
-          <div style="font-family:var(--display);font-size:.85rem;font-weight:700;color:var(--gold2)">%RM global del equipo</div>
+          <div style="font-family:var(--font);font-size:.85rem;font-weight:700;color:var(--gold2)">%RM global del equipo</div>
           <div style="font-size:.72rem;color:var(--muted);margin-top:4px;line-height:1.6">
             ${totalVisitas} visitas · <span style="color:#e05a4a;font-weight:600">${totalReps} repetidas</span> · ${rmTecs.length} técnicos con datos
           </div>
@@ -1128,14 +1128,14 @@ function buildTecDetailHTML(tec){
                 stroke-dasharray="${(2*Math.PI*23).toFixed(1)}"
                 stroke-dashoffset="${(2*Math.PI*23*(1-rm.pctRM/100)).toFixed(1)}"/>
             </svg>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:.82rem;font-weight:700;color:${rmCol}">${rm.pctRM}%</div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${rmCol}">${rm.pctRM}%</div>
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">🛠️ RMs</div>
             <div style="font-size:.75rem;color:var(--text)">${rm.total} visitas · <span style="color:#e05a4a">${rm.reps} repetidas</span></div>
             ${rm.topPost&&rm.topPost.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Causa raíz: <strong style="color:var(--orange)">${rm.topPost[0][0]}</strong></div>`:''}
           </div>
-          <button onclick="showRMDashFromTec('${tec.id}')" style="flex-shrink:0;padding:8px 12px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--display);font-size:.65rem;font-weight:700;cursor:pointer;text-transform:uppercase">Ver →</button>
+          <button onclick="showRMDashFromTec('${tec.id}')" style="flex-shrink:0;padding:8px 12px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.65rem;font-weight:700;cursor:pointer;text-transform:uppercase">Ver →</button>
         </div>`;
       }
       if(cum){
@@ -1149,14 +1149,14 @@ function buildTecDetailHTML(tec){
                 stroke-dasharray="${(2*Math.PI*23).toFixed(1)}"
                 stroke-dashoffset="${(2*Math.PI*23*(1-cum.pct/100)).toFixed(1)}"/>
             </svg>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:.82rem;font-weight:700;color:${cumCol}">${cum.pct}%</div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${cumCol}">${cum.pct}%</div>
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">✅ Cumplimiento</div>
             <div style="font-size:.75rem;color:var(--text)">${cum.total} visitas · <span style="color:#e05a4a">${cum.noOk} no cumplidas</span></div>
             ${cum.topRazones&&cum.topRazones.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Razón: <strong style="color:#e05a4a">${cum.topRazones[0][0]}</strong></div>`:'<div style="font-size:.62rem;color:var(--green2);margin-top:2px">Sin incumplimientos ✓</div>'}
           </div>
-          <button onclick="showCumDashFromTec('${tec.id}')" style="flex-shrink:0;padding:8px 12px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--display);font-size:.65rem;font-weight:700;cursor:pointer;text-transform:uppercase">Ver →</button>
+          <button onclick="showCumDashFromTec('${tec.id}')" style="flex-shrink:0;padding:8px 12px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.65rem;font-weight:700;cursor:pointer;text-transform:uppercase">Ver →</button>
         </div>`;
       }
       return html;
@@ -1409,7 +1409,7 @@ function _openRMDash(tecId){
             cx="35" cy="35" r="28"
             stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
         </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:.95rem;font-weight:700;color:${col}">${rm.pctRM}%</div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${rm.pctRM}%</div>
       </div>
       <div>
         <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
@@ -1466,7 +1466,7 @@ function showDetail(type){
       ${s==='ok'?`<span style="color:var(--green2)">✓ Por encima del objetivo (89.5%). ¡Buen trabajo!</span>`
         :`<span style="color:#e05a4a">✗ Necesitas reducir las repeticiones para superar el 89.5%.</span>`}
     </div>
-    <button onclick="showRMDash('${tec.id}')" style="margin-top:14px;width:100%;padding:12px;background:linear-gradient(135deg,var(--dim),#1c1400);border:1px solid var(--border2);border-radius:11px;color:var(--gold2);font-family:var(--display);font-size:.78rem;font-weight:700;letter-spacing:.08em;cursor:pointer;text-transform:uppercase">
+    <button onclick="showRMDash('${tec.id}')" style="margin-top:14px;width:100%;padding:12px;background:linear-gradient(135deg,var(--dim),#1c1400);border:1px solid var(--border2);border-radius:11px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;letter-spacing:.08em;cursor:pointer;text-transform:uppercase">
       📊 Ver dashboard de RMs →
     </button>`;
   } else if(type==='cum'){
@@ -1598,7 +1598,7 @@ function showEquipoDash(type, jeId){
     const extras=cfg.cols.map(c=>{
       const v=c.fn(t);
       const col=c.color?c.color(t):'var(--muted)';
-      return`<td style="padding:6px 4px;text-align:center;font-size:.7rem;font-family:var(--display);font-weight:700;color:${col}">${v}</td>`;
+      return`<td style="padding:6px 4px;text-align:center;font-size:.7rem;font-family:var(--font);font-weight:700;color:${col}">${v}</td>`;
     }).join('');
 
     return`<tr style="border-bottom:1px solid var(--border)">
@@ -1818,7 +1818,7 @@ function _openCumDash(tecId){
           <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
             cx="35" cy="35" r="28" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
         </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:.95rem;font-weight:700;color:${col}">${cum.pct}%</div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${cum.pct}%</div>
       </div>
       <div>
         <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
