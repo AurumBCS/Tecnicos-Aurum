@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_14.html -->
+<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_15.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -476,9 +476,9 @@ const JE_NAMES = {
   'JR9426': 'Coordinador Regional'
 };
 
-const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbw3z2v2lqshgLv7OZuAL4GWbzu_g2KW0FwcRlWd6UJBuPJoHM-qJH1n9k9br9WeMpaJ/exec?type=csv";
-const AUTH_URL = "https://script.google.com/macros/s/AKfycbw3z2v2lqshgLv7OZuAL4GWbzu_g2KW0FwcRlWd6UJBuPJoHM-qJH1n9k9br9WeMpaJ/exec?type=auth";
-const DOCS_URL = "https://script.google.com/macros/s/AKfycbw3z2v2lqshgLv7OZuAL4GWbzu_g2KW0FwcRlWd6UJBuPJoHM-qJH1n9k9br9WeMpaJ/exec?type=docs";
+const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbyrQbqmRxajG-J7JTrIO88N5ZLwZhTq6zUETIwSReHsOTtjMReyaIZin1xvYfn5G1Y/exec?type=csv";
+const AUTH_URL = "https://script.google.com/macros/s/AKfycbyrQbqmRxajG-J7JTrIO88N5ZLwZhTq6zUETIwSReHsOTtjMReyaIZin1xvYfn5G1Y/exec?type=auth";
+const DOCS_URL = "https://script.google.com/macros/s/AKfycbyrQbqmRxajG-J7JTrIO88N5ZLwZhTq6zUETIwSReHsOTtjMReyaIZin1xvYfn5G1Y/exec?type=docs";
 let AUTH_DATA = {};
 let DOCS_DATA = [];
 let _datosActualizados = false;
@@ -612,17 +612,17 @@ function parsePct(v){
 }
 function parseMoney(v){
   if(!v) return 0;
-  const s = String(v).replace(/€|\s/g,'').trim();
+  let s = String(v).replace(/€|\s|"/g,'').trim();
   const neg = s.startsWith('-');
-  // "232.00" o "1,234.00" o "1.234,00"
-  let n = s.replace('-','');
-  // Si tiene coma como decimal europeo: "1.234,00" → 1234.00
-  if(n.includes(',') && n.indexOf(',') > n.indexOf('.')){
-    n = n.replace(/\./g,'').replace(',','.');
+  s = s.replace('-','');
+  if(!s) return 0;
+  // "1.234,00" formato europeo
+  if(s.includes(',') && s.lastIndexOf(',') > s.lastIndexOf('.')){
+    s = s.replace(/\./g,'').replace(',','.');
   } else {
-    n = n.replace(',','');
+    s = s.replace(/,/g,'');
   }
-  const val = parseFloat(n) || 0;
+  const val = parseFloat(s) || 0;
   return neg ? -val : val;
 }
 function csvRow(r){
@@ -889,9 +889,12 @@ function renderMain(tec, returnToEquipo=false){
   }).join('');
 
   renderDocsPendientes(tec.id,'docsPendientesMain');
-  // Si DOCS_DATA vació, reintenta en background
+  // Reintento garantizado tras cargar docs
+  const _tecId = tec.id;
   if(!DOCS_DATA.length){
-    loadDocs().then(()=>renderDocsPendientes(tec.id,'docsPendientesMain'));
+    loadDocs().then(()=>{
+      renderDocsPendientes(_tecId,'docsPendientesMain');
+    });
   }
   showPanel('mainPanel');
 }
@@ -1691,9 +1694,15 @@ function showEquipoDash(type, jeId){
 // ══════════════════════════════════════════════
 function renderDocsPendientes(tecId, containerId){
   const id = String(tecId).trim().toUpperCase();
-  const docs = DOCS_DATA.filter(d=>String(d.mat).trim().toUpperCase()===id);
   const container = document.getElementById(containerId);
   if(!container) return;
+  const docs = DOCS_DATA.filter(d=>String(d.mat).trim().toUpperCase()===id);
+  console.log(`Docs para ${id}: ${docs.length} de ${DOCS_DATA.length} totales`);
+  if(!DOCS_DATA.length){
+    container.innerHTML=`<div class="section-head" style="margin-top:20px">📋 Documentación pendiente</div>
+      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:.75rem;color:var(--muted)">Cargando datos...</div>`;
+    return;
+  }
   if(!docs.length){
     container.innerHTML='';
     return;
@@ -1785,7 +1794,30 @@ async function doLogin(){
   document.getElementById('loginBtn').style.opacity='.5';
 
   // Cargar datos CSV y autenticación en paralelo
-  await Promise.all([loadSheets(), loadAuth(), loadDocs()]);
+  // Timeout helper — si tarda más de 8s continúa sin datos
+  const withTimeout = (promise, ms=8000) =>
+    Promise.race([promise, new Promise(r=>setTimeout(r, ms))]);
+
+  await Promise.all([
+    withTimeout(loadSheets()),
+    withTimeout(loadAuth())
+  ]);
+
+  // Si el timeout ganó, reintenta en background y re-renderiza al llegar
+  if(!_datosActualizados){
+    Promise.all([loadSheets(), loadAuth()]).then(()=>{
+      if(CURRENT_TEC) renderMain(CURRENT_TEC);
+      else if(CURRENT_JE_ID){
+        const jeTec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
+        if(jeTec && ACTIVE_TAB==='misDatos') renderMain(jeTec);
+      }
+    });
+  }
+
+  loadDocs().then(()=>{
+    if(CURRENT_TEC) renderDocsPendientes(CURRENT_TEC.id,'docsPendientesMain');
+    if(CURRENT_JE_ID) renderDocsEquipo(CURRENT_JE_ID,'equipoDocsContainer');
+  });
 
   document.getElementById('spinner').style.display='none';
   document.getElementById('loginBtn').style.opacity='1';
