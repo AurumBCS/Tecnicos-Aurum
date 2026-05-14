@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_12.html -->
+<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_13.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -347,7 +347,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="sync-dot"></div>
       Sincronizado desde Google Sheets · <span id="lastUpdate">—</span>
     </div>
-    <div class="section-head">Indicadores de calidad</div>
+    <div class="section-head">Indicadores de calidad · <span style="color:var(--orange);cursor:pointer" onclick="document.getElementById(&#39;docsPendientesMain&#39;).scrollIntoView({behavior:&#39;smooth&#39;})">📋 Docs pendientes</span></div>
     <div class="hero-metrics" id="heroMetrics"></div>
     <div class="section-head">Resumen de objetivos</div>
     <div class="summary-card fade-up" id="summaryCard"></div>
@@ -476,9 +476,9 @@ const JE_NAMES = {
   'JR9426': 'Coordinador Regional'
 };
 
-const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbwODYI3k0SrHRfFEQhBDAJdTlTCTcffl7ylpCIbPJUlzB0SgagFuc5c1c0BdRhflsSo/exec";
-const AUTH_URL = "https://script.google.com/macros/s/AKfycbzpbQ4SvoodiZY_GJjx7LhFphWZlSpcLeeZlh5OLETq1-SjykZvceHkk-wo7xjYl4Q9/exec";
-const DOCS_URL = "https://script.google.com/macros/s/AKfycbwaI6zxrwJorv-UPFMyDN-EYru0aYOCSZD1p0YSVl032irsxL87Nn49Lmry65YVEUNK/exec";
+const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbw3z2v2lqshgLv7OZuAL4GWbzu_g2KW0FwcRlWd6UJBuPJoHM-qJH1n9k9br9WeMpaJ/exec?type=csv";
+const AUTH_URL = "https://script.google.com/macros/s/AKfycbw3z2v2lqshgLv7OZuAL4GWbzu_g2KW0FwcRlWd6UJBuPJoHM-qJH1n9k9br9WeMpaJ/exec?type=auth";
+const DOCS_URL = "https://script.google.com/macros/s/AKfycbw3z2v2lqshgLv7OZuAL4GWbzu_g2KW0FwcRlWd6UJBuPJoHM-qJH1n9k9br9WeMpaJ/exec?type=docs";
 let AUTH_DATA = {};
 let DOCS_DATA = [];
 let _datosActualizados = false;
@@ -681,12 +681,17 @@ async function loadDocs(){
   try{
     const res=await fetch(DOCS_URL,{cache:'no-store'});
     if(!res.ok) return;
-    const data=await res.json();
-    if(Array.isArray(data) && data.length>0){
-      DOCS_DATA=data;
+    const text=await res.text();
+    const data=JSON.parse(text);
+    if(Array.isArray(data)&&data.length>0){
+      // Limpiar fecha: tomar solo la parte de fecha corta
+      DOCS_DATA=data.map(d=>({
+        ...d,
+        fecha: d.fecha ? d.fecha.toString().substring(0,15) : '—'
+      }));
       console.log('Docs cargados:',DOCS_DATA.length,'pendientes');
     }
-  }catch(e){console.log('Docs no disponible',e.message);}
+  }catch(e){console.log('Docs error:',e.message);}
 }
 
 async function loadSheets(){
@@ -884,6 +889,10 @@ function renderMain(tec, returnToEquipo=false){
   }).join('');
 
   renderDocsPendientes(tec.id,'docsPendientesMain');
+  // Si DOCS_DATA vació, reintenta en background
+  if(!DOCS_DATA.length){
+    loadDocs().then(()=>renderDocsPendientes(tec.id,'docsPendientesMain'));
+  }
   showPanel('mainPanel');
 }
 
