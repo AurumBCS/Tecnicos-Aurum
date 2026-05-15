@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_15.html -->
+<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_16.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -356,6 +356,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div class="section-head">Resto de indicadores</div>
     <div class="other-grid" id="otherGrid"></div>
     <div id="docsPendientesMain"></div>
+    <div id="flotaMain"></div>
   </div>
 
   <!-- Panel equipo JE -->
@@ -476,10 +477,12 @@ const JE_NAMES = {
   'JR9426': 'Coordinador Regional'
 };
 
-const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbyrQbqmRxajG-J7JTrIO88N5ZLwZhTq6zUETIwSReHsOTtjMReyaIZin1xvYfn5G1Y/exec?type=csv";
-const AUTH_URL = "https://script.google.com/macros/s/AKfycbyrQbqmRxajG-J7JTrIO88N5ZLwZhTq6zUETIwSReHsOTtjMReyaIZin1xvYfn5G1Y/exec?type=auth";
-const DOCS_URL = "https://script.google.com/macros/s/AKfycbyrQbqmRxajG-J7JTrIO88N5ZLwZhTq6zUETIwSReHsOTtjMReyaIZin1xvYfn5G1Y/exec?type=docs";
+const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbwVGfGGK2bMu9oWa3l6X675rzBphLei0tgQcn-BxqEku1jk_to83RPQFP69Qucxh2KO/exec?type=csv";
+const AUTH_URL = "https://script.google.com/macros/s/AKfycbwVGfGGK2bMu9oWa3l6X675rzBphLei0tgQcn-BxqEku1jk_to83RPQFP69Qucxh2KO/exec?type=auth";
+const DOCS_URL = "https://script.google.com/macros/s/AKfycbwVGfGGK2bMu9oWa3l6X675rzBphLei0tgQcn-BxqEku1jk_to83RPQFP69Qucxh2KO/exec?type=docs";
+const FLOTA_URL = "https://script.google.com/macros/s/AKfycbwVGfGGK2bMu9oWa3l6X675rzBphLei0tgQcn-BxqEku1jk_to83RPQFP69Qucxh2KO/exec?type=flota";
 let AUTH_DATA = {};
+let FLOTA_DATA = {};
 let DOCS_DATA = [];
 let _datosActualizados = false;
 
@@ -1770,6 +1773,43 @@ function renderDocsEquipo(jeId, containerId){
     </div>`;
 }
 
+
+// ══════════════════════════════════════════════
+//  FLOTA
+// ══════════════════════════════════════════════
+async function loadFlota(){
+  try{
+    const res=await fetch(FLOTA_URL,{cache:'no-store'});
+    if(!res.ok) return;
+    const data=await res.json();
+    if(data && typeof data==='object'){
+      FLOTA_DATA=data;
+      console.log('Flota cargada:',Object.keys(FLOTA_DATA).length,'técnicos');
+    }
+  }catch(e){console.log('Flota error:',e.message);}
+}
+
+function renderFlota(tecId, containerId){
+  const container=document.getElementById(containerId);
+  if(!container) return;
+  const id=String(tecId).trim().toUpperCase();
+  const coche=FLOTA_DATA[id];
+  if(!coche){ container.innerHTML=''; return; }
+  container.innerHTML=`
+    <div class="section-head" style="margin-top:20px">🚗 Vehículo asignado</div>
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
+      <div>
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">Matrícula asignada</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${coche}</div>
+      </div>
+      <div style="font-size:2.5rem">🚗</div>
+    </div>
+    <div style="background:rgba(212,131,26,.08);border:1px solid #3d2800;border-radius:10px;padding:10px 14px;margin-top:8px;font-size:.72rem;color:var(--orange)">
+      ⚠️ Si este vehículo no es el tuyo, comunícalo a tu jefe de equipo.
+    </div>`;
+}
+
 // ══════════════════════════════════════════════
 //  LOGIN
 // ══════════════════════════════════════════════
@@ -1817,6 +1857,9 @@ async function doLogin(){
   loadDocs().then(()=>{
     if(CURRENT_TEC) renderDocsPendientes(CURRENT_TEC.id,'docsPendientesMain');
     if(CURRENT_JE_ID) renderDocsEquipo(CURRENT_JE_ID,'equipoDocsContainer');
+  });
+  loadFlota().then(()=>{
+    if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
 
   document.getElementById('spinner').style.display='none';
