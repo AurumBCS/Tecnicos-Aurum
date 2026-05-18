@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_17.html -->
+<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_19.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -675,9 +675,14 @@ async function loadAuth(){
     const data=await res.json();
     if(data && typeof data==='object' && Object.keys(data).length>0){
       AUTH_DATA=data;
-      console.log('Auth cargado:',Object.keys(AUTH_DATA).length,'técnicos');
     }
-  }catch(e){console.log('Auth no disponible, acceso sin validación',e.message);}
+  }catch(e){console.log('Auth no disponible',e.message);}
+  // Añadir usuarios especiales siempre (aunque falle el script)
+  AUTH_DATA['CM9651']      = 'Y4798543K';
+  AUTH_DATA['JN4767']      = '77843052N';
+  AUTH_DATA['GD5381']      = '60233494J';
+  AUTH_DATA['BLAS.ALVAREZ']= '80065456H';
+  AUTH_DATA['JR9426']      = 'JR9426'; // contraseña = matrícula
 }
 
 async function loadDocs(){
@@ -1205,82 +1210,90 @@ function buildTecDetailHTML(tec){
 // ══════════════════════════════════════════════
 function renderJRPanel(){
   const jeIds = JERARQUIA['JR9426']||[];
+  const GRUPOS = [
+    { nombre:'Zonas 4 y 5', jeIds:['Q29994','Q28224','273371'], color:'#c9a84c' },
+    { nombre:'Zonas 6 y 7', jeIds:['286800','273379','239831'], color:'#3daa6e' }
+  ];
+
   // Resumen global
   const allTecs=jeIds.flatMap(id=>getTecnicosOfJE(id));
   const globalAv=calcAvg(allTecs);
   const glvG=getGrade(globalAv.mlv||0);
   const gmabG=getGrade(globalAv.mab||0);
   document.getElementById('jrResumen').innerHTML=`
-    <div class="equipo-kpi">
-      <div class="equipo-kpi-name">ML-V global</div>
-      <div class="equipo-kpi-val" style="color:${gradeColor(glvG)}">${(globalAv.mlv||0).toFixed(2)}</div>
-    </div>
-    <div class="equipo-kpi">
-      <div class="equipo-kpi-name">MA+B global</div>
-      <div class="equipo-kpi-val" style="color:${gradeColor(gmabG)}">${(globalAv.mab||0).toFixed(2)}</div>
-    </div>
-    <div class="equipo-kpi">
-      <div class="equipo-kpi-name">%RM global</div>
-      <div class="equipo-kpi-val" style="color:${(globalAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(globalAv.pRM||0).toFixed(1)}%</div>
-    </div>
-    <div class="equipo-kpi">
-      <div class="equipo-kpi-name">%Cum global</div>
-      <div class="equipo-kpi-val" style="color:${(globalAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(globalAv.pCum||0).toFixed(1)}%</div>
-    </div>
-    <div class="equipo-kpi">
-      <div class="equipo-kpi-name">Conv global</div>
-      <div class="equipo-kpi-val" style="color:${(globalAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(globalAv.conv||0).toFixed(1)}%</div>
-    </div>
-    <div class="equipo-kpi">
-      <div class="equipo-kpi-name">Técnicos</div>
-      <div class="equipo-kpi-val" style="color:var(--gold2)">${allTecs.length}</div>
+    <div class="equipo-kpi"><div class="equipo-kpi-name">ML-V global</div>
+      <div class="equipo-kpi-val" style="color:${gradeColor(glvG)}">${(globalAv.mlv||0).toFixed(2)}</div></div>
+    <div class="equipo-kpi"><div class="equipo-kpi-name">MA+B global</div>
+      <div class="equipo-kpi-val" style="color:${gradeColor(gmabG)}">${(globalAv.mab||0).toFixed(2)}</div></div>
+    <div class="equipo-kpi"><div class="equipo-kpi-name">%RM global</div>
+      <div class="equipo-kpi-val" style="color:${(globalAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(globalAv.pRM||0).toFixed(1)}%</div></div>
+    <div class="equipo-kpi"><div class="equipo-kpi-name">%Cum global</div>
+      <div class="equipo-kpi-val" style="color:${(globalAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(globalAv.pCum||0).toFixed(1)}%</div></div>
+    <div class="equipo-kpi"><div class="equipo-kpi-name">Conv global</div>
+      <div class="equipo-kpi-val" style="color:${(globalAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(globalAv.conv||0).toFixed(1)}%</div></div>
+    <div class="equipo-kpi"><div class="equipo-kpi-name">Técnicos</div>
+      <div class="equipo-kpi-val" style="color:var(--gold2)">${allTecs.length}</div></div>`;
+
+  // Lista agrupada por zonas
+  let jeListHTML = '';
+  GRUPOS.forEach(grupo => {
+    const grupoTecs = grupo.jeIds.flatMap(id=>getTecnicosOfJE(id));
+    const grupoAv = calcAvg(grupoTecs);
+    const gCol = grupoAv.mlv>=7?'var(--green2)':grupoAv.mlv>=6.5?'var(--orange)':'#e05a4a';
+
+    // Header del grupo con métricas totales
+    jeListHTML += `<div style="background:var(--dim);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:8px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${grupo.color},transparent)"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:.88rem;font-weight:800;color:${grupo.color}">${grupo.nombre}</div>
+        <div style="font-size:.72rem;color:var(--muted)">${grupoTecs.length} técnicos</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+        <div class="je-mini"><div class="je-mini-n" style="color:${gCol}">${(grupoAv.mlv||0).toFixed(2)}</div><div class="je-mini-l">ML-V</div></div>
+        <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(grupoAv.pRM||0).toFixed(1)}%</div><div class="je-mini-l">%RM</div></div>
+        <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(grupoAv.pCum||0).toFixed(1)}%</div><div class="je-mini-l">%Cum</div></div>
+        <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(grupoAv.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
+      </div>
     </div>`;
 
-  // Lista JEs ordenados por ML-V promedio
-  const jeSummaries=jeIds.map(id=>{
-    const tecs=getTecnicosOfJE(id);
-    const av=calcAvg(tecs);
-    const jeTec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
-    return {id, nombre:JE_NAMES[id]||id, tecs, av, jeTec};
-  }).sort((a,b)=>(b.av.mlv||0)-(a.av.mlv||0));
+    // JEs individuales del grupo
+    const jeSummaries = grupo.jeIds.map(id=>{
+      const tecs=getTecnicosOfJE(id);
+      const av=calcAvg(tecs);
+      return {id, nombre:JE_NAMES[id]||id, tecs, av};
+    }).sort((a,b)=>(b.av.mlv||0)-(a.av.mlv||0));
 
-  document.getElementById('jeList').innerHTML=jeSummaries.map(je=>{
-    const g=getGrade(je.av.mlv||0);
-    const col=gradeColor(g);
-    const rmOk=(je.av.pRM||0)>=89.5,cumOk=(je.av.pCum||0)>=90,convOk=(je.av.conv||0)>=15;
-    return`<div class="je-card g-${g} fade-up" onclick="showJEDetail('${je.id}')">
-      <div class="je-card-top">
-        <div>
-          <div class="je-card-name">${je.nombre}</div>
-          <div class="je-card-id">${je.id} · ${je.tecs.length} técnicos</div>
+    jeListHTML += jeSummaries.map(je=>{
+      const g=getGrade(je.av.mlv||0);
+      const col=gradeColor(g);
+      const rmOk=(je.av.pRM||0)>=89.5,cumOk=(je.av.pCum||0)>=90,convOk=(je.av.conv||0)>=15;
+      return`<div class="je-card g-${g} fade-up" onclick="showJEDetail('${je.id}')" style="margin-bottom:8px">
+        <div class="je-card-top">
+          <div>
+            <div class="je-card-name">${je.nombre}</div>
+            <div class="je-card-id">${je.id} · ${je.tecs.length} técnicos</div>
+          </div>
+          <div style="text-align:right">
+            <div class="je-card-mlv" style="color:${col}">${(je.av.mlv||0).toFixed(2)}</div>
+            <div style="font-size:.62rem;color:var(--muted)">ML-V promedio</div>
+          </div>
         </div>
-        <div style="text-align:right">
-          <div class="je-card-mlv" style="color:${col}">${(je.av.mlv||0).toFixed(2)}</div>
-          <div style="font-size:.62rem;color:var(--muted)">ML-V promedio</div>
+        <div class="je-mini-grid">
+          <div class="je-mini"><div class="je-mini-n" style="color:${gradeColor(getGrade(je.av.mab||0))}">${(je.av.mab||0).toFixed(2)}</div><div class="je-mini-l">MA+B</div></div>
+          <div class="je-mini"><div class="je-mini-n" style="color:${rmOk?'var(--green2)':'#e05a4a'}">${(je.av.pRM||0).toFixed(1)}%</div><div class="je-mini-l">%RM</div></div>
+          <div class="je-mini"><div class="je-mini-n" style="color:${cumOk?'var(--green2)':'#e05a4a'}">${(je.av.pCum||0).toFixed(1)}%</div><div class="je-mini-l">%Cum</div></div>
+          <div class="je-mini"><div class="je-mini-n" style="color:${convOk?'var(--green2)':'#e05a4a'}">${(je.av.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
         </div>
-      </div>
-      <div class="je-mini-grid">
-        <div class="je-mini">
-          <div class="je-mini-n" style="color:${gradeColor(getGrade(je.av.mab||0))}">${(je.av.mab||0).toFixed(2)}</div>
-          <div class="je-mini-l">MA+B</div>
-        </div>
-        <div class="je-mini">
-          <div class="je-mini-n" style="color:${rmOk?'var(--green2)':'#e05a4a'}">${(je.av.pRM||0).toFixed(1)}%</div>
-          <div class="je-mini-l">%RM</div>
-        </div>
-        <div class="je-mini">
-          <div class="je-mini-n" style="color:${cumOk?'var(--green2)':'#e05a4a'}">${(je.av.pCum||0).toFixed(1)}%</div>
-          <div class="je-mini-l">%Cum</div>
-        </div>
-        <div class="je-mini">
-          <div class="je-mini-n" style="color:${convOk?'var(--green2)':'#e05a4a'}">${(je.av.conv||0).toFixed(1)}%</div>
-          <div class="je-mini-l">Conv</div>
-        </div>
-      </div>
-      <div class="je-arrow">Ver equipo completo →</div>
-    </div>`;
-  }).join('');
+        <div class="je-arrow">Ver equipo completo →</div>
+      </div>`;
+    }).join('');
+
+    jeListHTML += '<div style="height:12px"></div>'; // separador entre grupos
+  });
+
+  document.getElementById('jeList').innerHTML=jeListHTML;
 }
+
 
 // ══════════════════════════════════════════════
 //  DETALLE JE DESDE JR
@@ -1815,11 +1828,10 @@ function renderFlota(tecId, containerId){
 // ══════════════════════════════════════════════
 function findUser(q){
   q=q.trim().toUpperCase();
-  // ¿Es JR?
-  if(q==='JR9426') return {type:'jr',id:'JR9426'};
-  // ¿Es JE?
+  // JR nivel — acceso igual que JR9426
+  const JR_IDS=['JR9426','CM9651','JN4767','GD5381','BLAS.ALVAREZ'];
+  if(JR_IDS.includes(q)) return {type:'jr',id:q};
   if(JERARQUIA[q]) return {type:'je',id:q};
-  // ¿Es técnico normal?
   const tec=CURRENT_DATA.tecnicos.find(t=>
     t.id.toUpperCase()===q||t.raw.toUpperCase().includes(q)||t.nombre.toUpperCase().includes(q));
   if(tec) return {type:'tecnico',tec};
@@ -1868,7 +1880,7 @@ async function doLogin(){
   // Validar DNI si tenemos datos de auth
   if(Object.keys(AUTH_DATA).length > 0){
     const dniEsperado = AUTH_DATA[mat];
-    if(!dniEsperado || dniEsperado !== dni){
+    if(!dniEsperado || dniEsperado.toUpperCase() !== dni.toUpperCase()){
       document.getElementById('loginError').style.display='block';
       document.getElementById('matInput').style.borderColor='#c0392b';
       document.getElementById('dniInput').style.borderColor='#c0392b';
@@ -1886,10 +1898,16 @@ async function doLogin(){
   document.getElementById('appScreen').style.display='block';
 
   if(found.type==='jr'){
-    // JR9426: solo vista lista JEs
     CURRENT_USER_TYPE='jr';
-    document.getElementById('topbarName').textContent='Coordinador Regional';
-    document.getElementById('topbarId').textContent='JR9426 · Regional';
+    const JR_NOMBRES={
+      'JR9426':'Coordinador Regional',
+      'CM9651':'Coordinador Regional',
+      'JN4767':'Coordinador Regional',
+      'GD5381':'Coordinador Regional',
+      'BLAS.ALVAREZ':'Blas Álvarez'
+    };
+    document.getElementById('topbarName').textContent=JR_NOMBRES[found.id]||'Coordinador Regional';
+    document.getElementById('topbarId').textContent=found.id+' · Regional';
     document.getElementById('scorePill').innerHTML='<span style="color:var(--gold2);font-weight:700">Vista global</span>';
     document.getElementById('tabsBarJR').style.display='flex';
     document.getElementById('tabsBar').style.display='none';
@@ -2058,7 +2076,7 @@ document.getElementById('dniInput').addEventListener('keydown',e=>{if(e.key==='E
 let autoLogout;
 function resetTimer(){
   clearTimeout(autoLogout);
-  autoLogout=setTimeout(()=>{doLogout();alert('Sesión cerrada por inactividad.');},5*60*1000);
+  autoLogout=setTimeout(()=>{doLogout();alert('Sesión cerrada por inactividad.');},30*60*1000);
 }
 document.addEventListener('click',resetTimer);
 document.addEventListener('touchstart',resetTimer);
