@@ -2233,14 +2233,19 @@ function renderCFLPanel() {
 }
 
 // Cargar al inicio
-cargarMedalia().then(() =&gt; {
+// Cargar al inicio
+cargarMedalia().then(() => {
   if(CURRENT_USER_TYPE === 'jr') {
     // Solo mostrar CFL para coordinadores
     const coordinadores = ['JR9426', 'CM9651', 'JN476', 'GD5381', 'BLAS.ALVAREZ'];
-    if(coordinadores.includes(CURRENT_USER.id.toUpperCase())) {
+    const userId = document.getElementById('topbarId').textContent.split(' ')[0].toUpperCase();
+    console.log('User ID:', userId, 'Es coordinador?', coordinadores.includes(userId));
+    if(coordinadores.includes(userId)) {
       document.getElementById('tabCFL').style.display = '';
+      console.log('✓ CFL visible para:', userId);
     } else {
       document.getElementById('tabCFL').style.display = 'none';
+      console.log('✗ CFL no visible para:', userId);
     }
   }
 });
