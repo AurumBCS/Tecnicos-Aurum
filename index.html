@@ -1810,13 +1810,47 @@ async function loadFlota(){
   }catch(e){console.log('Flota error:',e.message);}
 }
 
+async function loadVacaciones(){
+  try{
+    const res=await fetch(VACACIONES_URL+'&t='+Date.now(),{cache:'no-store'});
+    if(!res.ok) return;
+    const text=await res.text();
+    const lines=text.trim().split('\n');
+    if(lines.length<2) return;
+    
+    const headers=lines[0].split(',').map(h=>h.trim());
+    const matriculaIdx=headers.findIndex(h=>h.toLowerCase().includes('matrícula'));
+    const consumidoIdx=headers.findIndex(h=>h.toLowerCase().includes('consumido'));
+    const dispoIdx=headers.findIndex(h=>h.toLowerCase().includes('dispo'));
+    const apIdx=headers.findIndex(h=>h===h.toUpperCase() && h==='AP');
+    
+    if(matriculaIdx===-1) return;
+    
+    for(let i=1;i<lines.length;i++){
+      const cells=lines[i].split(',').map(c=>c.trim());
+      if(cells.length<matriculaIdx+1) continue;
+      const mat=cells[matriculaIdx].toUpperCase();
+      if(!mat) continue;
+      
+      VACACIONES_DATA[mat]={
+        consumido: consumidoIdx!==-1 ? parseInt(cells[consumidoIdx])||0 : 0,
+        disponible: dispoIdx!==-1 ? parseInt(cells[dispoIdx])||0 : 0,
+        ap: apIdx!==-1 ? parseInt(cells[apIdx])||0 : 0
+      };
+    }
+    console.log('Vacaciones cargadas para',Object.keys(VACACIONES_DATA).length,'técnicos');
+  }catch(e){console.log('Vacaciones error:',e.message);}
+}
+
 function renderFlota(tecId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
   const id=String(tecId).trim().toUpperCase();
   const coche=FLOTA_DATA[id];
-  if(!coche){ container.innerHTML=''; return; }
-  container.innerHTML=`
+  
+  let html=``;
+  if(coche){
+    html+=`
     <div class="section-head" style="margin-top:20px">🚗 Vehículo asignado</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
@@ -1829,6 +1863,36 @@ function renderFlota(tecId, containerId){
     <div style="background:rgba(212,131,26,.08);border:1px solid #3d2800;border-radius:10px;padding:10px 14px;margin-top:8px;font-size:.72rem;color:var(--orange)">
       ⚠️ Si este vehículo no es el tuyo, comunícalo a tu jefe de equipo.
     </div>`;
+  }
+  
+  const vac=VACACIONES_DATA[id];
+  if(vac){
+    const statusColor=vac.disponible>5?'var(--green2)':vac.disponible>0?'var(--orange)':'#e05a4a';
+    html+=`
+    <div class="section-head" style="margin-top:20px">📅 Vacaciones 2026</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;text-align:center;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--green2),transparent)"></div>
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px">Vacaciones</div>
+        <div style="font-size:1.8rem;font-weight:800;color:var(--green2)">${vac.consumido}</div>
+        <div style="font-size:.65rem;color:var(--muted);margin-top:4px">días disfrutados</div>
+      </div>
+      <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;text-align:center;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--orange),transparent)"></div>
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px">Asuntos</div>
+        <div style="font-size:1.8rem;font-weight:800;color:var(--orange)">${vac.ap}</div>
+        <div style="font-size:.65rem;color:var(--muted);margin-top:4px">días personales</div>
+      </div>
+      <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;text-align:center;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${statusColor},transparent)"></div>
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px">Disponibles</div>
+        <div style="font-size:1.8rem;font-weight:800;color:${statusColor}">${vac.disponible}</div>
+        <div style="font-size:.65rem;color:var(--muted);margin-top:4px">días restantes</div>
+      </div>
+    </div>`;
+  }
+  
+  container.innerHTML=html;
 }
 
 // ══════════════════════════════════════════════
@@ -1879,6 +1943,9 @@ async function doLogin(){
     if(CURRENT_JE_ID) renderDocsEquipo(CURRENT_JE_ID,'equipoDocsContainer');
   });
   loadFlota().then(()=>{
+    if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
+  });
+  loadVacaciones().then(()=>{
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
 
@@ -2087,7 +2154,8 @@ async function refreshData(){
       loadSheets(),
       loadAuth(),
       loadDocs(),
-      loadFlota()
+      loadFlota(),
+      loadVacaciones()
     ]);
 
     if(CURRENT_TEC) {
