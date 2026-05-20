@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0061)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_OPTIMIZADO.html -->
+<!-- saved from url=(0063)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_OPTIMIZADO_1.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -303,8 +303,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <label class="login-label" for="dniInput" style="margin-top:10px">Contraseña (DNI)</label>
       <input class="login-input" id="dniInput" type="password" placeholder="Introduce tu DNI…" autocomplete="off">
       <button class="login-btn" id="loginBtn">Acceder</button>
-      <div class="spinner" id="spinner" style="display: none;"></div>
-      <div class="login-error" id="loginError" style="display: block;">❌ Matrícula o contraseña incorrecta.</div>
+      <div class="spinner" id="spinner"></div>
+      <div class="login-error" id="loginError">❌ Matrícula o contraseña incorrecta.</div>
       <div class="login-footer">Datos desde Google Sheets · Aurum BC Security<br>Confidencial · Solo para uso interno</div>
     </div>
   </div>
@@ -451,7 +451,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 </div>
 
 <script>
-const SHEET_API = 'AKfycbx4XzqEycpeg9AeSVuZON-xjX-fOA-yzLSNygtA3YGg52HwmIWtr4barsn76_je2f6v';
+const SHEET_API = 'https://script.google.com/macros/s/AKfycbzSnj2-7tDHocDA2PxZ_phOtCCd5_p7uG6PiUhOCLOV1lmq7Iq5dk2OxQf3nXngboCJ/exec';
 let CURRENT_DATA = {}, CUM_DATA = {}, RM_DATA = {}, DOCS_DATA = {}, FLOTA_DATA = {}, MEDALIA_DATA = [];
 let CURRENT_USER_TYPE = null, CURRENT_TEC = null, CURRENT_JE_ID = null, ACTIVE_TAB = 'misDatos';
 let CURRENT_CFL_ZONA = 'Zona 4-5';
