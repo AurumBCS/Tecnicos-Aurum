@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_20.html -->
+<!-- saved from url=(0061)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_OPTIMIZADO.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Aurum BC">
 <title>Aurum BC Security</title>
 <link rel="preconnect" href="https://fonts.googleapis.com/">
-<link href="./Index_files/css2" rel="stylesheet">
+<link href="file:///C:/Users/Viatek/Downloads/Index_files/css2" rel="stylesheet">
 <style>
 :root{
   --bg:#0a0a0a;--s1:#111;--s2:#181818;
@@ -303,8 +303,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <label class="login-label" for="dniInput" style="margin-top:10px">Contraseña (DNI)</label>
       <input class="login-input" id="dniInput" type="password" placeholder="Introduce tu DNI…" autocomplete="off">
       <button class="login-btn" id="loginBtn">Acceder</button>
-      <div class="spinner" id="spinner"></div>
-      <div class="login-error" id="loginError">❌ Matrícula o contraseña incorrecta.</div>
+      <div class="spinner" id="spinner" style="display: none;"></div>
+      <div class="login-error" id="loginError" style="display: block;">❌ Matrícula o contraseña incorrecta.</div>
       <div class="login-footer">Datos desde Google Sheets · Aurum BC Security<br>Confidencial · Solo para uso interno</div>
     </div>
   </div>
@@ -326,7 +326,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <div class="month-banner">
     <div>
       <div class="month-label">Periodo activo</div>
-      <div class="month-title" id="monthTitle">—</div>
+      <div class="month-title" id="monthTitle">mayo de 2026</div>
     </div>
     <div class="score-pill" id="scorePill">—</div>
   </div>
@@ -339,7 +339,6 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <!-- Tabs para JR -->
   <div class="tabs-bar" id="tabsBarJR" style="display:none">
     <button class="tab-btn active" id="tabJEs" onclick="switchTab(&#39;jes&#39;)">Jefes de equipo</button>
-    <button class="tab-btn" id="tabCFL" onclick="switchTab('cfl')">CFL Medalia</button>
   </div>
 
   <!-- Panel técnico normal -->
@@ -448,1837 +447,291 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <button class="detail-back" id="backCumBtn">← Volver</button>
       <div id="cumDashContent"></div>
     </div>
-  
-  <!-- Panel CFL (Medalia) para coordinadores -->
-  <div id="cflPanel">
-    <div style="padding:14px 13px 48px;max-width:680px;margin:0 auto">
-      <div class="data-banner" style="margin-bottom:14px">
-        <div class="sync-dot"></div>
-        Dashboard CFL · Notas globales de encuestas Medalia
-      </div>
-      
-      <!-- Tabs por zona -->
-      <div class="tabs-bar" id="cflZonaTabs" style="gap:4px;overflow-x:auto;border-bottom:1px solid var(--border)">
-        <button class="tab-btn active" data-zona="Zona 4-5" onclick="switchCFLZona('Zona 4-5')">Zona 4-5</button>
-        <button class="tab-btn" data-zona="Zona 6-7" onclick="switchCFLZona('Zona 6-7')">Zona 6-7</button>
-      </div>
-      
-      <!-- Resumen por tipo CFL -->
-      <div class="section-head">Resumen por tipo</div>
-      <div id="cflResumen" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div>
-      
-      <!-- Desplegable de técnicos -->
-      <div class="section-head">Técnicos · Notas y comentarios</div>
-      <div style="margin-bottom:14px">
-        <select id="cflTecSelect" style="width:100%;padding:10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--font);cursor:pointer">
-          <option value="">Selecciona un técnico...</option>
-        </select>
-      </div>
-      
-      <!-- Detalle técnico -->
-      <div id="cflTecDetail"></div>
-    </div>
   </div>
-
-</div>
 </div>
 
 <script>
-// ══════════════════════════════════════════════
-//  JERARQUÍA
-// ══════════════════════════════════════════════
-const CUM_DATA = {"334204":{"total":33,"ok":30,"noOk":3,"pct":90.9,"topRazones":[["Titular, cliente no está",1]],"avOk":13,"avNo":1,"noavOk":17,"noavNo":2},"247472":{"total":44,"ok":42,"noOk":2,"pct":95.5,"topRazones":[],"avOk":23,"avNo":2,"noavOk":19,"noavNo":0},"338851":{"total":38,"ok":36,"noOk":2,"pct":94.7,"topRazones":[],"avOk":22,"avNo":1,"noavOk":14,"noavNo":1},"356455":{"total":33,"ok":26,"noOk":7,"pct":78.8,"topRazones":[["N/A",1]],"avOk":16,"avNo":6,"noavOk":10,"noavNo":1},"333528":{"total":32,"ok":31,"noOk":1,"pct":96.9,"topRazones":[],"avOk":18,"avNo":0,"noavOk":13,"noavNo":1},"356452":{"total":40,"ok":36,"noOk":4,"pct":90.0,"topRazones":[["N/A",1],["Cliente se tiene que marchar",1]],"avOk":14,"avNo":1,"noavOk":22,"noavNo":3},"356441":{"total":36,"ok":33,"noOk":3,"pct":91.7,"topRazones":[["Titular, cliente no está",1]],"avOk":18,"avNo":3,"noavOk":15,"noavNo":0},"314303":{"total":36,"ok":34,"noOk":2,"pct":94.4,"topRazones":[],"avOk":19,"avNo":1,"noavOk":15,"noavNo":1},"356442":{"total":31,"ok":28,"noOk":3,"pct":90.3,"topRazones":[["Incidencia en medios, Herramientas",1],["N/A",1]],"avOk":17,"avNo":1,"noavOk":11,"noavNo":2},"333156":{"total":43,"ok":39,"noOk":4,"pct":90.7,"topRazones":[["N/A",2]],"avOk":23,"avNo":2,"noavOk":16,"noavNo":2},"343017":{"total":31,"ok":29,"noOk":2,"pct":93.5,"topRazones":[["Cliente se tiene que marchar",1]],"avOk":22,"avNo":1,"noavOk":7,"noavNo":1},"317024":{"total":26,"ok":24,"noOk":2,"pct":92.3,"topRazones":[],"avOk":16,"avNo":1,"noavOk":8,"noavNo":1},"299538":{"total":31,"ok":27,"noOk":4,"pct":87.1,"topRazones":[["N/A",1]],"avOk":10,"avNo":2,"noavOk":17,"noavNo":2},"307113":{"total":36,"ok":33,"noOk":3,"pct":91.7,"topRazones":[["Titular, cliente no está",2]],"avOk":20,"avNo":1,"noavOk":13,"noavNo":2},"310655":{"total":38,"ok":33,"noOk":5,"pct":86.8,"topRazones":[["N/A",1],["Titular, cliente no está",1]],"avOk":20,"avNo":3,"noavOk":13,"noavNo":2},"356434":{"total":48,"ok":42,"noOk":6,"pct":87.5,"topRazones":[["Titular, cliente no está",2],["N/A",1]],"avOk":25,"avNo":3,"noavOk":17,"noavNo":3},"303760":{"total":39,"ok":38,"noOk":1,"pct":97.4,"topRazones":[["N/A",1]],"avOk":24,"avNo":0,"noavOk":14,"noavNo":1},"315166":{"total":26,"ok":24,"noOk":2,"pct":92.3,"topRazones":[["Pendiente solución del cliente",1]],"avOk":11,"avNo":0,"noavOk":13,"noavNo":2},"340320":{"total":38,"ok":37,"noOk":1,"pct":97.4,"topRazones":[],"avOk":27,"avNo":0,"noavOk":10,"noavNo":1},"337588":{"total":28,"ok":27,"noOk":1,"pct":96.4,"topRazones":[],"avOk":10,"avNo":0,"noavOk":17,"noavNo":1},"312756":{"total":33,"ok":31,"noOk":2,"pct":93.9,"topRazones":[["Titular, cliente no está",1]],"avOk":19,"avNo":0,"noavOk":12,"noavNo":2},"339251":{"total":35,"ok":32,"noOk":3,"pct":91.4,"topRazones":[["Titular, cliente no está",1]],"avOk":16,"avNo":0,"noavOk":16,"noavNo":3},"Q30910":{"total":29,"ok":27,"noOk":2,"pct":93.1,"topRazones":[["N/A",1]],"avOk":13,"avNo":0,"noavOk":14,"noavNo":2},"290754":{"total":34,"ok":30,"noOk":4,"pct":88.2,"topRazones":[["N/A",1]],"avOk":13,"avNo":2,"noavOk":17,"noavNo":2},"356432":{"total":42,"ok":40,"noOk":2,"pct":95.2,"topRazones":[["Titular, cliente no está",1]],"avOk":28,"avNo":1,"noavOk":12,"noavNo":1},"301652":{"total":43,"ok":41,"noOk":2,"pct":95.3,"topRazones":[],"avOk":25,"avNo":0,"noavOk":16,"noavNo":2},"286106":{"total":39,"ok":33,"noOk":6,"pct":84.6,"topRazones":[["Titular, cliente no está",1],["Pendiente solución del cliente",1]],"avOk":25,"avNo":2,"noavOk":8,"noavNo":4},"279300":{"total":31,"ok":28,"noOk":3,"pct":90.3,"topRazones":[["N/A",1]],"avOk":7,"avNo":0,"noavOk":21,"noavNo":3},"277029":{"total":37,"ok":30,"noOk":7,"pct":81.1,"topRazones":[["N/A",2],["Titular, cliente no está",1],["Pendiente de material, habitual",1],["Técnico sin Skills",1]],"avOk":15,"avNo":2,"noavOk":15,"noavNo":5},"294255":{"total":27,"ok":24,"noOk":3,"pct":88.9,"topRazones":[],"avOk":12,"avNo":1,"noavOk":12,"noavNo":2},"353969":{"total":36,"ok":31,"noOk":5,"pct":86.1,"topRazones":[["Titular, cliente no está",1]],"avOk":15,"avNo":1,"noavOk":16,"noavNo":4},"333158":{"total":36,"ok":34,"noOk":2,"pct":94.4,"topRazones":[],"avOk":20,"avNo":0,"noavOk":14,"noavNo":2},"356448":{"total":44,"ok":38,"noOk":6,"pct":86.4,"topRazones":[["Titular, cliente no está",2]],"avOk":22,"avNo":1,"noavOk":16,"noavNo":5},"302786":{"total":36,"ok":34,"noOk":2,"pct":94.4,"topRazones":[["N/A",1],["Otros",1]],"avOk":11,"avNo":1,"noavOk":23,"noavNo":1},"356444":{"total":37,"ok":35,"noOk":2,"pct":94.6,"topRazones":[["Titular, cliente no está",1]],"avOk":21,"avNo":0,"noavOk":14,"noavNo":2},"356980":{"total":31,"ok":26,"noOk":5,"pct":83.9,"topRazones":[["Titular, cliente no está",1],["Incidencia en medios, Herramientas",1],["N/A",1]],"avOk":12,"avNo":2,"noavOk":14,"noavNo":3},"359191":{"total":30,"ok":29,"noOk":1,"pct":96.7,"topRazones":[["Titular, cliente no está",1]],"avOk":15,"avNo":1,"noavOk":14,"noavNo":0},"356426":{"total":49,"ok":43,"noOk":6,"pct":87.8,"topRazones":[["Cliente se tiene que marchar",1],["N/A",1],["Pendiente de material, habitual",1]],"avOk":19,"avNo":3,"noavOk":24,"noavNo":3},"359189":{"total":35,"ok":30,"noOk":5,"pct":85.7,"topRazones":[["Cliente se tiene que marchar",1]],"avOk":14,"avNo":2,"noavOk":16,"noavNo":3},"339886":{"total":36,"ok":35,"noOk":1,"pct":97.2,"topRazones":[],"avOk":12,"avNo":1,"noavOk":23,"noavNo":0},"356431":{"total":35,"ok":31,"noOk":4,"pct":88.6,"topRazones":[["N/A",1]],"avOk":13,"avNo":0,"noavOk":18,"noavNo":4},"359193":{"total":26,"ok":24,"noOk":2,"pct":92.3,"topRazones":[["Titular, cliente no está",1]],"avOk":13,"avNo":1,"noavOk":11,"noavNo":1},"342074":{"total":39,"ok":33,"noOk":6,"pct":84.6,"topRazones":[["Titular, cliente no está",1],["N/A",1]],"avOk":14,"avNo":1,"noavOk":19,"noavNo":5},"338071":{"total":31,"ok":30,"noOk":1,"pct":96.8,"topRazones":[],"avOk":14,"avNo":0,"noavOk":16,"noavNo":1},"336919":{"total":36,"ok":34,"noOk":2,"pct":94.4,"topRazones":[["Titular, cliente no está",1]],"avOk":18,"avNo":1,"noavOk":16,"noavNo":1},"356458":{"total":45,"ok":43,"noOk":2,"pct":95.6,"topRazones":[["Cliente se tiene que marchar",1],["Titular, cliente no está",1]],"avOk":27,"avNo":0,"noavOk":16,"noavNo":2},"286596":{"total":31,"ok":25,"noOk":6,"pct":80.6,"topRazones":[["Titular, cliente no está",1]],"avOk":16,"avNo":3,"noavOk":9,"noavNo":3},"356445":{"total":27,"ok":25,"noOk":2,"pct":92.6,"topRazones":[["N/A",1]],"avOk":11,"avNo":1,"noavOk":14,"noavNo":1},"334203":{"total":46,"ok":43,"noOk":3,"pct":93.5,"topRazones":[["Titular, cliente no está",1]],"avOk":29,"avNo":2,"noavOk":14,"noavNo":1},"358719":{"total":19,"ok":16,"noOk":3,"pct":84.2,"topRazones":[],"avOk":10,"avNo":1,"noavOk":6,"noavNo":2},"276085":{"total":33,"ok":32,"noOk":1,"pct":97.0,"topRazones":[],"avOk":17,"avNo":1,"noavOk":15,"noavNo":0},"DY9618":{"total":46,"ok":41,"noOk":5,"pct":89.1,"topRazones":[["Titular, cliente no está",2],["Incidencia en medios, Herramientas",1]],"avOk":25,"avNo":2,"noavOk":16,"noavNo":3},"356440":{"total":34,"ok":27,"noOk":7,"pct":79.4,"topRazones":[["Cliente se tiene que marchar",1],["N/A",1]],"avOk":15,"avNo":3,"noavOk":12,"noavNo":4},"296625":{"total":35,"ok":32,"noOk":3,"pct":91.4,"topRazones":[],"avOk":20,"avNo":1,"noavOk":12,"noavNo":2},"356427":{"total":36,"ok":32,"noOk":4,"pct":88.9,"topRazones":[["Titular, cliente no está",1],["Pendiente de material, habitual",1]],"avOk":22,"avNo":3,"noavOk":10,"noavNo":1},"338399":{"total":34,"ok":30,"noOk":4,"pct":88.2,"topRazones":[["Titular, cliente no está",1]],"avOk":24,"avNo":3,"noavOk":6,"noavNo":1},"293800":{"total":49,"ok":47,"noOk":2,"pct":95.9,"topRazones":[["Titular, cliente no está",1]],"avOk":24,"avNo":1,"noavOk":23,"noavNo":1},"JC5863":{"total":33,"ok":31,"noOk":2,"pct":93.9,"topRazones":[["Titular, cliente no está",1]],"avOk":11,"avNo":2,"noavOk":20,"noavNo":0},"247470":{"total":38,"ok":36,"noOk":2,"pct":94.7,"topRazones":[],"avOk":16,"avNo":1,"noavOk":20,"noavNo":1},"356443":{"total":24,"ok":18,"noOk":6,"pct":75.0,"topRazones":[["N/A",2],["Incidencia en medios, Herramientas",1],["Pendiente de material, habitual",1]],"avOk":10,"avNo":3,"noavOk":8,"noavNo":3},"297373":{"total":20,"ok":19,"noOk":1,"pct":95.0,"topRazones":[],"avOk":10,"avNo":0,"noavOk":9,"noavNo":1},"295342":{"total":32,"ok":30,"noOk":2,"pct":93.8,"topRazones":[["Incidencia en medios, Herramientas",1],["N/A",1]],"avOk":25,"avNo":1,"noavOk":5,"noavNo":1},"358717":{"total":34,"ok":32,"noOk":2,"pct":94.1,"topRazones":[["Pendiente solución del cliente",1]],"avOk":13,"avNo":0,"noavOk":19,"noavNo":2},"356460":{"total":38,"ok":35,"noOk":3,"pct":92.1,"topRazones":[["Titular, cliente no está",1]],"avOk":18,"avNo":0,"noavOk":17,"noavNo":3},"303768":{"total":37,"ok":34,"noOk":3,"pct":91.9,"topRazones":[["Titular, cliente no está",2],["N/A",1]],"avOk":16,"avNo":0,"noavOk":18,"noavNo":3},"301193":{"total":35,"ok":34,"noOk":1,"pct":97.1,"topRazones":[],"avOk":14,"avNo":1,"noavOk":20,"noavNo":0},"357633":{"total":35,"ok":34,"noOk":1,"pct":97.1,"topRazones":[["Pendiente solución del cliente",1]],"avOk":16,"avNo":0,"noavOk":18,"noavNo":1},"336469":{"total":40,"ok":36,"noOk":4,"pct":90.0,"topRazones":[["Cliente se tiene que marchar",1],["Pendiente de material, habitual",1]],"avOk":24,"avNo":4,"noavOk":12,"noavNo":0},"Q14001":{"total":37,"ok":36,"noOk":1,"pct":97.3,"topRazones":[["Titular, cliente no está",1]],"avOk":26,"avNo":0,"noavOk":10,"noavNo":1},"312440":{"total":33,"ok":33,"noOk":0,"pct":100.0,"topRazones":[],"avOk":17,"avNo":0,"noavOk":16,"noavNo":0},"314302":{"total":35,"ok":35,"noOk":0,"pct":100.0,"topRazones":[],"avOk":19,"avNo":0,"noavOk":16,"noavNo":0},"Q30909":{"total":29,"ok":27,"noOk":2,"pct":93.1,"topRazones":[],"avOk":12,"avNo":0,"noavOk":15,"noavNo":2},"357636":{"total":23,"ok":23,"noOk":0,"pct":100.0,"topRazones":[],"avOk":16,"avNo":0,"noavOk":7,"noavNo":0},"358721":{"total":29,"ok":20,"noOk":9,"pct":69.0,"topRazones":[["N/A",1],["Incidencia en medios, Herramientas",1],["Titular, cliente no está",1]],"avOk":7,"avNo":0,"noavOk":13,"noavNo":9},"313824":{"total":27,"ok":26,"noOk":1,"pct":96.3,"topRazones":[],"avOk":14,"avNo":1,"noavOk":12,"noavNo":0},"274629":{"total":40,"ok":36,"noOk":4,"pct":90.0,"topRazones":[["Titular, cliente no está",2]],"avOk":21,"avNo":4,"noavOk":15,"noavNo":0},"336070":{"total":34,"ok":29,"noOk":5,"pct":85.3,"topRazones":[["Incidencia en medios, Herramientas",1],["Titular, cliente no está",1],["Pendiente de material, habitual",1]],"avOk":22,"avNo":4,"noavOk":7,"noavNo":1},"357641":{"total":27,"ok":23,"noOk":4,"pct":85.2,"topRazones":[["Incidencia en medios, Herramientas",1],["Pendiente de material, habitual",1],["N/A",1]],"avOk":8,"avNo":0,"noavOk":15,"noavNo":4},"338045":{"total":38,"ok":33,"noOk":5,"pct":86.8,"topRazones":[["Titular, cliente no está",2]],"avOk":17,"avNo":0,"noavOk":16,"noavNo":5},"356463":{"total":30,"ok":27,"noOk":3,"pct":90.0,"topRazones":[],"avOk":6,"avNo":0,"noavOk":21,"noavNo":3},"306055":{"total":39,"ok":39,"noOk":0,"pct":100.0,"topRazones":[],"avOk":26,"avNo":0,"noavOk":13,"noavNo":0},"294898":{"total":28,"ok":27,"noOk":1,"pct":96.4,"topRazones":[["Cliente se tiene que marchar",1]],"avOk":13,"avNo":0,"noavOk":14,"noavNo":1},"318921":{"total":29,"ok":26,"noOk":3,"pct":89.7,"topRazones":[["N/A",1],["Titular, cliente no está",1]],"avOk":17,"avNo":0,"noavOk":9,"noavNo":3},"310306":{"total":10,"ok":6,"noOk":4,"pct":60.0,"topRazones":[["Pendiente de material, habitual",1]],"avOk":3,"avNo":2,"noavOk":3,"noavNo":2},"339887":{"total":29,"ok":28,"noOk":1,"pct":96.6,"topRazones":[],"avOk":17,"avNo":0,"noavOk":11,"noavNo":1},"310656":{"total":27,"ok":25,"noOk":2,"pct":92.6,"topRazones":[["Pendiente solución del cliente",1],["Titular, cliente no está",1]],"avOk":13,"avNo":0,"noavOk":12,"noavNo":2},"359684":{"total":13,"ok":13,"noOk":0,"pct":100.0,"topRazones":[],"avOk":9,"avNo":0,"noavOk":4,"noavNo":0},"301653":{"total":21,"ok":21,"noOk":0,"pct":100.0,"topRazones":[],"avOk":7,"avNo":0,"noavOk":14,"noavNo":0},"317492":{"total":5,"ok":3,"noOk":2,"pct":60.0,"topRazones":[],"avOk":0,"avNo":1,"noavOk":3,"noavNo":1}};
-const RM_DATA = {"314302":{"total":6,"reps":1,"pctRM":83.3,"durMedia":65.2,"topMotivos":[["DIY Otros",2],["Cambio de equipo",1],["Fallos supervisión",1],["Teclado / Tag reader",1],["Tamper",1]],"motivosRM":[["Cambio de equipo",1]],"topPost":[["Falsas alarmas",1]]},"314303":{"total":4,"reps":1,"pctRM":75.0,"durMedia":79.2,"topMotivos":[["Cambio de equipo",2],["Otros - Cliente con Camara",1],["Reubicaciones",1]],"motivosRM":[["Cambio de equipo",1]],"topPost":[["Pilas bajas",1]]},"Q14001":{"total":10,"reps":3,"pctRM":70.0,"durMedia":72.0,"topMotivos":[["Traslados y montajes",3],["Pilas bajas",2],["Desmontaje por baja",1],["SmartLock",1],["Ampliación",1],["Bloqueos GSM",1]],"motivosRM":[["SmartLock",1],["Traslados y montajes",1],["Bloqueos GSM",1]],"topPost":[["SmartLock",1],["Camara ARLO",1],["DIY Avería",1]]},"338071":{"total":8,"reps":0,"pctRM":100.0,"durMedia":38.6,"topMotivos":[["Tamper",3],["Reubicaciones",1],["Pilas bajas",1],["Ampliación",1],["SmartLock",1],["Traslados y montajes",1]],"motivosRM":[],"topPost":[]},"239831":{"total":6,"reps":1,"pctRM":83.3,"durMedia":53.2,"topMotivos":[["Pilas bajas",2],["Revisiones",2],["Bloqueos GSM",1],["Traslados y montajes",1]],"motivosRM":[["Traslados y montajes",1]],"topPost":[["Tamper",1]]},"336919":{"total":7,"reps":1,"pctRM":85.7,"durMedia":40.6,"topMotivos":[["Desmontaje por baja",2],["Bloqueos GSM",1],["Falsas alarmas",1],["Ampliación",1],["ZeroVision",1],["Otros - Averías",1]],"motivosRM":[["ZeroVision",1]],"topPost":[["ZeroVision",1]]},"295342":{"total":13,"reps":2,"pctRM":84.6,"durMedia":53.4,"topMotivos":[["Bloqueos GSM",3],["Reubicaciones",2],["Falsas alarmas",2],["ANP",2],["Pilas bajas",1],["Traslados y montajes",1]],"motivosRM":[["Bloqueos GSM",1],["ANP",1]],"topPost":[["Tamper",1],["Camara ARLO",1]]},"294898":{"total":10,"reps":1,"pctRM":90.0,"durMedia":59.0,"topMotivos":[["Ampliación",3],["Tamper",2],["Otros - Averías",1],["Desmontaje por baja",1],["Reubicaciones",1],["Traslados y montajes",1]],"motivosRM":[["Reubicaciones",1]],"topPost":[["Falsas alarmas",1]]},"296625":{"total":5,"reps":0,"pctRM":100.0,"durMedia":56.0,"topMotivos":[["Cambio de equipo",1],["Ampliación",1],["Fallos supervisión",1],["Revisiones",1],["Traslados y montajes",1]],"motivosRM":[],"topPost":[]},"336070":{"total":8,"reps":2,"pctRM":75.0,"durMedia":53.6,"topMotivos":[["Ampliación",3],["ANP",1],["Volumétrico no detecta",1],["Revisiones",1],["Fallos supervisión",1],["Reprogramación de la central",1]],"motivosRM":[["Ampliación",1],["Fallos supervisión",1]],"topPost":[["Batería equipo",1],["Pilas bajas",1]]},"356441":{"total":7,"reps":0,"pctRM":100.0,"durMedia":62.3,"topMotivos":[["Reubicaciones",2],["DIY Otros",1],["Tamper",1],["ZeroVision",1],["Desmontaje por baja",1],["Ampliación",1]],"motivosRM":[],"topPost":[]},"340320":{"total":7,"reps":1,"pctRM":85.7,"durMedia":68.3,"topMotivos":[["Ampliación",4],["DIY Otros",1],["DDI",1],["Falsas alarmas",1]],"motivosRM":[["Ampliación",1]],"topPost":[["Teclado / Tag reader",1]]},"290754":{"total":8,"reps":2,"pctRM":75.0,"durMedia":51.0,"topMotivos":[["Ampliación",4],["Traslados y montajes",2],["Tamper",1],["Montajes,Desm,Traslados",1]],"motivosRM":[["Ampliación",2]],"topPost":[["Tamper",1],["Falsas alarmas",1]]},"356442":{"total":4,"reps":0,"pctRM":100.0,"durMedia":80.0,"topMotivos":[["Pilas bajas",1],["Revisiones",1],["Reprogramación de la central",1],["DIY Otros",1]],"motivosRM":[],"topPost":[]},"274629":{"total":20,"reps":2,"pctRM":90.0,"durMedia":35.5,"topMotivos":[["Ampliación",3],["Fallos supervisión",3],["Falsas alarmas",3],["DIY Otros",2],["Bloqueos GSM",2],["Volumétrico no detecta",1]],"motivosRM":[["Tamper",1],["Revisiones",1]],"topPost":[["Pilas bajas",1],["Teclado / Tag reader",1]]},"356434":{"total":5,"reps":1,"pctRM":80.0,"durMedia":80.8,"topMotivos":[["Tamper",2],["DIY Otros",1],["Pilas bajas",1],["Fallos supervisión",1]],"motivosRM":[["DIY Otros",1]],"topPost":[["DIY Pilas",1]]},"303760":{"total":10,"reps":2,"pctRM":80.0,"durMedia":59.3,"topMotivos":[["Pilas bajas",3],["Ampliación",2],["Camara ARLO",1],["Bloqueos GSM",1],["Revisiones",1],["Otros - Averías",1]],"motivosRM":[["Camara ARLO",1],["Ampliación",1]],"topPost":[["Pilas bajas",1],["Falsas alarmas",1]]},"310656":{"total":7,"reps":0,"pctRM":100.0,"durMedia":55.6,"topMotivos":[["Fallos supervisión",1],["DIY Otros",1],["Tamper",1],["Pilas bajas",1],["Ampliación",1],["Desmontaje otros elementos",1]],"motivosRM":[],"topPost":[]},"334203":{"total":5,"reps":2,"pctRM":60.0,"durMedia":48.0,"topMotivos":[["Ampliación",2],["Teclado / Tag reader",1],["Falsas alarmas",1],["Camara ARLO",1]],"motivosRM":[["Teclado / Tag reader",1],["Falsas alarmas",1]],"topPost":[["DIY Pilas",1],["Pilas bajas",1]]},"307113":{"total":5,"reps":0,"pctRM":100.0,"durMedia":48.4,"topMotivos":[["DIY Otros",2],["Falsas alarmas",1],["Camara ARLO",1],["Traslados y montajes",1]],"motivosRM":[],"topPost":[]},"286800":{"total":16,"reps":0,"pctRM":100.0,"durMedia":41.7,"topMotivos":[["Falsas alarmas",2],["Ampliación",2],["Traslados y montajes",2],["Desmontaje por baja",2],["Montajes,Desm,Traslados",1],["Camara ARLO",1]],"motivosRM":[],"topPost":[]},"310655":{"total":11,"reps":1,"pctRM":90.9,"durMedia":60.0,"topMotivos":[["Camara ARLO",4],["SmartLock",2],["Fallos supervisión",1],["Falsas alarmas",1],["Desmontaje otros elementos",1],["Ampliación",1]],"motivosRM":[["Fallos supervisión",1]],"topPost":[["Tamper",1]]},"318921":{"total":12,"reps":1,"pctRM":91.7,"durMedia":56.3,"topMotivos":[["Bloqueos GSM",3],["Falsas alarmas",2],["Revisiones",2],["Ampliación",1],["Cambio de equipo",1],["Tamper",1]],"motivosRM":[["Tamper",1]],"topPost":[["Pilas bajas",1]]},"339887":{"total":7,"reps":1,"pctRM":85.7,"durMedia":42.9,"topMotivos":[["Falsas alarmas",2],["Desmontaje otros elementos",1],["Pilas bajas",1],["Reubicaciones",1],["Teclado / Tag reader",1],["ANP",1]],"motivosRM":[["Falsas alarmas",1]],"topPost":[["Falsas alarmas",1]]},"356445":{"total":3,"reps":1,"pctRM":66.7,"durMedia":81.7,"topMotivos":[["Tamper",1],["DIY Otros",1],["Falsas alarmas",1]],"motivosRM":[["Tamper",1]],"topPost":[["Fallos supervisión",1]]},"343017":{"total":12,"reps":3,"pctRM":75.0,"durMedia":41.7,"topMotivos":[["Tamper",2],["Fallos supervisión",2],["Otros - Cliente con Camara",1],["Reubicaciones",1],["SmartLock",1],["Ampliación",1]],"motivosRM":[["SmartLock",1],["Tamper",1],["Traslados y montajes",1]],"topPost":[["Tamper",2],["SmartLock",1]]},"308264":{"total":12,"reps":2,"pctRM":83.3,"durMedia":61.2,"topMotivos":[["Ampliación",4],["Volumétrico no detecta",1],["Tamper",1],["Falsas alarmas",1],["Desmontaje por baja",1],["Reubicaciones",1]],"motivosRM":[["Ampliación",1],["Camara ARLO",1]],"topPost":[["Camara ARLO",2]]},"356458":{"total":5,"reps":0,"pctRM":100.0,"durMedia":60.6,"topMotivos":[["Ampliación",1],["Tamper",1],["Traslados y montajes",1],["Reubicaciones",1],["Pilas bajas",1]],"motivosRM":[],"topPost":[]},"247472":{"total":8,"reps":1,"pctRM":87.5,"durMedia":42.9,"topMotivos":[["Ampliación",5],["Pilas bajas",1],["Bloqueos GSM",1],["Traslados y montajes",1]],"motivosRM":[["Ampliación",1]],"topPost":[["SmartLock",1]]},"Q30909":{"total":5,"reps":1,"pctRM":80.0,"durMedia":61.8,"topMotivos":[["Ampliación",2],["Desmontaje otros elementos",1],["Otros - Averías",1],["Bloqueos GSM",1]],"motivosRM":[["Desmontaje otros elementos",1]],"topPost":[["DIY Avería",1]]},"356426":{"total":4,"reps":1,"pctRM":75.0,"durMedia":102.2,"topMotivos":[["Ampliación",1],["DIY Otros",1],["Revisiones",1],["Traslados y montajes",1]],"motivosRM":[["Traslados y montajes",1]],"topPost":[["Batería equipo",1]]},"293800":{"total":7,"reps":0,"pctRM":100.0,"durMedia":56.1,"topMotivos":[["Camara ARLO",2],["Traslados y montajes",2],["DIY Otros",1],["Cambio de equipo",1],["Ampliación",1]],"motivosRM":[],"topPost":[]},"306055":{"total":12,"reps":2,"pctRM":83.3,"durMedia":53.1,"topMotivos":[["DIY Otros",2],["Traslados y montajes",2],["Ampliación",2],["Reprogramación de la central",1],["Pilas bajas",1],["Teclado / Tag reader",1]],"motivosRM":[["Volumétrico no detecta",1],["SmartLock",1]],"topPost":[["Volumétrico no detecta",1],["SmartLock",1]]},"356429":{"total":5,"reps":2,"pctRM":60.0,"durMedia":95.0,"topMotivos":[["Camara ARLO",2],["Ampliación",1],["Fallos supervisión",1],["Revisiones",1]],"motivosRM":[["Camara ARLO",2]],"topPost":[["Camara ARLO",2]]},"356463":{"total":3,"reps":0,"pctRM":100.0,"durMedia":165.3,"topMotivos":[["Traslados y montajes",1],["ZeroVision",1],["Desmontaje por baja",1]],"motivosRM":[],"topPost":[]},"339886":{"total":6,"reps":1,"pctRM":83.3,"durMedia":80.5,"topMotivos":[["Ampliación",2],["Traslados y montajes",2],["Pilas bajas",1],["SmartLock",1]],"motivosRM":[["SmartLock",1]],"topPost":[["SmartLock",1]]},"338045":{"total":12,"reps":1,"pctRM":91.7,"durMedia":47.3,"topMotivos":[["Pilas bajas",3],["Ampliación",3],["Fallos supervisión",1],["DIY Otros",1],["Desmontaje por baja",1],["Traslados y montajes",1]],"motivosRM":[["Pilas bajas",1]],"topPost":[["Fallos supervisión",1]]},"356440":{"total":3,"reps":0,"pctRM":100.0,"durMedia":169.0,"topMotivos":[["Batería equipo",1],["Ampliación",1],["Traslados y montajes",1]],"motivosRM":[],"topPost":[]},"301652":{"total":7,"reps":1,"pctRM":85.7,"durMedia":51.0,"topMotivos":[["Pilas bajas",2],["Ampliación",1],["Fallos supervisión",1],["DIY Otros",1],["ANP",1],["Cambio de equipo",1]],"motivosRM":[["DIY Otros",1]],"topPost":[["SmartLock",1]]},"356452":{"total":4,"reps":0,"pctRM":100.0,"durMedia":91.8,"topMotivos":[["Tamper",1],["DIY Otros",1],["Traslados y montajes",1],["ANP",1]],"motivosRM":[],"topPost":[]},"356448":{"total":2,"reps":1,"pctRM":50.0,"durMedia":180.0,"topMotivos":[["Pilas bajas",1],["ANP",1]],"motivosRM":[["ANP",1]],"topPost":[["Bloqueos GSM",1]]},"337583":{"total":5,"reps":0,"pctRM":100.0,"durMedia":56.6,"topMotivos":[["Traslados y montajes",2],["Teclado / Tag reader",1],["Revisiones",1],["Ampliación",1]],"motivosRM":[],"topPost":[]},"356444":{"total":8,"reps":2,"pctRM":75.0,"durMedia":62.6,"topMotivos":[["Volumétrico no detecta",2],["Tamper",2],["Falsas alarmas",1],["Pilas bajas",1],["Otros - Averías",1],["Batería equipo",1]],"motivosRM":[["Pilas bajas",1],["Volumétrico no detecta",1]],"topPost":[["Otros - Averías",1],["Pilas bajas",1]]},"DY9618":{"total":7,"reps":1,"pctRM":85.7,"durMedia":40.4,"topMotivos":[["ANP",2],["Pilas bajas",1],["DIY Otros",1],["Fallos supervisión",1],["Revisiones",1],["Traslados y montajes",1]],"motivosRM":[["DIY Otros",1]],"topPost":[["Falsas alarmas",1]]},"312756":{"total":7,"reps":0,"pctRM":100.0,"durMedia":42.9,"topMotivos":[["Reubicaciones",1],["Desmontaje por baja",1],["Tamper",1],["ANP",1],["Ampliación",1],["Traslados y montajes",1]],"motivosRM":[],"topPost":[]},"312440":{"total":6,"reps":0,"pctRM":100.0,"durMedia":58.5,"topMotivos":[["DIY Otros",1],["SmartLock",1],["Traslados y montajes",1],["Montajes,Desm,Traslados",1],["ANP",1],["Ampliación",1]],"motivosRM":[],"topPost":[]},"JC5863":{"total":6,"reps":0,"pctRM":100.0,"durMedia":47.5,"topMotivos":[["Fallos supervisión",2],["Cambio de equipo",1],["Ampliación",1],["Camara ARLO",1],["ANP",1]],"motivosRM":[],"topPost":[]},"310306":{"total":4,"reps":0,"pctRM":100.0,"durMedia":49.5,"topMotivos":[["DIY Otros",1],["Bloqueos GSM",1],["Desmontaje por baja",1],["Traslados y montajes",1]],"motivosRM":[],"topPost":[]},"297373":{"total":6,"reps":0,"pctRM":100.0,"durMedia":50.8,"topMotivos":[["DIY Otros",2],["Tamper",1],["Teclado / Tag reader",1],["RBE",1],["Traslados y montajes",1]],"motivosRM":[],"topPost":[]},"302786":{"total":14,"reps":3,"pctRM":78.6,"durMedia":53.8,"topMotivos":[["Pilas bajas",3],["Desmontaje por baja",3],["Tamper",2],["Ampliación",2],["Desmontaje otros elementos",2],["Fallos supervisión",1]],"motivosRM":[["Desmontaje otros elementos",1],["Fallos supervisión",1],["Pilas bajas",1]],"topPost":[["DIY Avería",1],["Pilas bajas",1],["Bloqueos GSM",1]]},"339251":{"total":12,"reps":2,"pctRM":83.3,"durMedia":47.6,"topMotivos":[["Bloqueos GSM",3],["Revisiones",3],["Tamper",2],["Pilas bajas",2],["DIY Otros",2]],"motivosRM":[["Pilas bajas",1],["DIY Otros",1]],"topPost":[["DIY Pilas",1],["Pilas bajas",1]]},"299538":{"total":5,"reps":0,"pctRM":100.0,"durMedia":65.8,"topMotivos":[["DIY Otros",1],["Reubicaciones",1],["Falsas alarmas",1],["Traslados y montajes",1],["Ampliación",1]],"motivosRM":[],"topPost":[]},"301193":{"total":9,"reps":1,"pctRM":88.9,"durMedia":44.0,"topMotivos":[["Ampliación",5],["SmartLock",2],["Revisiones",1],["Desmontaje por baja",1]],"motivosRM":[["Ampliación",1]],"topPost":[["Volumétrico no detecta",1]]},"247470":{"total":7,"reps":1,"pctRM":85.7,"durMedia":48.9,"topMotivos":[["Ampliación",4],["Camara ARLO",1],["Pilas bajas",1],["Reubicaciones",1]],"motivosRM":[["Ampliación",1]],"topPost":[["SmartLock",1]]},"333528":{"total":6,"reps":1,"pctRM":83.3,"durMedia":52.7,"topMotivos":[["Teclado / Tag reader",1],["Camara ARLO",1],["Bloqueos GSM",1],["Pilas bajas",1],["DIY Otros",1],["Fallos supervisión",1]],"motivosRM":[["DIY Otros",1]],"topPost":[["Fallos supervisión",1]]},"333158":{"total":6,"reps":1,"pctRM":83.3,"durMedia":74.8,"topMotivos":[["Ampliación",3],["Reubicaciones",1],["Desmontaje otros elementos",1],["Fallos supervisión",1]],"motivosRM":[["Ampliación",1]],"topPost":[["Tamper",1]]},"338851":{"total":15,"reps":2,"pctRM":86.7,"durMedia":36.0,"topMotivos":[["SmartLock",4],["Reubicaciones",3],["Bloqueos GSM",2],["Revisiones",1],["Tamper",1],["Camara ARLO",1]],"motivosRM":[["Reubicaciones",1],["SmartLock",1]],"topPost":[["DIY Pilas",1],["SmartLock",1]]},"286596":{"total":8,"reps":2,"pctRM":75.0,"durMedia":67.2,"topMotivos":[["Reubicaciones",2],["Traslados y montajes",2],["Tamper",1],["Desmontaje por baja",1],["ANP",1],["Revisiones",1]],"motivosRM":[["Reubicaciones",1],["Traslados y montajes",1]],"topPost":[["Volumétrico no detecta",1],["Reprogramación de la central",1]]},"333156":{"total":6,"reps":2,"pctRM":66.7,"durMedia":50.2,"topMotivos":[["DIY Otros",2],["Camara ARLO",1],["SmartLock",1],["Cambio de equipo",1],["Ampliación",1]],"motivosRM":[["Camara ARLO",1],["DIY Otros",1]],"topPost":[["Camara ARLO",1],["DIY Pilas",1]]},"356432":{"total":5,"reps":2,"pctRM":60.0,"durMedia":94.0,"topMotivos":[["Ampliación",3],["Tamper",1],["Pilas bajas",1]],"motivosRM":[["Ampliación",1],["Pilas bajas",1]],"topPost":[["Tamper",1],["DIY Avería",1]]},"317024":{"total":11,"reps":0,"pctRM":100.0,"durMedia":41.6,"topMotivos":[["Desmontaje por baja",2],["SmartLock",2],["ANP",2],["Bloqueos GSM",1],["Reprogramación de la central",1],["Reubicaciones",1]],"motivosRM":[],"topPost":[]},"338399":{"total":3,"reps":0,"pctRM":100.0,"durMedia":71.7,"topMotivos":[["Cambio de equipo",1],["Tamper",1],["Falsas alarmas",1]],"motivosRM":[],"topPost":[]},"313824":{"total":5,"reps":1,"pctRM":80.0,"durMedia":53.6,"topMotivos":[["Ampliación",4],["Fallos supervisión",1]],"motivosRM":[["Ampliación",1]],"topPost":[["Pilas bajas",1]]},"353969":{"total":6,"reps":0,"pctRM":100.0,"durMedia":67.8,"topMotivos":[["Tamper",2],["Revisiones",2],["Traslados y montajes",2]],"motivosRM":[],"topPost":[]},"316650":{"total":4,"reps":0,"pctRM":100.0,"durMedia":47.8,"topMotivos":[["Otros - Averías",1],["Camara ARLO",1],["Tamper",1],["Fallos supervisión",1]],"motivosRM":[],"topPost":[]},"356455":{"total":9,"reps":0,"pctRM":100.0,"durMedia":64.9,"topMotivos":[["Volumétrico no detecta",2],["Tamper",2],["Teclado / Tag reader",1],["Otros - Averías",1],["Batería equipo",1],["Desmontaje otros elementos",1]],"motivosRM":[],"topPost":[]},"276085":{"total":7,"reps":0,"pctRM":100.0,"durMedia":70.6,"topMotivos":[["Otros - Averías",1],["Revisiones",1],["Ampliación",1],["Desmontaje por baja",1],["Traslados y montajes",1],["Montajes,Desm,Traslados",1]],"motivosRM":[],"topPost":[]},"279300":{"total":11,"reps":0,"pctRM":100.0,"durMedia":55.6,"topMotivos":[["Traslados y montajes",3],["Revisiones",1],["Pilas bajas",1],["SmartLock",1],["Documentación",1],["Fallos supervisión",1]],"motivosRM":[],"topPost":[]},"277029":{"total":10,"reps":1,"pctRM":90.0,"durMedia":48.8,"topMotivos":[["Camara ARLO",2],["SmartLock",2],["RBE",1],["Teclado / Tag reader",1],["Tamper",1],["Revisiones",1]],"motivosRM":[["Camara ARLO",1]],"topPost":[["Fallos supervisión",1]]},"301653":{"total":6,"reps":0,"pctRM":100.0,"durMedia":52.5,"topMotivos":[["SmartLock",2],["Fallos supervisión",1],["Bloqueos GSM",1],["Desmontaje por baja",1],["Traslados y montajes",1]],"motivosRM":[],"topPost":[]},"336469":{"total":12,"reps":0,"pctRM":100.0,"durMedia":68.9,"topMotivos":[["Ampliación",4],["ANP",2],["DIY Otros",2],["SmartLock",2],["Montajes,Desm,Traslados",1],["Reprogramación de la central",1]],"motivosRM":[],"topPost":[]},"315166":{"total":6,"reps":2,"pctRM":66.7,"durMedia":69.5,"topMotivos":[["SmartLock",1],["Tamper",1],["DIY Otros",1],["Ampliación",1],["Traslados y montajes",1],["Bloqueos GSM",1]],"motivosRM":[["SmartLock",1],["Bloqueos GSM",1]],"topPost":[["SmartLock",1],["Bloqueos GSM",1]]},"356431":{"total":3,"reps":0,"pctRM":100.0,"durMedia":70.0,"topMotivos":[["Traslados y montajes",2],["Desmontaje por baja",1]],"motivosRM":[],"topPost":[]},"356460":{"total":4,"reps":0,"pctRM":100.0,"durMedia":89.8,"topMotivos":[["Revisiones",1],["Camara ARLO",1],["Bloqueos GSM",1],["Reubicaciones",1]],"motivosRM":[],"topPost":[]},"317492":{"total":9,"reps":2,"pctRM":77.8,"durMedia":68.4,"topMotivos":[["Traslados y montajes",3],["Reubicaciones",2],["Tamper",1],["Ampliación",1],["DIY Otros",1],["Otros - Averías",1]],"motivosRM":[["Reubicaciones",2]],"topPost":[["Reprogramación de la central",1],["Volumétrico no detecta",1]]},"356427":{"total":7,"reps":1,"pctRM":85.7,"durMedia":70.7,"topMotivos":[["Fallos supervisión",2],["DIY Otros",1],["Otros - Averías",1],["Desmontaje por baja",1],["Volumétrico no detecta",1],["Tamper",1]],"motivosRM":[["Fallos supervisión",1]],"topPost":[["Falsas alarmas",1]]},"356461":{"total":4,"reps":0,"pctRM":100.0,"durMedia":137.2,"topMotivos":[["Traslados y montajes",2],["ANP",1],["Ampliación",1]],"motivosRM":[],"topPost":[]}};
-
-const JERARQUIA = {
-  'JR9426': ['239831','286800','273379','273371','Q28224','Q29994'],
-  '239831': ['296625','336070','356443','JC5863','358721','277029','357641','333158','338045'],
-  '286800': ['Q14001','302786','Q30910','294255','317492','291125','359684','359682','336919','307113','358717','303760','317024','342074','RR6743','359189','341284'],
-  '273379': ['279300','356427','294898','337588','338851','303768','286106','274629','357636','286596','343017','310655','356444','308264','336469','318921','339251','358719','356455','295342','356463'],
-  '273371': ['333156','356432','356434','290754','356440','333528','301653','306055','293800','339887','363','356463','356980','356460','337583','312440','339886','312756'],
-  'Q28224': ['315166','313824','299538','356431','247470','310306','Q30909','334203','297373','356445','357633','338071','314302','356458','340320'],
-  'Q29994': ['356426','301193','301652','247472','353969','DY9618','310656','356441','356442','356448','356452','359193','334204','276085','312756']
-};
-
-const JE_NAMES = {
-  '239831': 'Pablo Marques Peñalver',
-  '286800': 'Ezequiel Pugliese',
-  '273379': 'Maikel Ramón Gutiérrez Niño',
-  '273371': 'Armando José Madrid Ruiz',
-  'Q28224': 'Manuel Enrique Sequeira Avila',
-  'Q29994': 'Hefranyer Humberto Chacón Tovar',
-  'JR9426': 'Coordinador Regional'
-};
-
-const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbyrDjD23yIhg72ee7hEKKpGCQYwjfcELbIJB3iFQvqg2KQVfrJPRngEb4qH1ujlQh9C/exec?type=csv";
-const AUTH_URL = "https://script.google.com/macros/s/AKfycbyrDjD23yIhg72ee7hEKKpGCQYwjfcELbIJB3iFQvqg2KQVfrJPRngEb4qH1ujlQh9C/exec?type=auth";
-const DOCS_URL = "https://script.google.com/macros/s/AKfycbyrDjD23yIhg72ee7hEKKpGCQYwjfcELbIJB3iFQvqg2KQVfrJPRngEb4qH1ujlQh9C/exec?type=docs";
-const FLOTA_URL = "https://script.google.com/macros/s/AKfycbyrDjD23yIhg72ee7hEKKpGCQYwjfcELbIJB3iFQvqg2KQVfrJPRngEb4qH1ujlQh9C/exec?type=flota";
-let AUTH_DATA = {};
-let FLOTA_DATA = {};
-let DOCS_DATA = [];
-let _datosActualizados = false;
-
-// ── Fallback mínimo (se rellena con los datos del CSV real) ──
-const FALLBACK_DATA = {"tecnicos":[{"id":"Q30910-Claudio Febres DeMartini","nombre":"Q30910-Claudio Febres DeMartini","provincia":"","raw":"Q30910-Claudio Febres DeMartini","palito":41,"lab":7,"mpal":5.8571,"mlv":5.9429,"mab":6.37,"ab":44.6,"nec":49,"uven":9.3,"ventas":232.0,"conv":22.68,"p20":22.68,"falt":4.4,"incum":2,"pCum":93.1,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":232.0},{"id":"274629","nombre":"Fernando David Alves","provincia":"V","raw":"JE-V-274629-Fernando David Alves","palito":51,"lab":7,"mpal":7.2857,"mlv":7.8,"mab":7.8,"ab":54.6,"nec":49,"uven":7.4,"ventas":188.0,"conv":14.51,"p20":14.51,"falt":0.0,"incum":4,"pCum":90.0,"ppa":0.0,"dev":-140.0,"devE":-140.0,"pRM":90.0,"rm":2.0,"cfl":0,"ventas20":188.0},{"id":"357636","nombre":"Franco Maximiliano Maffioni","provincia":"V","raw":"E-V-357636- Franco Maximiliano Maffioni","palito":45,"lab":7,"mpal":6.4286,"mlv":6.7714,"mab":6.77,"ab":47.4,"nec":49,"uven":4.5,"ventas":132.0,"conv":10.0,"p20":10.0,"falt":1.6,"incum":0,"pCum":100.0,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":132.0},{"id":"356455","nombre":"Robert Xavier Tamayo Herná","provincia":"V","raw":"E-V-356455- Robert Xavier Tamayo Herná","palito":29,"lab":7,"mpal":4.1429,"mlv":4.6571,"mab":4.66,"ab":32.6,"nec":49,"uven":4.6,"ventas":136.0,"conv":15.86,"p20":15.86,"falt":16.4,"incum":7,"pCum":78.8,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":136.0},{"id":"339251","nombre":"Luis Antonio De Azevedo Mend","provincia":"V","raw":"E-V-339251- Luis Antonio De Azevedo Mend","palito":50,"lab":7,"mpal":7.1429,"mlv":8.3429,"mab":8.34,"ab":58.4,"nec":49,"uven":14.2,"ventas":396.0,"conv":28.4,"p20":28.4,"falt":0.0,"incum":3,"pCum":91.4,"ppa":25.0,"dev":0,"devE":0,"pRM":83.33,"rm":2.0,"cfl":0,"ventas20":396.0},{"id":"338851","nombre":"Daniel Alfonso Kolman Go","provincia":"V","raw":"E-V-338851-Daniel Alfonso Kolman Go","palito":51,"lab":7,"mpal":7.2857,"mlv":8.4857,"mab":8.49,"ab":59.4,"nec":49,"uven":11.8,"ventas":328.8,"conv":23.14,"p20":23.14,"falt":0.0,"incum":2,"pCum":94.7,"ppa":20.0,"dev":0,"devE":0,"pRM":86.67,"rm":2.0,"cfl":0,"ventas20":328.8},{"id":"337588","nombre":"Carvic Ordóñez Salas","provincia":"V","raw":"E-V-337588-Carvic Ordóñez Salas","palito":38,"lab":7,"mpal":5.4286,"mlv":6.8,"mab":6.8,"ab":47.6,"nec":49,"uven":5.6,"ventas":152.0,"conv":14.74,"p20":14.74,"falt":1.4,"incum":1,"pCum":96.4,"ppa":0,"dev":-108.0,"devE":-108.0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":152.0},{"id":"336469","nombre":"José Manuel Larez Salazar","provincia":"V","raw":"E-V-336469-José Manuel Larez Salazar","palito":44,"lab":7,"mpal":6.2857,"mlv":7.1429,"mab":7.14,"ab":50.0,"nec":49,"uven":6.6,"ventas":180.0,"conv":15.0,"p20":15.0,"falt":0.0,"incum":4,"pCum":90.0,"ppa":0.0,"dev":-99.0,"devE":-99.0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":180.0},{"id":"318921","nombre":"Junior Robert Moreno","provincia":"V","raw":"E-V-318921-Junior Robert Moreno","palito":38,"lab":6,"mpal":6.3333,"mlv":7.5333,"mab":7.53,"ab":45.2,"nec":42,"uven":9.6,"ventas":279.4,"conv":25.26,"p20":25.26,"falt":0.0,"incum":3,"pCum":89.7,"ppa":0.0,"dev":-108.0,"devE":-108.0,"pRM":91.67,"rm":1.0,"cfl":0,"ventas20":279.4},{"id":"310655","nombre":"Joan Francisco Valero","provincia":"V","raw":"E-V-310655-Joan Francisco Valero","palito":45,"lab":7,"mpal":6.4286,"mlv":6.7714,"mab":6.77,"ab":47.4,"nec":49,"uven":8.3,"ventas":224.0,"conv":18.44,"p20":18.44,"falt":1.6,"incum":5,"pCum":86.8,"ppa":33.33,"dev":-108.0,"devE":-108.0,"pRM":90.91,"rm":1.0,"cfl":0,"ventas20":224.0},{"id":"308264","nombre":"Jose Antonio Valero","provincia":"V","raw":"E-V-308264-Jose Antonio Valero","palito":13,"lab":2,"mpal":6.5,"mlv":7.1,"mab":7.1,"ab":14.2,"nec":14,"uven":3.0,"ventas":84.0,"conv":23.08,"p20":23.08,"falt":0.0,"incum":0,"pCum":0,"ppa":0,"dev":0,"devE":0,"pRM":83.33,"rm":2.0,"cfl":0,"ventas20":84.0},{"id":"295342","nombre":"Roberto Gonzalez Guerrero","provincia":"V","raw":"E-V-295342- Roberto Gonzalez Guerrero","palito":41,"lab":7,"mpal":5.8571,"mlv":6.3714,"mab":6.37,"ab":44.6,"nec":49,"uven":4.7,"ventas":120.0,"conv":11.46,"p20":11.46,"falt":4.4,"incum":2,"pCum":93.8,"ppa":25.0,"dev":0,"devE":0,"pRM":84.62,"rm":2.0,"cfl":0,"ventas20":120.0},{"id":"294898","nombre":"Bogdan Sebastian Alves","provincia":"V","raw":"E-V-294898- Bogdan Sebastian Alves","palito":50,"lab":6,"mpal":8.3333,"mlv":9.0667,"mab":9.73,"ab":58.4,"nec":42,"uven":18.2,"ventas":524.0,"conv":36.4,"p20":36.4,"falt":0.0,"incum":1,"pCum":96.4,"ppa":0.0,"dev":-100.0,"devE":-100.0,"pRM":90.0,"rm":1.0,"cfl":0,"ventas20":524.0},{"id":"286596","nombre":"Henry Adrian Garcia","provincia":"V","raw":"E-V-286596-Henry Adrian Garcia","palito":35,"lab":6,"mpal":5.8333,"mlv":6.2333,"mab":6.23,"ab":37.4,"nec":42,"uven":13.6,"ventas":448.0,"conv":38.86,"p20":38.86,"falt":4.6,"incum":6,"pCum":80.6,"ppa":0.0,"dev":-108.0,"devE":-108.0,"pRM":75.0,"rm":2.0,"cfl":0,"ventas20":448.0},{"id":"286106","nombre":"Enzo Guccione Kert","provincia":"V","raw":"E-V-286106-Enzo Guccione Kert","palito":51,"lab":7,"mpal":7.2857,"mlv":7.2286,"mab":7.8,"ab":54.6,"nec":49,"uven":13.2,"ventas":383.8,"conv":25.88,"p20":25.88,"falt":0.0,"incum":6,"pCum":84.6,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":383.8},{"id":"279300","nombre":"Alexander Xavier Hernandez","provincia":"V","raw":"E-V-279300-Alexander Xavier Hernandez","palito":46,"lab":7,"mpal":6.5714,"mlv":8.4571,"mab":8.46,"ab":59.2,"nec":49,"uven":4.0,"ventas":120.0,"conv":8.7,"p20":8.7,"falt":0.0,"incum":3,"pCum":90.3,"ppa":33.33,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":120.0},{"id":"273379","nombre":"Maykel Ramon Gutierrez","provincia":"V","raw":"E-V-273379-Maykel Ramon Gutierrez","palito":0,"lab":0,"mpal":0,"mlv":0,"mab":0,"ab":0,"nec":0,"uven":0,"ventas":0,"conv":0,"p20":0,"falt":0,"incum":0,"pCum":0,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":0},{"id":"356427","nombre":"Andrés Enrique Riccio Par","provincia":"V","raw":"E-V- 356427- Andrés Enrique Riccio Par","palito":53,"lab":7,"mpal":7.5714,"mlv":7.7429,"mab":7.74,"ab":54.2,"nec":49,"uven":2.8,"ventas":76.0,"conv":5.28,"p20":5.28,"falt":0.0,"incum":4,"pCum":88.9,"ppa":0.0,"dev":0,"devE":0,"pRM":85.71,"rm":1.0,"cfl":0,"ventas20":76.0},{"id":"JC5863","nombre":"Jesus Marques Peñalver","provincia":"MUR","raw":"E-MUR-JC5863-Jesus Marques Peñalver","palito":42,"lab":7,"mpal":6.0,"mlv":7.5429,"mab":7.54,"ab":52.8,"nec":49,"uven":5.1,"ventas":124.0,"conv":12.14,"p20":12.14,"falt":0.0,"incum":2,"pCum":93.9,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":124.0},{"id":"358721","nombre":"José Alexander García Rojas","provincia":"MUR","raw":"E-MUR-358721-José Alexander García Rojas","palito":26,"lab":7,"mpal":3.7143,"mlv":3.6286,"mab":4.06,"ab":28.4,"nec":49,"uven":4.4,"ventas":92.0,"conv":16.92,"p20":16.92,"falt":20.6,"incum":9,"pCum":69.0,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":92.0},{"id":"356443","nombre":"Jesús Eduardo Monzón Oviedo","provincia":"MUR","raw":"E-MUR-356443-Jesús Eduardo Monzón Oviedo","palito":16,"lab":5,"mpal":3.02,"mlv":4.4,"mab":4.4,"ab":22.0,"nec":35,"uven":0,"ventas":0,"conv":0,"p20":0,"falt":13.0,"incum":6,"pCum":75.0,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":0},{"id":"336070","nombre":"Edixon José González Muñoz","provincia":"MUR","raw":"E-MUR-336070-Edixon José González Muñoz","palito":38,"lab":7,"mpal":5.4286,"mlv":5.8286,"mab":6.11,"ab":42.8,"nec":49,"uven":4.4,"ventas":120.0,"conv":11.58,"p20":11.58,"falt":6.2,"incum":5,"pCum":85.3,"ppa":0,"dev":0,"devE":0,"pRM":75.0,"rm":2.0,"cfl":0,"ventas20":120.0},{"id":"333158","nombre":"Paloma Vélez González","provincia":"MUR","raw":"E-MUR-333158-Paloma Vélez González","palito":44,"lab":7,"mpal":6.2857,"mlv":6.9714,"mab":6.97,"ab":48.8,"nec":49,"uven":8.9,"ventas":260.0,"conv":20.23,"p20":20.23,"falt":0.2,"incum":2,"pCum":94.4,"ppa":0.0,"dev":0,"devE":0,"pRM":83.33,"rm":1.0,"cfl":0,"ventas20":260.0},{"id":"296625","nombre":"Daniel Alejandro Laynez","provincia":"MUR","raw":"E-MUR-296625-Daniel Alejandro Laynez","palito":49,"lab":7,"mpal":7.0,"mlv":8.0286,"mab":8.03,"ab":56.2,"nec":49,"uven":7.6,"ventas":228.0,"conv":15.51,"p20":15.51,"falt":0.0,"incum":3,"pCum":91.4,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":228.0},{"id":"E-MD-Q30909-Daniel Enrique Gonzalez","nombre":"E-MD-Q30909-Daniel Enrique Gonzalez","provincia":"","raw":"E-MD-Q30909-Daniel Enrique Gonzalez","palito":33,"lab":6,"mpal":5.5,"mlv":7.1,"mab":7.1,"ab":42.6,"nec":42,"uven":7.6,"ventas":204.0,"conv":23.03,"p20":23.03,"falt":0.0,"incum":2,"pCum":93.1,"ppa":25.0,"dev":0,"devE":0,"pRM":80.0,"rm":1.0,"cfl":0,"ventas20":204.0},{"id":"359193","nombre":"Ricardo Alberto De Jesus Sar","provincia":"MD","raw":"E-MD-359193-Ricardo Alberto De Jesus Sar","palito":30,"lab":7,"mpal":4.2857,"mlv":4.6286,"mab":4.63,"ab":32.4,"nec":49,"uven":0.0,"ventas":0.0,"conv":0.0,"p20":0.0,"falt":16.6,"incum":2,"pCum":92.3,"ppa":50.0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":0.0},{"id":"359191","nombre":"Rafael Augusto La Salvia Boc","provincia":"MD","raw":"E-MD-359191-Rafael Augusto La Salvia Boc","palito":35,"lab":7,"mpal":5.0,"mlv":5.1714,"mab":5.17,"ab":36.2,"nec":49,"uven":0.8,"ventas":20.0,"conv":2.29,"p20":2.29,"falt":12.8,"incum":1,"pCum":96.7,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":20.0},{"id":"357633","nombre":"Krystiam José Maicabare Fran","provincia":"MD","raw":"E-MD-357633-Krystiam José Maicabare Fran","palito":41,"lab":7,"mpal":5.8571,"mlv":6.3714,"mab":6.37,"ab":44.6,"nec":49,"uven":6.2,"ventas":160.0,"conv":15.12,"p20":15.12,"falt":4.4,"incum":1,"pCum":97.1,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":160.0},{"id":"356980","nombre":"Reyner Jesús González Valder","provincia":"MD","raw":"E-MD-356980-Reyner Jesús González Valder","palito":38,"lab":7,"mpal":5.4286,"mlv":6.2857,"mab":6.29,"ab":44.0,"nec":49,"uven":3.2,"ventas":84.0,"conv":8.42,"p20":8.42,"falt":5.0,"incum":5,"pCum":83.9,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":84.0},{"id":"356463","nombre":"María Alejandra Pérez Reyes","provincia":"MD","raw":"E-MD-356463-María Alejandra Pérez Reyes","palito":38,"lab":7,"mpal":5.4286,"mlv":6.9714,"mab":6.97,"ab":48.8,"nec":49,"uven":2.0,"ventas":56.0,"conv":5.26,"p20":5.26,"falt":0.2,"incum":3,"pCum":90.0,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":56.0},{"id":"356461","nombre":"Wilmer José Chávez Brito","provincia":"MD","raw":"E-MD-356461-Wilmer José Chávez Brito","palito":0,"lab":0,"mpal":0,"mlv":0,"mab":0,"ab":0,"nec":0,"uven":0,"ventas":0,"conv":0,"p20":0,"falt":0,"incum":0,"pCum":0,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":0},{"id":"356460","nombre":"William Alexander Nieto Garc","provincia":"MD","raw":"E-MD-356460-William Alexander Nieto Garc","palito":40,"lab":7,"mpal":5.7143,"mlv":5.8286,"mab":6.4,"ab":44.8,"nec":49,"uven":4.6,"ventas":144.0,"conv":11.5,"p20":11.5,"falt":4.2,"incum":3,"pCum":92.1,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":144.0},{"id":"356458","nombre":"Rodrigo Ignacio Fusco Zeiden","provincia":"MD","raw":"E-MD-356458-Rodrigo Ignacio Fusco Zeiden","palito":53,"lab":7,"mpal":7.5714,"mlv":8.3429,"mab":8.77,"ab":61.4,"nec":49,"uven":6.1,"ventas":200.0,"conv":11.51,"p20":11.51,"falt":0.0,"incum":2,"pCum":95.6,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":200.0},{"id":"356452","nombre":"Luis Alfredo Peña Camacaro","provincia":"MD","raw":"E-MD-356452-Luis Alfredo Peña Camacaro","palito":43,"lab":7,"mpal":6.1429,"mlv":6.8286,"mab":6.83,"ab":47.8,"nec":49,"uven":6.7,"ventas":156.0,"conv":15.58,"p20":15.58,"falt":1.2,"incum":4,"pCum":90.0,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":156.0},{"id":"356448","nombre":"Juan Carlos Hernández Villeg","provincia":"MD","raw":"E-MD-356448-Juan Carlos Hernández Villeg","palito":52,"lab":7,"mpal":7.4286,"mlv":7.6,"mab":8.63,"ab":60.4,"nec":49,"uven":9.5,"ventas":244.0,"conv":18.27,"p20":18.27,"falt":0.0,"incum":6,"pCum":86.4,"ppa":0.0,"dev":0,"devE":0,"pRM":50.0,"rm":1.0,"cfl":0,"ventas20":244.0},{"id":"356445","nombre":"José Manuel Casas Vilchez","provincia":"MD","raw":"E-MD-356445-José Manuel Casas Vilchez","palito":39,"lab":7,"mpal":5.5714,"mlv":6.7714,"mab":6.77,"ab":47.4,"nec":49,"uven":7.2,"ventas":180.0,"conv":18.46,"p20":18.46,"falt":1.6,"incum":2,"pCum":92.6,"ppa":0.0,"dev":0,"devE":0,"pRM":66.67,"rm":1.0,"cfl":0,"ventas20":180.0},{"id":"356442","nombre":"Iker Xavier Urizarbarrena Fe","provincia":"MD","raw":"E-MD-356442-Iker Xavier Urizarbarrena Fe","palito":38,"lab":7,"mpal":5.4286,"mlv":6.1143,"mab":6.11,"ab":42.8,"nec":49,"uven":1.6,"ventas":40.0,"conv":4.21,"p20":4.21,"falt":6.2,"incum":3,"pCum":90.3,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":40.0},{"id":"356441","nombre":"Hector Rafael Pérez García","provincia":"MD","raw":"E-MD-356441-Hector Rafael Pérez García","palito":41,"lab":7,"mpal":5.8571,"mlv":6.3429,"mab":7.06,"ab":49.4,"nec":49,"uven":7.2,"ventas":204.0,"conv":17.56,"p20":17.56,"falt":0.0,"incum":3,"pCum":91.7,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":204.0},{"id":"356440","nombre":"Hadid José Alvarez Flautes","provincia":"MD","raw":"E-MD-356440-Hadid José Alvarez Flautes","palito":39,"lab":6,"mpal":6.5,"mlv":6.6333,"mab":7.5,"ab":45.0,"nec":42,"uven":1.0,"ventas":28.0,"conv":2.56,"p20":2.56,"falt":0.0,"incum":7,"pCum":79.4,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":28.0},{"id":"356434","nombre":"Carlos José Vargas Alvarez","provincia":"MD","raw":"E-MD-356434-Carlos José Vargas Alvarez","palito":54,"lab":7,"mpal":7.7143,"mlv":7.9714,"mab":8.4,"ab":58.8,"nec":49,"uven":8.7,"ventas":264.0,"conv":16.11,"p20":16.11,"falt":0.0,"incum":6,"pCum":87.5,"ppa":0.0,"dev":0,"devE":0,"pRM":80.0,"rm":1.0,"cfl":0,"ventas20":264.0},{"id":"356432","nombre":"Carlos Augusto Chipman Brice","provincia":"MD","raw":"E-MD-356432-Carlos Augusto Chipman Brice","palito":49,"lab":7,"mpal":7.0,"mlv":6.9429,"mab":7.69,"ab":53.8,"nec":49,"uven":13.5,"ventas":364.0,"conv":27.55,"p20":27.55,"falt":0.0,"incum":2,"pCum":95.2,"ppa":0.0,"dev":0,"devE":0,"pRM":60.0,"rm":2.0,"cfl":0,"ventas20":364.0},{"id":"356431","nombre":"Armando José Martínez Castil","provincia":"MD","raw":"E-MD-356431-Armando José Martínez Castil","palito":50,"lab":7,"mpal":7.1429,"mlv":7.9429,"mab":8.69,"ab":60.8,"nec":49,"uven":16.5,"ventas":428.0,"conv":33.0,"p20":33.0,"falt":0.0,"incum":4,"pCum":88.6,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":428.0},{"id":"356429","nombre":"Angelo Manuel Rizzuti Rengif","provincia":"MD","raw":"E-MD-356429-Angelo Manuel Rizzuti Rengif","palito":0,"lab":0,"mpal":0,"mlv":0,"mab":0,"ab":0,"nec":0,"uven":0,"ventas":0,"conv":0,"p20":0,"falt":0,"incum":0,"pCum":0,"ppa":0,"dev":0,"devE":0,"pRM":60.0,"rm":2.0,"cfl":0,"ventas20":0},{"id":"356426","nombre":"Abraham José Pérez Naborre","provincia":"MD","raw":"E-MD-356426-Abraham José Pérez Naborre","palito":56,"lab":7,"mpal":8.0,"mlv":7.9714,"mab":8.69,"ab":60.8,"nec":49,"uven":5.3,"ventas":132.0,"conv":9.46,"p20":9.46,"falt":0.0,"incum":6,"pCum":87.8,"ppa":0.0,"dev":0,"devE":0,"pRM":75.0,"rm":1.0,"cfl":0,"ventas20":132.0},{"id":"353969","nombre":"Carlos Luis Sánchez Rus","provincia":"MD","raw":"E-MD-353969-Carlos Luis Sánchez Rus","palito":45,"lab":7,"mpal":6.4286,"mlv":7.4571,"mab":7.46,"ab":52.2,"nec":49,"uven":9.2,"ventas":260.0,"conv":20.44,"p20":20.44,"falt":0.0,"incum":5,"pCum":86.1,"ppa":33.33,"dev":-108.0,"devE":-108.0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":260.0},{"id":"340320","nombre":"Ronaldo José Shigueto Franco","provincia":"MD","raw":"E-MD-340320-Ronaldo José Shigueto Franco","palito":59,"lab":7,"mpal":8.4286,"mlv":8.8857,"mab":9.46,"ab":66.2,"nec":49,"uven":33.2,"ventas":860.0,"conv":56.27,"p20":56.27,"falt":0.0,"incum":1,"pCum":97.4,"ppa":25.0,"dev":-208.0,"devE":-208.0,"pRM":85.71,"rm":1.0,"cfl":0,"ventas20":860.0},{"id":"339887","nombre":"Manuel Antonio Márquez Cale","provincia":"MD","raw":"E-MD-339887-Manuel Antonio Márquez Cale","palito":44,"lab":7,"mpal":6.2857,"mlv":7.1429,"mab":7.14,"ab":50.0,"nec":49,"uven":9.4,"ventas":244.0,"conv":21.36,"p20":21.36,"falt":0.0,"incum":1,"pCum":96.6,"ppa":25.0,"dev":0,"devE":0,"pRM":85.71,"rm":1.0,"cfl":0,"ventas20":244.0},{"id":"339886","nombre":"Rafael Carmelo Sainz","provincia":"MD","raw":"E-MD-339886-Rafael Carmelo Sainz","palito":60,"lab":7,"mpal":8.5714,"mlv":9.0857,"mab":9.94,"ab":69.6,"nec":49,"uven":24.5,"ventas":920.0,"conv":40.83,"p20":40.83,"falt":0.0,"incum":1,"pCum":97.2,"ppa":0.0,"dev":-108.0,"devE":-108.0,"pRM":83.33,"rm":1.0,"cfl":0,"ventas20":920.0},{"id":"338071","nombre":"Luis Enrique Goncalves Benco","provincia":"MD","raw":"E-MD-338071-Luis Enrique Goncalves Benco","palito":39,"lab":7,"mpal":5.5714,"mlv":6.7714,"mab":6.77,"ab":47.4,"nec":49,"uven":0.8,"ventas":20.0,"conv":2.05,"p20":2.05,"falt":1.6,"incum":1,"pCum":96.8,"ppa":20.0,"dev":-99.0,"devE":-99.0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":20.0},{"id":"337583","nombre":"Yelwuinger Yonfrander Rodríg","provincia":"MD","raw":"E-MD-337583-Yelwuinger Yonfrander Rodríg","palito":0,"lab":0,"mpal":0,"mlv":0,"mab":0,"ab":0,"nec":0,"uven":0,"ventas":0,"conv":0,"p20":0,"falt":0,"incum":0,"pCum":0,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":0},{"id":"334204","nombre":"Robert Armando Martínez Garc","provincia":"MD","raw":"E-MD-334204-Robert Armando Martínez Garc","palito":37,"lab":7,"mpal":5.2857,"mlv":7.5143,"mab":7.51,"ab":52.6,"nec":49,"uven":7.3,"ventas":280.0,"conv":19.73,"p20":19.73,"falt":0.0,"incum":3,"pCum":90.9,"ppa":0.0,"dev":-108.0,"devE":-108.0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":280.0},{"id":"334203","nombre":"Giancarlo Izquierdo Mireles","provincia":"MD","raw":"E-MD-334203-Giancarlo Izquierdo Mireles","palito":53,"lab":7,"mpal":7.5714,"mlv":7.8571,"mab":8.6,"ab":60.2,"nec":49,"uven":13.3,"ventas":340.0,"conv":25.09,"p20":25.09,"falt":0.0,"incum":3,"pCum":93.5,"ppa":33.33,"dev":0,"devE":0,"pRM":60.0,"rm":2.0,"cfl":0,"ventas20":340.0},{"id":"333528","nombre":"Irving Daniel Villalobos Gon","provincia":"MD","raw":"E-MD-333528-Irving Daniel Villalobos Gon","palito":46,"lab":7,"mpal":6.5714,"mlv":7.9429,"mab":7.94,"ab":55.6,"nec":49,"uven":10.5,"ventas":268.0,"conv":22.83,"p20":22.83,"falt":0.0,"incum":1,"pCum":96.9,"ppa":0.0,"dev":-100.0,"devE":-100.0,"pRM":83.33,"rm":1.0,"cfl":0,"ventas20":268.0},{"id":"315166","nombre":"Adrian Arribas Garcia","provincia":"MD","raw":"E-MD-315166-Adrian Arribas Garcia","palito":30,"lab":5,"mpal":6.0,"mlv":6.72,"mab":6.72,"ab":33.6,"nec":35,"uven":5.9,"ventas":156.0,"conv":19.67,"p20":19.67,"falt":1.4,"incum":2,"pCum":92.3,"ppa":0.0,"dev":0,"devE":0,"pRM":66.67,"rm":2.0,"cfl":0,"ventas20":156.0},{"id":"314303","nombre":"Marco Cavallera Carvalho","provincia":"MD","raw":"E-MD-314303-Marco Cavallera Carvalho","palito":53,"lab":7,"mpal":7.5714,"mlv":8.0857,"mab":8.09,"ab":56.6,"nec":49,"uven":7.0,"ventas":176.0,"conv":13.21,"p20":13.21,"falt":0.0,"incum":2,"pCum":94.4,"ppa":0.0,"dev":0,"devE":0,"pRM":75.0,"rm":1.0,"cfl":0,"ventas20":176.0},{"id":"314302","nombre":"Ramon Varela","provincia":"MD","raw":"E-MD-314302-Ramon Varela","palito":48,"lab":7,"mpal":6.8571,"mlv":7.3143,"mab":7.89,"ab":55.2,"nec":49,"uven":3.8,"ventas":108.0,"conv":7.92,"p20":7.92,"falt":0.0,"incum":0,"pCum":100.0,"ppa":0.0,"dev":0,"devE":0,"pRM":83.33,"rm":1.0,"cfl":0,"ventas20":108.0},{"id":"313824","nombre":"Alexis Alejandro Silva","provincia":"MD","raw":"E-MD-313824-Alexis Alejandro Silva","palito":19,"lab":4,"mpal":4.75,"mlv":6.25,"mab":6.25,"ab":25.0,"nec":28,"uven":2.3,"ventas":60.0,"conv":12.11,"p20":12.11,"falt":3.0,"incum":1,"pCum":96.3,"ppa":0.0,"dev":0,"devE":0,"pRM":80.0,"rm":1.0,"cfl":0,"ventas20":60.0},{"id":"312756","nombre":"Victor Gabriel Morales López","provincia":"MD","raw":"E-MD-312756-Victor Gabriel Morales López","palito":36,"lab":5,"mpal":7.2,"mlv":7.68,"mab":7.68,"ab":38.4,"nec":35,"uven":13.4,"ventas":380.0,"conv":37.22,"p20":37.22,"falt":0.0,"incum":2,"pCum":93.9,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":380.0},{"id":"312440","nombre":"Yonathan Yoel Diaz","provincia":"MD","raw":"E-MD-312440-Yonathan Yoel Diaz","palito":45,"lab":7,"mpal":6.4286,"mlv":7.8,"mab":7.8,"ab":54.6,"nec":49,"uven":8.7,"ventas":247.6,"conv":19.33,"p20":19.33,"falt":0.0,"incum":0,"pCum":100.0,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":247.6},{"id":"310306","nombre":"Christopher Hamilton Moria","provincia":"MD","raw":"E-MD-310306-Christopher Hamilton Moria","palito":4,"lab":1,"mpal":4.0,"mlv":5.2,"mab":5.2,"ab":5.2,"nec":7,"uven":0,"ventas":0,"conv":0,"p20":0,"falt":1.8,"incum":4,"pCum":60.0,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":0},{"id":"306055","nombre":"Luis Augusto Nuñez","provincia":"MD","raw":"E-MD-306055-Luis Augusto Nuñez","palito":47,"lab":6,"mpal":7.8333,"mlv":8.0333,"mab":9.03,"ab":54.2,"nec":42,"uven":7.0,"ventas":208.0,"conv":14.89,"p20":14.89,"falt":0.0,"incum":0,"pCum":100.0,"ppa":0.0,"dev":0,"devE":0,"pRM":83.33,"rm":2.0,"cfl":0,"ventas20":208.0},{"id":"301652","nombre":"Blas Alejandro Rojas","provincia":"MD","raw":"E-MD-301652-Blas Alejandro Rojas","palito":49,"lab":7,"mpal":7.0,"mlv":7.2857,"mab":7.86,"ab":55.0,"nec":49,"uven":6.3,"ventas":167.8,"conv":12.86,"p20":12.86,"falt":0.0,"incum":2,"pCum":95.3,"ppa":0.0,"dev":0,"devE":0,"pRM":85.71,"rm":1.0,"cfl":0,"ventas20":167.8},{"id":"301193","nombre":"Arturo Enrique Briceño","provincia":"MD","raw":"E-MD-301193-Arturo Enrique Briceño","palito":46,"lab":7,"mpal":6.5714,"mlv":7.7714,"mab":7.77,"ab":54.4,"nec":49,"uven":7.8,"ventas":248.0,"conv":16.96,"p20":16.96,"falt":0.0,"incum":1,"pCum":97.1,"ppa":0.0,"dev":-108.0,"devE":-108.0,"pRM":88.89,"rm":1.0,"cfl":0,"ventas20":248.0},{"id":"299538","nombre":"Amado Rafael Lopez","provincia":"MD","raw":"E-MD-299538-Amado Rafael Lopez","palito":47,"lab":7,"mpal":6.7143,"mlv":8.2,"mab":8.94,"ab":62.6,"nec":49,"uven":11.3,"ventas":279.8,"conv":24.04,"p20":24.04,"falt":0.0,"incum":4,"pCum":87.1,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":279.8},{"id":"293800","nombre":"Luis Jose Rovario","provincia":"MD","raw":"E-MD-293800-Luis Jose Rovario","palito":61,"lab":7,"mpal":8.7143,"mlv":9.02,"mab":9.91,"ab":69.4,"nec":49,"uven":14.7,"ventas":412.0,"conv":24.1,"p20":24.1,"falt":0.0,"incum":2,"pCum":95.9,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":412.0},{"id":"290754","nombre":"Ericsson Misael Pereira","provincia":"MD","raw":"E-MD-290754-Ericsson Misael Pereira","palito":45,"lab":7,"mpal":6.4286,"mlv":7.9714,"mab":7.97,"ab":55.8,"nec":49,"uven":12.3,"ventas":316.0,"conv":27.33,"p20":27.33,"falt":0.0,"incum":4,"pCum":88.2,"ppa":0.0,"dev":0,"devE":0,"pRM":75.0,"rm":2.0,"cfl":0,"ventas20":316.0},{"id":"276085","nombre":"Natasha Adobbato Rojas","provincia":"MD","raw":"E-MD-276085-Natasha Adobbato Rojas","palito":50,"lab":7,"mpal":7.1429,"mlv":8.0,"mab":8.0,"ab":56.0,"nec":49,"uven":10.7,"ventas":292.0,"conv":21.4,"p20":21.4,"falt":0.0,"incum":1,"pCum":97.0,"ppa":12.5,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":292.0},{"id":"247472","nombre":"Carlos Enrique Marcano Moral","provincia":"MD","raw":"E-MD-247472-Carlos Enrique Marcano Moral","palito":60,"lab":7,"mpal":8.5714,"mlv":8.06,"mab":9.6,"ab":67.2,"nec":49,"uven":14.7,"ventas":395.8,"conv":24.5,"p20":24.5,"falt":0.0,"incum":2,"pCum":95.5,"ppa":0.0,"dev":0,"devE":0,"pRM":87.5,"rm":1.0,"cfl":0,"ventas20":395.8},{"id":"316650","nombre":"Alex Gabriel Pereira","provincia":"MALL","raw":"E-MALL-316650-Alex Gabriel Pereira","palito":0,"lab":0,"mpal":0,"mlv":0,"mab":0,"ab":0,"nec":0,"uven":0,"ventas":0,"conv":0,"p20":0,"falt":0,"incum":0,"pCum":0,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":0},{"id":"247470","nombre":"Bernardo Antonio Marquez","provincia":"MALL","raw":"E-MALL-247470-Bernardo Antonio Marquez","palito":44,"lab":7,"mpal":6.2857,"mlv":8.0,"mab":8.0,"ab":56.0,"nec":49,"uven":8.7,"ventas":244.0,"conv":19.77,"p20":19.77,"falt":0.0,"incum":2,"pCum":94.7,"ppa":16.67,"dev":0,"devE":0,"pRM":85.71,"rm":1.0,"cfl":0,"ventas20":244.0},{"id":"338399","nombre":"Egler José Cadena Serpa","provincia":"MA","raw":"E-MA-338399-Egler José Cadena Serpa","palito":38,"lab":7,"mpal":5.4286,"mlv":5.5143,"mab":5.94,"ab":41.6,"nec":49,"uven":5.1,"ventas":141.0,"conv":13.42,"p20":13.42,"falt":7.4,"incum":4,"pCum":88.2,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":141.0},{"id":"359684","nombre":"Jairo Salvador Márquez","provincia":"BCN","raw":"E-BCN-359684-Jairo Salvador Márquez","palito":22,"lab":4,"mpal":5.5,"mlv":5.8,"mab":5.8,"ab":23.2,"nec":28,"uven":3.8,"ventas":96.0,"conv":17.27,"p20":17.27,"falt":4.8,"incum":0,"pCum":100.0,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":96.0},{"id":"359189","nombre":"Ricardo Nunes Blanco","provincia":"BCN","raw":"E-BCN-359189-Ricardo Nunes Blanco","palito":32,"lab":7,"mpal":4.5714,"mlv":4.6571,"mab":5.09,"ab":35.6,"nec":49,"uven":5.0,"ventas":140.0,"conv":15.63,"p20":15.63,"falt":13.4,"incum":5,"pCum":85.7,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":140.0},{"id":"358717","nombre":"José Francisco Martínez Rub","provincia":"BCN","raw":"E-BCN-358717-José Francisco Martínez Rub","palito":39,"lab":7,"mpal":5.5714,"mlv":6.0286,"mab":6.6,"ab":46.2,"nec":49,"uven":8.0,"ventas":164.0,"conv":20.51,"p20":20.51,"falt":2.8,"incum":2,"pCum":94.1,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":164.0},{"id":"342074","nombre":"Mario Jesús Coba Rodríguez","provincia":"BCN","raw":"E-BCN-342074-Mario Jesús Coba Rodríguez","palito":48,"lab":7,"mpal":6.8571,"mlv":7.1429,"mab":7.71,"ab":54.0,"nec":49,"uven":2.4,"ventas":64.0,"conv":5.0,"p20":5.0,"falt":0.0,"incum":6,"pCum":84.6,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":64.0},{"id":"336919","nombre":"Jeyson Daniel Gainza Jaure","provincia":"BCN","raw":"E-BCN-336919- Jeyson Daniel Gainza Jaure","palito":46,"lab":7,"mpal":6.5714,"mlv":7.9429,"mab":7.94,"ab":55.6,"nec":49,"uven":9.6,"ventas":231.8,"conv":20.87,"p20":20.87,"falt":0.0,"incum":2,"pCum":94.4,"ppa":0.0,"dev":0,"devE":0,"pRM":85.71,"rm":1.0,"cfl":0,"ventas20":231.8},{"id":"317492","nombre":"Edwin Giovanny Tituaña","provincia":"BCN","raw":"E-BCN-317492-Edwin Giovanny Tituaña","palito":13,"lab":2,"mpal":6.5,"mlv":7.1,"mab":7.1,"ab":14.2,"nec":14,"uven":1.0,"ventas":28.0,"conv":7.69,"p20":7.69,"falt":0.0,"incum":2,"pCum":60.0,"ppa":0,"dev":0,"devE":0,"pRM":77.78,"rm":2.0,"cfl":0,"ventas20":28.0},{"id":"317024","nombre":"Luis Alejandro Carmona","provincia":"BCN","raw":"E-BCN-317024-Luis Alejandro Carmona","palito":42,"lab":5,"mpal":8.4,"mlv":10.08,"mab":10.08,"ab":50.4,"nec":35,"uven":7.2,"ventas":180.0,"conv":17.14,"p20":17.14,"falt":0.0,"incum":2,"pCum":92.3,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":180.0},{"id":"307113","nombre":"Jose David Vergara","provincia":"BCN","raw":"E-BCN-307113-Jose David Vergara","palito":50,"lab":7,"mpal":7.1429,"mlv":8.8571,"mab":8.86,"ab":62.0,"nec":49,"uven":7.7,"ventas":200.0,"conv":15.4,"p20":15.4,"falt":0.0,"incum":3,"pCum":91.7,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":200.0},{"id":"303760","nombre":"Jose Vicente Toro","provincia":"BCN","raw":"E-BCN-303760-Jose Vicente Toro","palito":51,"lab":7,"mpal":7.2857,"mlv":7.8,"mab":7.8,"ab":54.6,"nec":49,"uven":7.5,"ventas":216.0,"conv":14.71,"p20":14.71,"falt":0.0,"incum":1,"pCum":97.4,"ppa":0.0,"dev":0,"devE":0,"pRM":80.0,"rm":2.0,"cfl":0,"ventas20":216.0},{"id":"302786","nombre":"Christian Alexander Reyna","provincia":"BCN","raw":"E-BCN-302786-Christian Alexander Reyna","palito":47,"lab":7,"mpal":6.7143,"mlv":8.4286,"mab":8.43,"ab":59.0,"nec":49,"uven":16.5,"ventas":540.0,"conv":35.11,"p20":35.11,"falt":0.0,"incum":2,"pCum":94.4,"ppa":0.0,"dev":-216.0,"devE":-216.0,"pRM":78.57,"rm":3.0,"cfl":0,"ventas20":540.0},{"id":"294255","nombre":"Daniel Ricardo Rocha Castil","provincia":"BCN","raw":"E-BCN-294255-Daniel Ricardo Rocha Castil","palito":40,"lab":7,"mpal":5.7143,"mlv":5.8,"mab":6.23,"ab":43.6,"nec":49,"uven":3.4,"ventas":84.0,"conv":8.5,"p20":8.5,"falt":5.4,"incum":3,"pCum":88.9,"ppa":0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":84.0},{"id":"357641","nombre":"Matheo Ghio","provincia":"ALIC","raw":"E-ALIC-357641-Matheo Ghio","palito":31,"lab":7,"mpal":4.4286,"mlv":5.2857,"mab":5.29,"ab":37.0,"nec":49,"uven":2.0,"ventas":92.0,"conv":6.45,"p20":6.45,"falt":12.0,"incum":4,"pCum":85.2,"ppa":0.0,"dev":-108.0,"devE":-108.0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":92.0},{"id":"DY9618","nombre":"Darwing José Ojeda Castill","provincia":"MD","raw":"E5-MD-DY9618-Darwing José Ojeda Castill","palito":45,"lab":7,"mpal":6.4286,"mlv":7.5143,"mab":7.97,"ab":55.8,"nec":49,"uven":12.5,"ventas":336.0,"conv":27.78,"p20":27.78,"falt":0.0,"incum":5,"pCum":89.1,"ppa":0.0,"dev":0,"devE":0,"pRM":85.71,"rm":1.0,"cfl":0,"ventas20":336.0},{"id":"333156","nombre":"Brian Anthony Torres Fernán","provincia":"MD","raw":"E5-MD-333156-Brian Anthony Torres Fernán","palito":48,"lab":7,"mpal":6.8571,"mlv":7.1143,"mab":7.54,"ab":52.8,"nec":49,"uven":8.6,"ventas":212.0,"conv":17.92,"p20":17.92,"falt":0.0,"incum":4,"pCum":90.7,"ppa":0.0,"dev":0,"devE":0,"pRM":66.67,"rm":2.0,"cfl":0,"ventas20":212.0},{"id":"310656","nombre":"Eliyau Chocron Perez","provincia":"MD","raw":"E5-MD-310656-Eliyau Chocron Perez","palito":37,"lab":6,"mpal":6.1667,"mlv":8.3667,"mab":8.37,"ab":50.2,"nec":42,"uven":11.7,"ventas":308.0,"conv":31.62,"p20":31.62,"falt":0.0,"incum":2,"pCum":92.6,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":308.0},{"id":"301653","nombre":"Juan Manuel Rodriguez","provincia":"MD","raw":"E5-MD-301653-Juan Manuel Rodriguez","palito":32,"lab":5,"mpal":6.4,"mlv":7.6,"mab":7.6,"ab":38.0,"nec":35,"uven":6.1,"ventas":160.0,"conv":19.06,"p20":19.06,"falt":0.0,"incum":0,"pCum":100.0,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":160.0},{"id":"297373","nombre":"Jose Daniel Spatuzzi","provincia":"MD","raw":"E5-MD-297373-Jose Daniel Spatuzzi","palito":34,"lab":5,"mpal":6.8,"mlv":8.0,"mab":8.0,"ab":40.0,"nec":35,"uven":4.2,"ventas":112.0,"conv":12.35,"p20":12.35,"falt":0.0,"incum":1,"pCum":95.0,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0.0,"cfl":0,"ventas20":112.0},{"id":"E5-BCN-Q14001-Carlos Enrique Pernas","nombre":"E5-BCN-Q14001-Carlos Enrique Pernas","provincia":"","raw":"E5-BCN-Q14001-Carlos Enrique Pernas","palito":44,"lab":7,"mpal":6.2857,"mlv":7.1429,"mab":7.14,"ab":50.0,"nec":49,"uven":9.4,"ventas":245.6,"conv":21.36,"p20":21.36,"falt":0.0,"incum":1,"pCum":97.3,"ppa":0.0,"dev":0,"devE":0,"pRM":70.0,"rm":3.0,"cfl":0,"ventas20":245.6},{"id":"338045","nombre":"Vincenzo Agostinho Velard","provincia":"ALIC","raw":"E5-ALIC-338045-Vincenzo Agostinho Velard","palito":50,"lab":7,"mpal":7.1429,"mlv":7.3143,"mab":8.34,"ab":58.4,"nec":49,"uven":8.9,"ventas":228.0,"conv":17.8,"p20":17.8,"falt":0.0,"incum":5,"pCum":86.8,"ppa":0.0,"dev":0,"devE":0,"pRM":91.67,"rm":1.0,"cfl":0,"ventas20":228.0},{"id":"277029","nombre":"Juan Victor Gonzalez","provincia":"ALIC","raw":"E5-ALIC-277029-Juan Victor Gonzalez","palito":43,"lab":7,"mpal":6.1429,"mlv":6.7714,"mab":7.34,"ab":51.4,"nec":49,"uven":1.6,"ventas":40.0,"conv":3.72,"p20":3.72,"falt":0.0,"incum":7,"pCum":81.1,"ppa":0.0,"dev":0,"devE":0,"pRM":90.0,"rm":1.0,"cfl":0,"ventas20":40.0},{"id":"358719","nombre":"Ramón Esteban García Atehor","provincia":"V","raw":"E -V-358719- Ramón Esteban García Atehor","palito":31,"lab":5,"mpal":6.2,"mlv":6.2,"mab":6.2,"ab":31.0,"nec":35,"uven":10.9,"ventas":272.0,"conv":35.16,"p20":35.16,"falt":4.0,"incum":3,"pCum":84.2,"ppa":0.0,"dev":0,"devE":0,"pRM":100.0,"rm":0,"cfl":0,"ventas20":272.0},{"id":"356444","nombre":"Johann Alejandro Dean Vilc","provincia":"V","raw":"E- V-356444- Johann Alejandro Dean Vilc","palito":50,"lab":7,"mpal":7.1429,"mlv":7.0857,"mab":7.66,"ab":53.6,"nec":49,"uven":3.5,"ventas":96.0,"conv":7.0,"p20":7.0,"falt":0.0,"incum":2,"pCum":94.6,"ppa":0.0,"dev":0,"devE":0,"pRM":75.0,"rm":2.0,"cfl":0,"ventas20":96.0},{"id":"343017","nombre":"Hugo Alejandro Ledezma Sanll","provincia":"V","raw":"E- V-343017-Hugo Alejandro Ledezma Sanll","palito":44,"lab":7,"mpal":6.2857,"mlv":6.6286,"mab":6.63,"ab":46.4,"nec":49,"uven":5.8,"ventas":148.0,"conv":13.18,"p20":13.18,"falt":2.6,"incum":2,"pCum":93.5,"ppa":0.0,"dev":0,"devE":0,"pRM":75.0,"rm":3.0,"cfl":0,"ventas20":148.0}]};
-
-let CURRENT_DATA = FALLBACK_DATA;
-let CURRENT_TEC  = null;
-let CURRENT_USER_TYPE = null; // 'tecnico' | 'je' | 'jr'
-let CURRENT_JE_ID = null;
-let ACTIVE_TAB = 'misDatos';
-
-// ══════════════════════════════════════════════
-//  UTILIDADES
-// ══════════════════════════════════════════════
-function getGrade(val){
-  if(val>=8)   return 'best';
-  if(val>=7)   return 'best';
-  if(val>=6.5) return 'ok';
-  return 'bad';
-}
-function gradeLabel(g){
-  return g==='best'?'En objetivo ≥7':g==='ok'?'Cerca ≥6.5':'Mejorable <6.5';
-}
-function gradeColor(g){
-  return g==='best'?'var(--green2)':g==='ok'?'var(--orange)':'#e05a4a';
-}
-const KPI_CONFIG=[
-  {key:'pRM',  label:'%RM',         icon:'🛠️',unit:'%',min:89.5,detail:'rm'},
-  {key:'pCum', label:'%Cumplimiento',icon:'✅',unit:'%',min:90.0,detail:'cum'},
-  {key:'conv', label:'Conv/Ventas', icon:'💰',unit:'%',min:15.0,detail:'ventas'},
-  {key:'p20',  label:'Cobro 20%',   icon:'💵',unit:'%',min:15.0,detail:'ventas'},
-  {key:'ventas20',label:'Tu 20% €', icon:'💶',unit:'€',info:true},
-  {key:'ppa',  label:'PPA',         icon:'⭐',unit:'%',min:10,detail:null},
-];
-const OTHER_KEYS=[
-  {key:'falt',label:'Faltantes'},{key:'lab',label:'Lab'},{key:'palito',label:'Palito'},
-  {key:'nec',label:'Nec'},{key:'uven',label:'UVen'},{key:'ab',label:'A+B'},
-  {key:'dev',label:'Dev'},{key:'devE',label:'Dev€',prefix:'€'},
-];
-function getStatus(cfg,val){
-  if(cfg.max!==undefined) return val<=cfg.max?'ok':'bad';
-  return val>=cfg.min?'ok':val>=cfg.min*.96?'warn':'bad';
-}
-function getBarPct(cfg,val){
-  if(cfg.max!==undefined) return val===0?100:0;
-  return Math.min(100,Math.round((val/(cfg.min*1.12))*100));
-}
-function statusLabel(s){
-  return s==='ok'?'✓ Objetivo cumplido':s==='warn'?'⚠ Cerca':'✗ Por debajo';
-}
-function avg(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0; }
-
-// ── Obtener técnicos de un JE ──
-function getTecnicosOfJE(jeId){
-  const ids = (JERARQUIA[jeId]||[]).map(id=>id.toUpperCase());
-  return CURRENT_DATA.tecnicos.filter(t=>ids.includes(t.id.toUpperCase()));
-}
-
-// ── Calcular promedios de un array de técnicos ──
-function calcAvg(tecs){
-  if(!tecs.length) return {};
-  const keys=['lab','palito','mpal','mlv','mab','ab','nec','uven','ventas','conv','p20','falt','rm','pRM','pCum','incum','ppa','dev','devE'];
-  const res={};
-  keys.forEach(k=>{
-    const vals=tecs.map(t=>parseFloat(t[k])||0).filter(v=>!isNaN(v));
-    res[k]=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
-  });
-  res['ventas20']=res['ventas'];
-  return res;
-}
-
-// ══════════════════════════════════════════════
-//  CSV LOADER
-// ══════════════════════════════════════════════
-function parseCSV(text){
-  const lines=text.trim().split(/\r?\n/);
-  // Saltar filas vacías al inicio para encontrar los headers
-  let headerIdx=0;
-  for(let i=0;i<lines.length;i++){
-    if(lines[i].replace(/,/g,'').trim()!==''){headerIdx=i;break;}
-  }
-  const hdrs=lines[headerIdx].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
-  return lines.slice(headerIdx+1).filter(l=>l.replace(/,/g,'').trim()!=='').map(line=>{
-    // Parsear CSV respetando comillas
-    const vals=[];let cur='',inQ=false;
-    for(let i=0;i<line.length;i++){
-      if(line[i]==='"'){inQ=!inQ;}
-      else if(line[i]===','&&!inQ){vals.push(cur.trim());cur='';}
-      else cur+=line[i];
-    }
-    vals.push(cur.trim());
-    const o={};hdrs.forEach((h,i)=>o[h]=vals[i]||'');return o;
-  });
-}
-function cleanPct(v){return parseFloat(String(v||'0').replace(/%|€|\s/g,'').replace(',','.').trim())||0}
-function cleanNum(v){
-  const s=String(v||'0').trim(),p=s.split('.');
-  if(p.length===3)try{return parseFloat(p[0][0]+'.'+p[0].slice(1)+p[1]+p[2])}catch(e){}
-  return parseFloat(s.replace(',','.'))||0;
-}
-function cleanMoney(v){
-  const s=String(v||'0').replace(/€|\s/g,'').trim();
-  const neg=s.startsWith('-');
-  const n=parseFloat(s.replace('-','').replace(',',''))||0;
-  return neg?-n:n;
-}
-function parseNum(v){
-  // Convierte "585.714.286" → 5.857 (formato europeo con puntos como miles y decimales)
-  if(!v) return 0;
-  v = String(v).replace(/€|\s|%/g,'').trim();
-  if(!v || v==='-') return 0;
-  const neg = v.startsWith('-');
-  v = v.replace('-','');
-  // Si tiene más de un punto, son separadores de miles → quitar todos menos el último
-  const parts = v.split('.');
-  let num;
-  if(parts.length > 2){
-    // Ej: "585.714.286" → juntar los dígitos = 585714286 → dividir por 100000 = 5.857
-    // En realidad son decimales con punto como separador de miles europeo
-    // "585.714.286" significa 5,857... → tomar primero.segundo como entero.decimal
-    num = parseFloat(parts[0] + '.' + parts.slice(1).join(''));
-  } else {
-    num = parseFloat(v.replace(',','.'));
-  }
-  return neg ? -num : (isNaN(num)?0:num);
-}
-function parsePct(v){
-  return parseNum(String(v||'').replace('%',''));
-}
-function parseMoney(v){
-  if(!v) return 0;
-  let s = String(v).replace(/€|\s|"/g,'').trim();
-  const neg = s.startsWith('-');
-  s = s.replace('-','');
-  if(!s) return 0;
-  // "1.234,00" formato europeo
-  if(s.includes(',') && s.lastIndexOf(',') > s.lastIndexOf('.')){
-    s = s.replace(/\./g,'').replace(',','.');
-  } else {
-    s = s.replace(/,/g,'');
-  }
-  const val = parseFloat(s) || 0;
-  return neg ? -val : val;
-}
-function csvRow(r){
-  // Columnas del CSV: Palito,Lab,MPal,ML-V,MA+B,A+B,Nec,Ventas,20%,Conv,Falt,Incum,%Cum,UVen,PPA,Dev,Dev(€),%RM,RM,Técnico
-  const tecRaw = r['Técnico'] || '';
-  const parts = tecRaw.split('-');
-  let id = '', nombre = '', provincia = '';
-  for(let i=0; i<parts.length; i++){
-    if(/^\d{5,}$/.test(parts[i].trim()) || /^[A-Z]{1,2}\d{4,}$/.test(parts[i].trim())){
-      id = parts[i].trim();
-      nombre = parts.slice(i+1).join(' ').trim();
-      provincia = i>=1 ? parts[i-1].trim() : '';
-      break;
-    }
-  }
-  if(!id){ id = tecRaw; nombre = tecRaw; }
-
-  return {
-    id, nombre, provincia, raw: tecRaw,
-    palito: parseInt(r['Palito'])||0,
-    lab:    parseInt(r['Lab'])||0,
-    mpal:   parseNum(r['MPal']),
-    mlv:    parseNum(r['ML-V']),
-    mab:    parseFloat(String(r['MA+B']||'0').replace(',','.'))||0,
-    ab:     parseFloat(String(r['A+B']||'0').replace(',','.'))||0,
-    nec:    parseInt(r['Nec'])||0,
-    uven:   parseFloat(String(r['Ventas']||'0').replace(',','.'))||0,
-    ventas: parseMoney(r['20%']),
-    conv:   parsePct(r['Conv']),
-    p20:    parsePct(r['Conv']),
-    falt:   parseFloat(String(r['Falt']||'0').replace(',','.'))||0,
-    incum:  parseInt(r['Incum'])||0,
-    pCum:   parsePct(r['%Cum']),
-    ppa:    parsePct(r['PPA']),
-    dev:    parseFloat(String(r['Dev']||'0').replace(',','.'))||0,
-    devE:   parseMoney(r['Dev.1']||r['Dev']||'0'),
-    pRM:    parsePct(r['%RM']),
-    rm:     parseFloat(String(r['RM']||'0').replace(',','.'))||0,
-    cfl:    0,
-    ventas20: parseMoney(r['20%'])
-  };
-}
-async function loadAuth(){
-  try{
-    const res=await fetch(AUTH_URL,{cache:'no-store'});
-    if(!res.ok) return;
-    const data=await res.json();
-    if(data && typeof data==='object' && Object.keys(data).length>0){
-      AUTH_DATA=data;
-    }
-  }catch(e){console.log('Auth no disponible',e.message);}
-  // Añadir usuarios especiales siempre (aunque falle el script)
-  AUTH_DATA['CM9651']      = 'Y4798543K';
-  AUTH_DATA['JN4767']      = '77843052N';
-  AUTH_DATA['GD5381']      = '60233494J';
-  AUTH_DATA['BLAS.ALVAREZ']= '80065456H';
-  AUTH_DATA['JR9426']      = 'JR9426'; // contraseña = matrícula
-}
-
-async function loadDocs(){
-  try{
-    const res=await fetch(DOCS_URL,{cache:'no-store'});
-    if(!res.ok) return;
-    const text=await res.text();
-    const data=JSON.parse(text);
-    if(Array.isArray(data)&&data.length>0){
-      // Limpiar fecha: tomar solo la parte de fecha corta
-      DOCS_DATA=data.map(d=>({
-        ...d,
-        fecha: d.fecha ? d.fecha.toString().substring(0,15) : '—'
-      }));
-      console.log('Docs cargados:',DOCS_DATA.length,'pendientes');
-    }
-  }catch(e){console.log('Docs error:',e.message);}
-}
-
-async function loadSheets(){
-  if(!SHEETS_CSV_URL) return;
-
-  // Con Apps Script propio no necesitamos proxy — llamada directa
-  const proxies = [
-    url => url, // directo (Apps Script ya resuelve el CORS)
-    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  ];
-
-  for(const proxyFn of proxies){
-    try{
-      const fetchUrl = proxyFn(SHEETS_CSV_URL);
-      const res = await fetch(fetchUrl, {cache: 'no-store'});
-      if(!res.ok) continue;
-      const text = await res.text();
-      if(!text.includes('Técnico') && !text.includes('Palito') && !text.includes('ecnico')) continue;
-      const tecs = parseCSV(text).filter(r=>r['Técnico']).map(r=>{
-        const t=csvRow(r); t.ventas20=t.ventas; return t;
-      });
-      if(tecs.length > 0){
-        CURRENT_DATA = {tecnicos: tecs};
-        _datosActualizados = true;
-        console.log(`Sheets OK: ${tecs.length} técnicos`);
-        return;
-      }
-    } catch(e){
-      console.log(`Intento fallido, probando siguiente...`, e.message);
-    }
-  }
-  console.log('No se pudo conectar — usando datos locales embebidos');
-}
-
-// ══════════════════════════════════════════════
-//  PANELS VISIBILITY
-// ══════════════════════════════════════════════
-function hideAllPanels(){
-  ['mainPanel','equipoPanel','jrPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel']
-    .forEach(id=>document.getElementById(id).style.display='none');
-}
-function showPanel(id){
-  hideAllPanels();
-  document.getElementById(id).style.display='block';
-}
-
-// ══════════════════════════════════════════════
-//  TABS
-// ══════════════════════════════════════════════
-function switchTab(tab){
-  ACTIVE_TAB=tab;
-  if(CURRENT_USER_TYPE==='je'){
-    document.getElementById('tabMisDatos').classList.toggle('active',tab==='misDatos');
-    document.getElementById('tabEquipo').classList.toggle('active',tab==='equipo');
-    if(tab==='misDatos') showPanel('mainPanel');
-    else { showPanel('equipoPanel'); renderEquipoPanel(CURRENT_JE_ID); }
-  } else if(CURRENT_USER_TYPE==='jr'){
-    showPanel('jrPanel');
-  }
-}
-
-// ══════════════════════════════════════════════
-//  RENDER TÉCNICO INDIVIDUAL
-// ══════════════════════════════════════════════
-function renderMain(tec, returnToEquipo=false){
-  CURRENT_TEC=tec;
-  document.getElementById('topbarName').textContent=tec.nombre.trim();
-  document.getElementById('topbarId').textContent=tec.id+' · '+tec.provincia;
-
-  // Mes dinámico — detectar desde los datos del CSV cuál es el periodo activo
-  const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const ahora = new Date();
-  const mesActual = meses[ahora.getMonth()];
-  const anioActual = ahora.getFullYear();
-  document.getElementById('monthTitle').textContent = mesActual + ' ' + anioActual;
-
-  // Actualizar banner de sincronización
-  const banner = document.querySelector('.data-banner');
-  if(banner){
-    if(_datosActualizados){
-      banner.innerHTML=`<div class="sync-dot"></div>Datos actualizados desde Google Sheets · ${mesActual} ${anioActual}`;
-    } else {
-      banner.innerHTML=`<div style="width:6px;height:6px;border-radius:50%;background:var(--orange);flex-shrink:0"></div><span style="color:var(--orange)">Datos locales (sin conexión)</span> · Última actualización conocida`;
-    }
-  }
-
-  const results=KPI_CONFIG.filter(k=>!k.info).map(k=>getStatus(k,tec[k.key]));
-  const okN=results.filter(r=>r==='ok').length;
-  const badN=results.filter(r=>r==='bad').length;
-  const totalKpis=KPI_CONFIG.filter(k=>!k.info).length;
-  const pct=Math.round(okN/totalKpis*100);
-  const rc=pct>=80?'#3daa6e':pct>=50?'#d4831a':'#c0392b';
-  document.getElementById('scorePill').innerHTML=
-    `<span style="color:${rc};font-weight:700">${okN}/${totalKpis}</span>&nbsp;<span style="color:#7a6840">objetivos</span>`;
-
-  // HERO
-  const mlvG=getGrade(tec.mlv),mabG=getGrade(tec.mab);
-  const scaleColors=['#c0392b','#d4831a','#c9a84c','#3daa6e'];
-  const scaleGrades=['bad','ok','good','best'];
-  function heroScale(g){
-    return scaleGrades.map((gr,i)=>
-      `<div class="hero-scale-item" style="background:${gr===g?scaleColors[i]:scaleColors[i]+'28'}"></div>`
-    ).join('');
-  }
-  document.getElementById('heroMetrics').innerHTML=`
-    <div class="hero-card g-${mlvG}" onclick="showDetail('mlv')">
-      <div class="hero-label">ML-V · Mant. extra</div>
-      <div class="hero-val g-${mlvG}">${tec.mlv.toFixed(2)}</div>
-      ${(()=>{
-        const m=tec.mlv,c=tec.conv;
-        let rate=m>=8?20:m>=7.5?17.5:m>=7?15:null;
-        if(rate!==null&&c<10)rate=5;else if(rate!==null&&c<13)rate=10;else if(rate!==null&&c<15)rate=12.5;
-        if(rate===null)return`<div style="font-size:.75rem;color:#e05a4a;margin-top:6px">Sin tarifa — ML-V menor de 7</div>`;
-        const why=m>=8?'ML-V ≥ 8':m>=7.5?'ML-V 7.5–7.99':'ML-V 7–7.49';
-        const convNote=c<15?` · Conv ${c.toFixed(1)}%`:'';
-        return`<div style="margin-top:8px;font-size:1rem;font-weight:800;color:var(--gold2)">💶 ${rate}€ / excedente o sáb.</div>
-               <div style="font-size:.65rem;color:var(--muted);margin-top:3px">${why}${convNote}</div>`;
-      })()}
-      <div class="hero-tap">→ detalle</div>
-    </div>
-    <div class="hero-card g-${mabG}" onclick="showDetail('mab')">
-      <div class="hero-label">MA+B</div>
-      <div class="hero-val g-${mabG}">${tec.mab.toFixed(2)}</div>
-      <span class="hero-badge g-${mabG}">${gradeLabel(mabG)}</span>
-      <div class="hero-scale">${heroScale(mabG)}</div>
-      <div class="hero-tap">→ detalle</div>
-    </div>`;
-
-  // Summary ring
-  const circ=2*Math.PI*30,offset=circ-(pct/100)*circ;
-  const msg=pct>=80?'¡Excelente trabajo!':pct>=50?'Sigue mejorando':'Requiere atención';
-  document.getElementById('summaryCard').innerHTML=`
-    <div class="summary-ring">
-      <svg width="74" height="74" viewBox="0 0 74 74">
-        <circle class="ring-bg" cx="37" cy="37" r="30"/>
-        <circle class="ring-fg" cx="37" cy="37" r="30" stroke="${rc}"
-          stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-      </svg>
-      <div class="ring-text">${pct}%</div>
-    </div>
-    <div class="summary-info">
-      <h3>${msg}</h3>
-      <p><span class="ok-txt">${okN} objetivo${okN!==1?'s':''} cumplido${okN!==1?'s':''}</span>
-      ${badN>0?` · <span class="bad-txt">${badN} por debajo</span>`:''}
-      <br>${tec.lab} laborables · ${tec.nombre.trim().split(' ')[0]}</p>
-    </div>`;
-
-  // KPIs
-  document.getElementById('kpiGrid').innerHTML=KPI_CONFIG.map(k=>{
-    if(k.info){
-      return`<div class="kpi-card ok fade-up">
-        <span class="kpi-icon">${k.icon}</span>
-        <div class="kpi-name">${k.label}</div>
-        <div class="kpi-val ok">€${tec.ventas.toFixed(2)}</div>
-        <div class="kpi-target">Comisión del periodo</div>
-        <div class="kpi-status ok">Informativo</div>
-        <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
-      </div>`;
-    }
-    const val=tec[k.key],s=getStatus(k,val),bp=getBarPct(k,val);
-    const tgt=k.max!==undefined?`Obj: = ${k.max}`:`Obj: ≥ ${k.min}${k.unit}`;
-    const disp=typeof val==='number'&&!Number.isInteger(val)?val.toFixed(2):val;
-    // %RM va directo al dashboard si hay datos, %Cum también
-    const rmHasData = k.detail==='rm' && (RM_DATA[tec.id]||RM_DATA[(tec.id||'').toUpperCase()]);
-    const cumHasData = k.detail==='cum' && (CUM_DATA[tec.id]||CUM_DATA[(tec.id||'').toUpperCase()]);
-    const clickFn = rmHasData
-      ? `onclick="showRMDash('${tec.id}')"`
-      : cumHasData
-        ? `onclick="showCumDash('${tec.id}')"`
-        : k.detail ? `onclick="showDetail('${k.detail}')"` : '';
-    const tapHint = rmHasData||cumHasData
-      ? '<div class="kpi-tap">→ dashboard</div>'
-      : k.detail ? '<div class="kpi-tap">→ detalle</div>' : '';
-    return`<div class="kpi-card ${s} fade-up" ${clickFn}>
-      <span class="kpi-icon">${k.icon}</span>
-      <div class="kpi-name">${k.label}</div>
-      <div class="kpi-val ${s}">${disp}<span class="kpi-unit">${k.unit}</span></div>
-      <div class="kpi-target">${tgt}</div>
-      <div class="kpi-status ${s}">${statusLabel(s)}</div>
-      <div class="kpi-bar"><div class="kpi-bar-fill ${s}" style="width:${bp}%"></div></div>
-      ${tapHint}
-    </div>`;
-  }).join('');
-
-  // Others
-  document.getElementById('otherGrid').innerHTML=OTHER_KEYS.map(k=>{
-    const val=tec[k.key],pre=k.prefix||'';
-    const disp=typeof val==='number'&&!Number.isInteger(val)?val.toFixed(2):val;
-    const col=(k.key==='dev'||k.key==='devE')?(val<0?'#c05040':val>0?'#3daa6e':'#7a6840'):'var(--text)';
-    return`<div class="other-card fade-up">
-      <div class="other-name">${k.label}</div>
-      <div class="other-val" style="color:${col}">${pre}${disp}</div>
-    </div>`;
-  }).join('');
-
-  renderDocsPendientes(tec.id,'docsPendientesMain');
-  // Reintento garantizado tras cargar docs
-  const _tecId = tec.id;
-  if(!DOCS_DATA.length){
-    loadDocs().then(()=>{
-      renderDocsPendientes(_tecId,'docsPendientesMain');
-    });
-  }
-  showPanel('mainPanel');
-}
-
-// ══════════════════════════════════════════════
-//  RENDER EQUIPO (vista JE)
-// ══════════════════════════════════════════════
-function renderEquipoPanel(jeId){
-  const tecs = getTecnicosOfJE(jeId);
-  const av = calcAvg(tecs);
-  const jeNombre = JE_NAMES[jeId] || jeId;
-
-  document.getElementById('equipoBanner').textContent=
-    `Equipo de ${jeNombre} · ${tecs.length} técnicos`;
-
-  // Hero promedios
-  const mlvG=getGrade(av.mlv||0),mabG=getGrade(av.mab||0);
-  document.getElementById('equipoHero').innerHTML=`
-    <div class="hero-card g-${mlvG}">
-      <div class="hero-label">ML-V promedio</div>
-      <div class="hero-val g-${mlvG}">${(av.mlv||0).toFixed(2)}</div>
-      <span class="hero-badge g-${mlvG}">${gradeLabel(mlvG)}</span>
-    </div>
-    <div class="hero-card g-${mabG}">
-      <div class="hero-label">MA+B promedio</div>
-      <div class="hero-val g-${mabG}">${(av.mab||0).toFixed(2)}</div>
-      <span class="hero-badge g-${mabG}">${gradeLabel(mabG)}</span>
-    </div>`;
-
-  // KPIs equipo: solo %RM, %Cumplimiento, Conversión, PPA
-  const JE_KPI_KEYS=[
-    {key:'pRM',  label:'%RM',          icon:'🛠️',unit:'%',min:89.5, dash:'rm'},
-    {key:'pCum', label:'%Cumplimiento',icon:'✅', unit:'%',min:90.0, dash:'cum'},
-    {key:'conv', label:'Conversión',   icon:'💰', unit:'%',min:15.0, dash:'conv'},
-    {key:'ppa',  label:'PPA',          icon:'⭐', unit:'%',min:10.0, dash:null},
-  ];
-  document.getElementById('equipoKpis').innerHTML=JE_KPI_KEYS.map(k=>{
-    const val=av[k.key]||0,s=getStatus(k,val),bp=getBarPct(k,val);
-    const disp=val.toFixed(2);
-    const clickAttr=k.dash?`onclick="showEquipoDash('${k.dash}','${jeId}')" style="cursor:pointer"`:'';
-    const tap=k.dash?'<div class="kpi-tap">→ ver ranking</div>':'';
-    return`<div class="kpi-card ${s} fade-up" ${clickAttr}>
-      <span class="kpi-icon">${k.icon}</span>
-      <div class="kpi-name">${k.label}</div>
-      <div class="kpi-val ${s}">${disp}<span class="kpi-unit">${k.unit}</span></div>
-      <div class="kpi-target">Obj: ≥ ${k.min}${k.unit}</div>
-      <div class="kpi-status ${s}">${statusLabel(s)}</div>
-      <div class="kpi-bar"><div class="kpi-bar-fill ${s}" style="width:${bp}%"></div></div>
-      ${tap}
-    </div>`;
-  }).join('');
-
-  // ── RM Global del equipo (desde Excel) ──
-  const tecIds = tecs.map(t=>t.id);
-  const rmTecs = tecIds.map(id=>({id, rm:RM_DATA[id]||RM_DATA[id.toUpperCase()]})).filter(x=>x.rm);
-  if(rmTecs.length){
-    const totalVisitas = rmTecs.reduce((s,x)=>s+x.rm.total,0);
-    const totalReps    = rmTecs.reduce((s,x)=>s+x.rm.reps,0);
-    const pctRMequipo  = totalVisitas>0?((totalVisitas-totalReps)/totalVisitas*100):0;
-    const rmCol        = pctRMequipo>=89.5?'var(--green2)':'#e05a4a';
-    // Top motivos post globales del equipo
-    const postMap={};
-    rmTecs.forEach(x=>(x.rm.topPost||[]).forEach(([m,n])=>postMap[m]=(postMap[m]||0)+n));
-    const topPost=Object.entries(postMap).sort((a,b)=>b[1]-a[1]).slice(0,4);
-    const maxPost=topPost[0]?topPost[0][1]:1;
-    // Top motivos RM globales
-    const rmMap={};
-    rmTecs.forEach(x=>(x.rm.motivosRM||[]).forEach(([m,n])=>rmMap[m]=(rmMap[m]||0)+n));
-    const topRm=Object.entries(rmMap).sort((a,b)=>b[1]-a[1]).slice(0,4);
-    const maxRm=topRm[0]?topRm[0][1]:1;
-
-    const circ=2*Math.PI*30;
-    const offset=circ-(pctRMequipo/100)*circ;
-
-    // Insertar antes de la lista de técnicos
-    const rmSection=`
-    <div class="section-head" style="margin-top:20px">RMs del equipo · datos reales</div>
-    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:12px;position:relative;overflow:hidden">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${rmCol},transparent)"></div>
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-        <div style="position:relative;width:74px;height:74px;flex-shrink:0">
-          <svg width="74" height="74" viewBox="0 0 74 74" style="transform:rotate(-90deg)">
-            <circle fill="none" stroke="var(--dim)" stroke-width="6" cx="37" cy="37" r="30"/>
-            <circle fill="none" stroke="${rmCol}" stroke-width="6" stroke-linecap="round"
-              cx="37" cy="37" r="30"
-              stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-          </svg>
-          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:1rem;font-weight:700;color:${rmCol}">${pctRMequipo.toFixed(1)}%</div>
-        </div>
-        <div style="flex:1">
-          <div style="font-family:var(--font);font-size:.85rem;font-weight:700;color:var(--gold2)">%RM global del equipo</div>
-          <div style="font-size:.72rem;color:var(--muted);margin-top:4px;line-height:1.6">
-            ${totalVisitas} visitas · <span style="color:#e05a4a;font-weight:600">${totalReps} repetidas</span> · ${rmTecs.length} técnicos con datos
-          </div>
-          <div style="font-size:.68rem;margin-top:5px;color:${rmCol};font-weight:600">
-            ${pctRMequipo>=89.5?`✓ Equipo en objetivo · +${(pctRMequipo-89.5).toFixed(1)} puntos`:`✗ Por debajo · faltan ${(89.5-pctRMequipo).toFixed(1)} puntos`}
-          </div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div>
-          <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:7px">Motivo de las RMs</div>
-          ${topRm.length?topRm.map(([m,n])=>`
-            <div style="margin-bottom:6px">
-              <div style="display:flex;justify-content:space-between;font-size:.66rem;margin-bottom:2px">
-                <span style="color:var(--text)">${m}</span><span style="color:#e05a4a;font-weight:700">${n}</span>
-              </div>
-              <div style="background:var(--dim);border-radius:3px;height:4px;overflow:hidden">
-                <div style="width:${Math.round(n/maxRm*100)}%;height:100%;background:#e05a4a;border-radius:3px"></div>
-              </div>
-            </div>`).join(''):'<div style="font-size:.7rem;color:var(--muted)">Sin datos</div>'}
-        </div>
-        <div>
-          <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:7px">Causa raíz (post)</div>
-          ${topPost.length?topPost.map(([m,n])=>`
-            <div style="margin-bottom:6px">
-              <div style="display:flex;justify-content:space-between;font-size:.66rem;margin-bottom:2px">
-                <span style="color:var(--text)">${m}</span><span style="color:var(--orange);font-weight:700">${n}</span>
-              </div>
-              <div style="background:var(--dim);border-radius:3px;height:4px;overflow:hidden">
-                <div style="width:${Math.round(n/maxPost*100)}%;height:100%;background:var(--orange);border-radius:3px"></div>
-              </div>
-            </div>`).join(''):'<div style="font-size:.7rem;color:var(--muted)">Sin datos</div>'}
-        </div>
-      </div>
-    </div>`;
-
-    // Inyectar en contenedor dedicado
-    document.getElementById('equipoRMGlobal').innerHTML=rmSection;
-  renderDocsEquipo(jeId,'equipoDocsContainer');
-  } else {
-    document.getElementById('equipoRMGlobal').innerHTML='';
-    if(document.getElementById('equipoDocsContainer')) renderDocsEquipo(jeId,'equipoDocsContainer');
-  }
-
-  // Lista de técnicos ordenados por ML-V desc — mejor con estrella
-  const sorted=[...tecs].sort((a,b)=>b.mlv-a.mlv);
-  // Calcular mejor técnico por score ponderado (ML-V + MA+B + KPIs)
-  function tecScore(t){
-    let s=t.mlv*2+t.mab;
-    if(t.pRM>=89.5)s+=1;if(t.pCum>=90)s+=1;if(t.conv>=15)s+=1;if(t.ppa>=10)s+=1;
-    return s;
-  }
-  const bestId=sorted.reduce((best,t)=>tecScore(t)>tecScore(best)?t:best,sorted[0])?.id;
-
-  document.getElementById('tecList').innerHTML=sorted.map((t,i)=>{
-    const g=getGrade(t.mlv);
-    const col=gradeColor(g);
-    const nombre=t.nombre.trim();
-    const isBest=t.id===bestId;
-    return`<div class="tec-row g-${g} fade-up" onclick="showTecDetail('${t.id}')">
-      <div class="tec-rank" style="${isBest?'color:var(--gold2);font-size:.85rem':''}">
-        ${isBest?'⭐':''}${!isBest?i+1:''}
-      </div>
-      <div class="tec-info">
-        <div class="tec-name">${nombre}${isBest?' <span style="font-size:.6rem;background:rgba(232,201,106,.15);color:var(--gold2);border:1px solid #3d3300;border-radius:4px;padding:1px 6px;vertical-align:middle;margin-left:4px">MEJOR</span>':''}</div>
-        <div class="tec-sub">${t.id} · ${t.provincia} · ${t.lab} lab.</div>
-      </div>
-      <div class="tec-vals">
-        <div>
-          <div class="tec-mlv" style="color:${col}">${t.mlv.toFixed(2)}</div>
-          <div class="tec-mab">MA+B ${t.mab.toFixed(2)}</div>
-        </div>
-        <div class="tec-arrow">›</div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// ══════════════════════════════════════════════
-//  DETALLE TÉCNICO DESDE EQUIPO
-// ══════════════════════════════════════════════
-function showTecDetail(tecId){
-  const tec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===tecId.toUpperCase());
-  if(!tec)return;
-  // Guardamos quién era el tecnico actual y lo mostramos en panel aparte
-  document.getElementById('tecDetailContent').innerHTML=buildTecDetailHTML(tec);
-  showPanel('tecDetailPanel');
-  window.scrollTo(0,0);
-}
-
-function buildTecDetailHTML(tec){
-  const g=getGrade(tec.mlv);
-  const col=gradeColor(g);
-  const results=KPI_CONFIG.filter(k=>!k.info).map(k=>getStatus(k,tec[k.key]));
-  const okN=results.filter(r=>r==='ok').length;
-  const pct=Math.round(okN/results.length*100);
-  const rc=pct>=80?'#3daa6e':pct>=50?'#d4831a':'#c0392b';
-  const circ=2*Math.PI*30,offset=circ-(pct/100)*circ;
-
-  return`
-    <div class="detail-hero">
-      <div class="detail-hero-title">👤 Técnico · ${tec.id}</div>
-      <div class="detail-hero-val" style="font-size:1.3rem;color:var(--gold2)">${tec.nombre.trim()}</div>
-      <div class="detail-hero-sub">${tec.provincia} · ${tec.lab} días laborables</div>
-    </div>
-
-    <div style="display:flex;gap:12px;margin-bottom:14px;align-items:center">
-      <div class="summary-ring" style="flex-shrink:0">
-        <svg width="74" height="74" viewBox="0 0 74 74">
-          <circle class="ring-bg" cx="37" cy="37" r="30"/>
-          <circle class="ring-fg" cx="37" cy="37" r="30" stroke="${rc}"
-            stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-        </svg>
-        <div class="ring-text">${pct}%</div>
-      </div>
-      <div style="flex:1">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="stat-box"><div class="n" style="color:${col}">${tec.mlv.toFixed(2)}</div><div class="l">ML-V</div></div>
-          <div class="stat-box"><div class="n" style="color:${gradeColor(getGrade(tec.mab))}">${tec.mab.toFixed(2)}</div><div class="l">MA+B</div></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="detail-section">KPIs</div>
-    <div class="kpi-grid">
-    ${KPI_CONFIG.map(k=>{
-      if(k.info){
-        return`<div class="kpi-card ok">
-          <span class="kpi-icon">${k.icon}</span>
-          <div class="kpi-name">${k.label}</div>
-          <div class="kpi-val ok">€${tec.ventas.toFixed(0)}</div>
-          <div class="kpi-target">Comisión</div>
-          <div class="kpi-status ok">Informativo</div>
-          <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
-        </div>`;
-      }
-      const val=tec[k.key],s=getStatus(k,val),bp=getBarPct(k,val);
-      const disp=typeof val==='number'&&!Number.isInteger(val)?val.toFixed(2):val;
-      return`<div class="kpi-card ${s}">
-        <span class="kpi-icon">${k.icon}</span>
-        <div class="kpi-name">${k.label}</div>
-        <div class="kpi-val ${s}">${disp}<span class="kpi-unit">${k.unit}</span></div>
-        <div class="kpi-target">≥ ${k.min||'—'}${k.unit||''}</div>
-        <div class="kpi-status ${s}">${statusLabel(s)}</div>
-        <div class="kpi-bar"><div class="kpi-bar-fill ${s}" style="width:${bp}%"></div></div>
-      </div>`;
-    }).join('')}
-    </div>
-
-    <div class="detail-section">Otros indicadores</div>
-    <div class="other-grid">
-    ${OTHER_KEYS.map(k=>{
-      const val=tec[k.key],pre=k.prefix||'';
-      const disp=typeof val==='number'&&!Number.isInteger(val)?val.toFixed(2):val;
-      const col2=(k.key==='dev'||k.key==='devE')?(val<0?'#c05040':val>0?'#3daa6e':'#7a6840'):'var(--text)';
-      return`<div class="other-card"><div class="other-name">${k.label}</div>
-        <div class="other-val" style="color:${col2}">${pre}${disp}</div></div>`;
-    }).join('')}
-    </div>
-    ${(()=>{
-      const rm=RM_DATA[tec.id]||RM_DATA[tec.id.toUpperCase()];
-      const cum=CUM_DATA[tec.id]||CUM_DATA[tec.id.toUpperCase()];
-      let html='';
-      if(rm||cum) html+='<div class="detail-section">Dashboards de datos reales</div>';
-      if(rm){
-        const rmCol=rm.pctRM>=89.5?'var(--green2)':'#e05a4a';
-        html+=`<div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;padding:14px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
-          <div style="position:relative;width:58px;height:58px;flex-shrink:0">
-            <svg width="58" height="58" viewBox="0 0 58 58" style="transform:rotate(-90deg)">
-              <circle fill="none" stroke="var(--dim)" stroke-width="6" cx="29" cy="29" r="23"/>
-              <circle fill="none" stroke="${rmCol}" stroke-width="6" stroke-linecap="round"
-                cx="29" cy="29" r="23"
-                stroke-dasharray="${(2*Math.PI*23).toFixed(1)}"
-                stroke-dashoffset="${(2*Math.PI*23*(1-rm.pctRM/100)).toFixed(1)}"/>
-            </svg>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${rmCol}">${rm.pctRM}%</div>
-          </div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">🛠️ RMs</div>
-            <div style="font-size:.75rem;color:var(--text)">${rm.total} visitas · <span style="color:#e05a4a">${rm.reps} repetidas</span></div>
-            ${rm.topPost&&rm.topPost.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Causa raíz: <strong style="color:var(--orange)">${rm.topPost[0][0]}</strong></div>`:''}
-          </div>
-          <button onclick="showRMDashFromTec('${tec.id}')" style="flex-shrink:0;padding:8px 12px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.65rem;font-weight:700;cursor:pointer;text-transform:uppercase">Ver →</button>
-        </div>`;
-      }
-      if(cum){
-        const cumCol=cum.pct>=90?'var(--green2)':'#e05a4a';
-        html+=`<div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;padding:14px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
-          <div style="position:relative;width:58px;height:58px;flex-shrink:0">
-            <svg width="58" height="58" viewBox="0 0 58 58" style="transform:rotate(-90deg)">
-              <circle fill="none" stroke="var(--dim)" stroke-width="6" cx="29" cy="29" r="23"/>
-              <circle fill="none" stroke="${cumCol}" stroke-width="6" stroke-linecap="round"
-                cx="29" cy="29" r="23"
-                stroke-dasharray="${(2*Math.PI*23).toFixed(1)}"
-                stroke-dashoffset="${(2*Math.PI*23*(1-cum.pct/100)).toFixed(1)}"/>
-            </svg>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${cumCol}">${cum.pct}%</div>
-          </div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">✅ Cumplimiento</div>
-            <div style="font-size:.75rem;color:var(--text)">${cum.total} visitas · <span style="color:#e05a4a">${cum.noOk} no cumplidas</span></div>
-            ${cum.topRazones&&cum.topRazones.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Razón: <strong style="color:#e05a4a">${cum.topRazones[0][0]}</strong></div>`:'<div style="font-size:.62rem;color:var(--green2);margin-top:2px">Sin incumplimientos ✓</div>'}
-          </div>
-          <button onclick="showCumDashFromTec('${tec.id}')" style="flex-shrink:0;padding:8px 12px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.65rem;font-weight:700;cursor:pointer;text-transform:uppercase">Ver →</button>
-        </div>`;
-      }
-      return html;
-    })()}
-    `;
-}
-
-// ══════════════════════════════════════════════
-//  RENDER JR (vista director)
-// ══════════════════════════════════════════════
-function renderJRPanel(){
-  const jeIds = JERARQUIA['JR9426']||[];
-  const GRUPOS = [
-    { nombre:'Zonas 4 y 5', jeIds:['Q29994','Q28224','273371'], color:'#c9a84c' },
-    { nombre:'Zonas 6 y 7', jeIds:['286800','273379','239831'], color:'#3daa6e' }
-  ];
-
-  // Resumen global
-  const allTecs=jeIds.flatMap(id=>getTecnicosOfJE(id));
-  const globalAv=calcAvg(allTecs);
-  const glvG=getGrade(globalAv.mlv||0);
-  const gmabG=getGrade(globalAv.mab||0);
-  document.getElementById('jrResumen').innerHTML=`
-    <div class="equipo-kpi"><div class="equipo-kpi-name">ML-V global</div>
-      <div class="equipo-kpi-val" style="color:${gradeColor(glvG)}">${(globalAv.mlv||0).toFixed(2)}</div></div>
-    <div class="equipo-kpi"><div class="equipo-kpi-name">MA+B global</div>
-      <div class="equipo-kpi-val" style="color:${gradeColor(gmabG)}">${(globalAv.mab||0).toFixed(2)}</div></div>
-    <div class="equipo-kpi"><div class="equipo-kpi-name">%RM global</div>
-      <div class="equipo-kpi-val" style="color:${(globalAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(globalAv.pRM||0).toFixed(1)}%</div></div>
-    <div class="equipo-kpi"><div class="equipo-kpi-name">%Cum global</div>
-      <div class="equipo-kpi-val" style="color:${(globalAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(globalAv.pCum||0).toFixed(1)}%</div></div>
-    <div class="equipo-kpi"><div class="equipo-kpi-name">Conv global</div>
-      <div class="equipo-kpi-val" style="color:${(globalAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(globalAv.conv||0).toFixed(1)}%</div></div>
-    <div class="equipo-kpi"><div class="equipo-kpi-name">Técnicos</div>
-      <div class="equipo-kpi-val" style="color:var(--gold2)">${allTecs.length}</div></div>`;
-
-  // Lista agrupada por zonas
-  let jeListHTML = '';
-  GRUPOS.forEach(grupo => {
-    const grupoTecs = grupo.jeIds.flatMap(id=>getTecnicosOfJE(id));
-    const grupoAv = calcAvg(grupoTecs);
-    const gCol = grupoAv.mlv>=7?'var(--green2)':grupoAv.mlv>=6.5?'var(--orange)':'#e05a4a';
-
-    // Header del grupo con métricas totales
-    jeListHTML += `<div style="background:var(--dim);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:8px;position:relative;overflow:hidden">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${grupo.color},transparent)"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="font-size:.88rem;font-weight:800;color:${grupo.color}">${grupo.nombre}</div>
-        <div style="font-size:.72rem;color:var(--muted)">${grupoTecs.length} técnicos</div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
-        <div class="je-mini"><div class="je-mini-n" style="color:${gCol}">${(grupoAv.mlv||0).toFixed(2)}</div><div class="je-mini-l">ML-V</div></div>
-        <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(grupoAv.pRM||0).toFixed(1)}%</div><div class="je-mini-l">%RM</div></div>
-        <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(grupoAv.pCum||0).toFixed(1)}%</div><div class="je-mini-l">%Cum</div></div>
-        <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(grupoAv.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
-      </div>
-    </div>`;
-
-    // JEs individuales del grupo
-    const jeSummaries = grupo.jeIds.map(id=>{
-      const tecs=getTecnicosOfJE(id);
-      const av=calcAvg(tecs);
-      return {id, nombre:JE_NAMES[id]||id, tecs, av};
-    }).sort((a,b)=>(b.av.mlv||0)-(a.av.mlv||0));
-
-    jeListHTML += jeSummaries.map(je=>{
-      const g=getGrade(je.av.mlv||0);
-      const col=gradeColor(g);
-      const rmOk=(je.av.pRM||0)>=89.5,cumOk=(je.av.pCum||0)>=90,convOk=(je.av.conv||0)>=15;
-      return`<div class="je-card g-${g} fade-up" onclick="showJEDetail('${je.id}')" style="margin-bottom:8px">
-        <div class="je-card-top">
-          <div>
-            <div class="je-card-name">${je.nombre}</div>
-            <div class="je-card-id">${je.id} · ${je.tecs.length} técnicos</div>
-          </div>
-          <div style="text-align:right">
-            <div class="je-card-mlv" style="color:${col}">${(je.av.mlv||0).toFixed(2)}</div>
-            <div style="font-size:.62rem;color:var(--muted)">ML-V promedio</div>
-          </div>
-        </div>
-        <div class="je-mini-grid">
-          <div class="je-mini"><div class="je-mini-n" style="color:${gradeColor(getGrade(je.av.mab||0))}">${(je.av.mab||0).toFixed(2)}</div><div class="je-mini-l">MA+B</div></div>
-          <div class="je-mini"><div class="je-mini-n" style="color:${rmOk?'var(--green2)':'#e05a4a'}">${(je.av.pRM||0).toFixed(1)}%</div><div class="je-mini-l">%RM</div></div>
-          <div class="je-mini"><div class="je-mini-n" style="color:${cumOk?'var(--green2)':'#e05a4a'}">${(je.av.pCum||0).toFixed(1)}%</div><div class="je-mini-l">%Cum</div></div>
-          <div class="je-mini"><div class="je-mini-n" style="color:${convOk?'var(--green2)':'#e05a4a'}">${(je.av.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
-        </div>
-        <div class="je-arrow">Ver equipo completo →</div>
-      </div>`;
-    }).join('');
-
-    jeListHTML += '<div style="height:12px"></div>'; // separador entre grupos
-  });
-
-  document.getElementById('jeList').innerHTML=jeListHTML;
-}
-
-
-// ══════════════════════════════════════════════
-//  DETALLE JE DESDE JR
-// ══════════════════════════════════════════════
-function showJEDetail(jeId){
-  const tecs=getTecnicosOfJE(jeId);
-  const av=calcAvg(tecs);
-  const jeNombre=JE_NAMES[jeId]||jeId;
-  const sorted=[...tecs].sort((a,b)=>b.mlv-a.mlv);
-
-  // JE propio en CSV
-  const jeTec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===jeId.toUpperCase());
-  const mlvG=getGrade(av.mlv||0),mabG=getGrade(av.mab||0);
-
-  document.getElementById('jrDetailContent').innerHTML=`
-    <div class="detail-hero">
-      <div class="detail-hero-title">👔 Jefe de equipo</div>
-      <div class="detail-hero-val" style="font-size:1.3rem;color:var(--gold2)">${jeNombre}</div>
-      <div class="detail-hero-sub">${jeId} · ${tecs.length} técnicos en el equipo</div>
-    </div>
-
-    <div class="detail-section">Promedios del equipo</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div class="hero-card g-${mlvG}">
-        <div class="hero-label">ML-V promedio</div>
-        <div class="hero-val g-${mlvG}">${(av.mlv||0).toFixed(2)}</div>
-        <span class="hero-badge g-${mlvG}">${gradeLabel(mlvG)}</span>
-      </div>
-      <div class="hero-card g-${mabG}">
-        <div class="hero-label">MA+B promedio</div>
-        <div class="hero-val g-${mabG}">${(av.mab||0).toFixed(2)}</div>
-        <span class="hero-badge g-${mabG}">${gradeLabel(mabG)}</span>
-      </div>
-    </div>
-
-    <div class="equipo-kpis" style="margin-bottom:14px">
-      <div class="equipo-kpi"><div class="equipo-kpi-name">%RM</div>
-        <div class="equipo-kpi-val" style="color:${(av.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(av.pRM||0).toFixed(1)}%</div></div>
-      <div class="equipo-kpi"><div class="equipo-kpi-name">%Cum</div>
-        <div class="equipo-kpi-val" style="color:${(av.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(av.pCum||0).toFixed(1)}%</div></div>
-      <div class="equipo-kpi"><div class="equipo-kpi-name">Conv</div>
-        <div class="equipo-kpi-val" style="color:${(av.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(av.conv||0).toFixed(1)}%</div></div>
-    </div>
-
-    ${jeTec?`<div class="detail-section">Datos propios del JE</div>${buildTecDetailHTML(jeTec)}`:''}
-
-    <div class="detail-section">Técnicos del equipo</div>
-    <div class="tec-list">
-    ${sorted.map((t,i)=>{
-      const g2=getGrade(t.mlv);
-      const col2=gradeColor(g2);
-      return`<div class="tec-row g-${g2}" onclick="showTecDetailFromJR('${t.id}')">
-        <div class="tec-rank">${i+1}</div>
-        <div class="tec-info">
-          <div class="tec-name">${t.nombre.trim()}</div>
-          <div class="tec-sub">${t.id} · ${t.provincia} · ${t.lab} lab.</div>
-        </div>
-        <div class="tec-vals">
-          <div>
-            <div class="tec-mlv" style="color:${col2}">${t.mlv.toFixed(2)}</div>
-            <div class="tec-mab">MA+B ${t.mab.toFixed(2)}</div>
-          </div>
-          <div class="tec-arrow">›</div>
-        </div>
-      </div>`;
-    }).join('')}
-    </div>`;
-
-  showPanel('jrDetailPanel');
-  window.scrollTo(0,0);
-}
-
-// Detalle técnico navegando desde JR > JE
-function showTecDetailFromJR(tecId){
-  const tec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===tecId.toUpperCase());
-  if(!tec)return;
-  // Reutilizamos tecDetailPanel pero el back vuelve a jrDetailPanel
-  document.getElementById('tecDetailContent').innerHTML=buildTecDetailHTML(tec);
-  document.getElementById('backTecBtn').onclick=()=>{
-    showPanel('jrDetailPanel'); window.scrollTo(0,0);
-  };
-  showPanel('tecDetailPanel');
-  window.scrollTo(0,0);
-}
-
-
-// showRMDashFromTec: abre el dashboard RM desde el panel tecDetail (equipo JE)
-let _rmBackPanel = 'detailPanel';
-function showRMDashFromTec(tecId){
-  _rmBackPanel = 'tecDetailPanel';
-  _openRMDash(tecId);
-}
-
-// ══════════════════════════════════════════════
-//  DASHBOARD RM INDIVIDUAL (desde detalle KPI)
-// ══════════════════════════════════════════════
-function showRMDash(tecId){
-  _rmBackPanel = 'mainPanel';
-  _openRMDash(tecId);
-}
-
-function _openRMDash(tecId){
-  const id = String(tecId).trim();
-  const rm = RM_DATA[id] || RM_DATA[id.toUpperCase()];
-  // Buscar técnico siempre por id, no depender de CURRENT_TEC
-  const tec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
-  if(!rm){
-    alert('No hay datos de RMs disponibles para este técnico (' + id + ').');
-    return;
-  }
-  if(!tec){
-    alert('Técnico no encontrado: ' + id);
-    return;
-  }
-
-  const pctOk = rm.pctRM >= 89.5;
-  const col = pctOk ? 'var(--green2)' : '#e05a4a';
-  const totalOk = rm.total - rm.reps;
-
-  function barras(arr, maxVal, color){
-    if(!arr || !arr.length) return '<div style="color:var(--muted);font-size:.75rem">Sin datos</div>';
-    return arr.map(([m,n])=>{
-      const pct = Math.round((n/maxVal)*100);
-      return `<div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-          <div style="font-size:.72rem;color:var(--text);font-weight:600">${m}</div>
-          <div style="font-size:.72rem;font-weight:700;color:${color}">${n}</div>
-        </div>
-        <div style="background:var(--dim);border-radius:4px;height:6px;overflow:hidden">
-          <div style="width:${pct}%;height:100%;border-radius:4px;background:${color};transition:width .5s"></div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  const maxMotivo  = rm.topMotivos && rm.topMotivos[0]  ? rm.topMotivos[0][1]  : 1;
-  const maxPost    = rm.topPost    && rm.topPost[0]     ? rm.topPost[0][1]     : 1;
-  const maxRMmot   = rm.motivosRM  && rm.motivosRM[0]   ? rm.motivosRM[0][1]   : 1;
-
-  const circ   = 2*Math.PI*28;
-  const offset = circ - (rm.pctRM/100)*circ;
-
-  document.getElementById('rmDashContent').innerHTML = `
-    <div class="detail-hero">
-      <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
-      <div class="detail-hero-val" style="color:${col}">${rm.pctRM}%</div>
-      <div class="detail-hero-sub">%RM del técnico · datos del Excel de mantenimientos</div>
-    </div>
-
-    <div style="display:flex;gap:9px;margin-bottom:16px">
-      <div class="stat-box" style="flex:1"><div class="n">${rm.total}</div><div class="l">Total<br>visitas</div></div>
-      <div class="stat-box" style="flex:1"><div class="n" style="color:#e05a4a">${rm.reps}</div><div class="l">Visitas<br>repetidas</div></div>
-      <div class="stat-box" style="flex:1"><div class="n" style="color:var(--green2)">${totalOk}</div><div class="l">Resueltas<br>1ª visita</div></div>
-      <div class="stat-box" style="flex:1"><div class="n" style="color:var(--muted)">${rm.durMedia}<span style="font-size:.7rem">min</span></div><div class="l">Duración<br>media</div></div>
-    </div>
-
-    <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
-      <div style="position:relative;width:70px;height:70px;flex-shrink:0">
-        <svg width="70" height="70" viewBox="0 0 70 70" style="transform:rotate(-90deg)">
-          <circle fill="none" stroke="var(--dim)" stroke-width="8" cx="35" cy="35" r="28"/>
-          <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
-            cx="35" cy="35" r="28"
-            stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-        </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${rm.pctRM}%</div>
-      </div>
-      <div>
-        <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
-        <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-          Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(rm.pctRM-89.5).toFixed(1)} puntos`:`Faltan ${(89.5-rm.pctRM).toFixed(1)} puntos`}
-        </div>
-      </div>
-    </div>
-
-    <div class="detail-section">Top motivos de todas las visitas</div>
-    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
-      ${barras(rm.topMotivos, maxMotivo, 'var(--gold3)')}
-    </div>
-
-    <div class="detail-section">Motivo de las visitas repetidas (RM)</div>
-    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
-      ${rm.motivosRM && rm.motivosRM.length
-        ? barras(rm.motivosRM, maxRMmot, '#e05a4a')
-        : '<div style="color:var(--green2);font-size:.75rem">✓ Sin repeticiones registradas</div>'}
-    </div>
-
-    <div class="detail-section">Causa raíz del post-mantenimiento</div>
-    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
-      ${rm.topPost && rm.topPost.length
-        ? barras(rm.topPost, maxPost, 'var(--orange)')
-        : '<div style="color:var(--muted);font-size:.75rem">Sin datos de causa raíz</div>'}
-    </div>`;
-
-  showPanel('rmDashPanel');
-  window.scrollTo(0,0);
-}
-
-// ══════════════════════════════════════════════
-//  DETAIL KPI PANEL
-// ══════════════════════════════════════════════
-function showDetail(type){
-  const tec=CURRENT_TEC;
-  const prevPanel = CURRENT_USER_TYPE==='je' && ACTIVE_TAB==='misDatos' ? 'mainPanel' : 'mainPanel';
-  showPanel('detailPanel');
-  window.scrollTo(0,0);
-  let html='';
-  if(type==='rm'){
-    const pct=tec.pRM,s=getStatus({min:89.5},pct);
-    const col=s==='ok'?'var(--green2)':s==='warn'?'var(--orange)':'#e05a4a';
-    html=`<div class="detail-hero"><div class="detail-hero-title">🛠️ %RM</div>
-      <div class="detail-hero-val" style="color:${col}">${pct.toFixed(2)}%</div>
-      <div class="detail-hero-sub">Objetivo ≥ 89.5% · ${tec.rm} repeticiones de ${tec.palito}</div></div>
-    <div class="stat-row">
-      <div class="stat-box"><div class="n">${tec.palito}</div><div class="l">Mantenimientos</div></div>
-      <div class="stat-box"><div class="n" style="color:#e05a4a">${tec.rm}</div><div class="l">Repeticiones</div></div>
-      <div class="stat-box"><div class="n" style="color:${col}">${pct.toFixed(1)}%</div><div class="l">Tu %RM</div></div>
-    </div>
-    <div style="font-size:.8rem;color:var(--muted);line-height:1.7;margin-top:8px">
-      ${s==='ok'?`<span style="color:var(--green2)">✓ Por encima del objetivo (89.5%). ¡Buen trabajo!</span>`
-        :`<span style="color:#e05a4a">✗ Necesitas reducir las repeticiones para superar el 89.5%.</span>`}
-    </div>
-    <button onclick="showRMDash('${tec.id}')" style="margin-top:14px;width:100%;padding:12px;background:linear-gradient(135deg,var(--dim),#1c1400);border:1px solid var(--border2);border-radius:11px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;letter-spacing:.08em;cursor:pointer;text-transform:uppercase">
-      📊 Ver dashboard de RMs →
-    </button>`;
-  } else if(type==='cum'){
-    const pct=tec.pCum,s=getStatus({min:90},pct);
-    const col=s==='ok'?'var(--green2)':s==='warn'?'var(--orange)':'#e05a4a';
-    html=`<div class="detail-hero"><div class="detail-hero-title">✅ %Cumplimiento</div>
-      <div class="detail-hero-val" style="color:${col}">${pct.toFixed(2)}%</div>
-      <div class="detail-hero-sub">Objetivo ≥ 90% · ${tec.incum} incumplimientos</div></div>
-    <div class="stat-row">
-      <div class="stat-box"><div class="n">${tec.nec}</div><div class="l">Necesarios</div></div>
-      <div class="stat-box"><div class="n">${tec.palito}</div><div class="l">Realizados</div></div>
-      <div class="stat-box"><div class="n" style="color:#e05a4a">${tec.incum}</div><div class="l">Incumpl.</div></div>
-    </div>
-    <div style="font-size:.8rem;color:var(--muted);line-height:1.7;margin-top:8px">
-      ${s==='ok'?`<span style="color:var(--green2)">✓ Cumplimiento por encima del 90%.</span>`
-        :`<span style="color:#e05a4a">✗ Cumplimiento por debajo del objetivo.</span>`}
-    </div>`;
-  } else if(type==='ventas'){
-    const pct=tec.conv,s=getStatus({min:15},pct);
-    const col=s==='ok'?'var(--green2)':s==='warn'?'var(--orange)':'#e05a4a';
-    const euros=tec.ventas.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
-    html=`<div class="detail-hero"><div class="detail-hero-title">💰 Conversión y Ventas</div>
-      <div class="detail-hero-val" style="color:${col}">${pct.toFixed(2)}%</div>
-      <div class="detail-hero-sub">Conv. objetivo ≥ 15% · ${tec.uven} unidades vendidas</div></div>
-    <div class="stat-row">
-      <div class="stat-box"><div class="n">${tec.uven}</div><div class="l">Unidades</div></div>
-      <div class="stat-box"><div class="n" style="color:var(--gold2)">€${euros}</div><div class="l">Tu 20%</div></div>
-      <div class="stat-box"><div class="n" style="color:${col}">${pct.toFixed(1)}%</div><div class="l">Conversión</div></div>
-    </div>
-    <div style="font-size:.8rem;color:var(--muted);line-height:1.7;margin-top:8px">
-      ${s==='ok'?`<span style="color:var(--green2)">✓ Conversión por encima del 15%. ¡Excelente!</span>`
-        :`<span style="color:#e05a4a">✗ Conversión por debajo del 15%.</span>`}
-    </div>`;
-  } else if(type==='mlv'||type==='mab'){
-    const isMlv=type==='mlv';
-    const val=isMlv?tec.mlv:tec.mab;
-    const g=getGrade(val);
-    const col=gradeColor(g);
-    const label=isMlv?'ML-V':'MA+B';
-    const levels=[
-      ['best','≥ 8.0','Excelente','#3daa6e'],
-      ['good','≥ 7.5','Bueno','#e8c96a'],
-      ['ok',  '≥ 7.0','Aceptable','#d4831a'],
-      ['bad', '< 7.0','Mejorable','#e05a4a'],
-    ];
-    html=`<div class="detail-hero"><div class="detail-hero-title">${isMlv?'📈':'📊'} ${label}</div>
-      <div class="detail-hero-val" style="color:${col}">${val.toFixed(2)}</div>
-      <div class="detail-hero-sub">${isMlv?'Media de letra V':'Media A+B — calidad global'}</div></div>
-    <div class="grade-legend">
-      <span class="grade-pill best">≥ 8.0 Excelente</span>
-      <span class="grade-pill good">≥ 7.5 Bueno</span>
-      <span class="grade-pill ok">≥ 7.0 Aceptable</span>
-      <span class="grade-pill bad">< 7.0 Mejorable</span>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:7px;margin-top:8px">
-      ${levels.map(([gr,rng,lbl,c])=>`
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
-          background:${gr===g?'rgba(201,168,76,.07)':'var(--dim)'};border:1px solid ${gr===g?'var(--border2)':'transparent'}">
-          <div style="width:8px;height:8px;border-radius:50%;background:${c};flex-shrink:0"></div>
-          <div style="font-size:.73rem;color:${gr===g?'var(--text)':'var(--muted)'}">
-            <strong style="color:${c}">${rng}</strong> — ${lbl}
-            ${gr===g?`<span style="color:var(--gold3);font-size:.65rem"> ← Tu nivel</span>`:''}
-          </div>
-        </div>`).join('')}
-    </div>`;
-  }
-  document.getElementById('detailContent').innerHTML=html;
-}
-
-// ══════════════════════════════════════════════
-//  DASHBOARD KPI EQUIPO (RM / CUM / CONV)
-// ══════════════════════════════════════════════
-function showEquipoDash(type, jeId){
-  const tecs=getTecnicosOfJE(jeId);
-
-  const CFG={
-    rm:{
-      title:'🛠️ %RM — Ratio de Mantenimiento',
-      sub:'Objetivo ≥ 89.5% · Cuántos mantenimientos NO se repiten',
-      key:'pRM', min:89.5, unit:'%',
-      cols:[
-        {label:'Mantenimientos',fn:t=>t.palito},
-        {label:'Repeticiones',fn:t=>t.rm, color:t=>t.rm===0?'var(--green2)':'#e05a4a'},
-        {label:'%RM',fn:t=>t.pRM.toFixed(1)+'%',color:t=>t.pRM>=89.5?'var(--green2)':'#e05a4a'},
-      ]
-    },
-    cum:{
-      title:'✅ %Cumplimiento de visitas',
-      sub:'Objetivo ≥ 90% · Visitas realizadas sobre las necesarias',
-      key:'pCum', min:90, unit:'%',
-      cols:[
-        {label:'Necesarios',fn:t=>t.nec},
-        {label:'Realizados',fn:t=>t.palito},
-        {label:'Incumpl.',fn:t=>t.incum,color:t=>t.incum===0?'var(--green2)':'#e05a4a'},
-        {label:'%Cum',fn:t=>t.pCum.toFixed(1)+'%',color:t=>t.pCum>=90?'var(--green2)':'#e05a4a'},
-      ]
-    },
-    conv:{
-      title:'💰 Conversión del equipo',
-      sub:'Objetivo ≥ 15% · Ventas sobre mantenimientos realizados',
-      key:'conv', min:15, unit:'%',
-      cols:[
-        {label:'Mant.',fn:t=>t.palito},
-        {label:'Unidades',fn:t=>t.uven},
-        {label:'Conversión',fn:t=>t.conv.toFixed(1)+'%',color:t=>t.conv>=15?'var(--green2)':'#e05a4a'},
-        {label:'20% €',fn:t=>'€'+t.ventas.toFixed(0),color:()=>'var(--gold2)'},
-      ]
-    }
-  };
-
-  const cfg=CFG[type];
-  const sorted=[...tecs].sort((a,b)=>b[cfg.key]-a[cfg.key]);
-  const okCount=sorted.filter(t=>t[cfg.key]>=(cfg.min)).length;
-  const avg2=tecs.length?tecs.reduce((s,t)=>s+t[cfg.key],0)/tecs.length:0;
-  const avgS=getStatus({min:cfg.min},avg2);
-  const avgCol=avgS==='ok'?'var(--green2)':avgS==='warn'?'var(--orange)':'#e05a4a';
-
-  // Barra de progreso horizontal por técnico
-  const maxVal=Math.max(...sorted.map(t=>t[cfg.key]),cfg.min*1.1)||1;
-
-  const rows=sorted.map((t,i)=>{
-    const val=t[cfg.key];
-    const ok=val>=cfg.min;
-    const barPct=Math.min(100,Math.round((val/maxVal)*100));
-    const barCol=ok?'var(--green2)':'#e05a4a';
-    const nombre=t.nombre.trim().split(' ').slice(0,2).join(' ');
-
-    // Extra cols
-    const extras=cfg.cols.map(c=>{
-      const v=c.fn(t);
-      const col=c.color?c.color(t):'var(--muted)';
-      return`<td style="padding:6px 4px;text-align:center;font-size:.7rem;font-family:var(--font);font-weight:700;color:${col}">${v}</td>`;
-    }).join('');
-
-    return`<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:8px 6px;min-width:0">
-        <div style="font-size:.74rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${i===0?'⭐ ':''}${nombre}</div>
-        <div style="background:var(--dim);border-radius:3px;height:4px;margin-top:5px;overflow:hidden">
-          <div style="width:${barPct}%;height:100%;border-radius:3px;background:${barCol};transition:width .5s"></div>
-        </div>
-      </td>
-      ${extras}
-    </tr>`;
-  }).join('');
-
-  const colHeaders=cfg.cols.map(c=>`<th style="padding:6px 4px;font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:center">${c.label}</th>`).join('');
-
-  document.getElementById('equipoDashContent').innerHTML=`
-    <div class="detail-hero">
-      <div class="detail-hero-title">${cfg.title}</div>
-      <div class="detail-hero-sub">${cfg.sub}</div>
-    </div>
-
-    <div style="display:flex;gap:9px;margin-bottom:16px">
-      <div class="stat-box" style="flex:1">
-        <div class="n" style="color:${avgCol}">${avg2.toFixed(1)}${cfg.unit}</div>
-        <div class="l">Promedio equipo</div>
-      </div>
-      <div class="stat-box" style="flex:1">
-        <div class="n" style="color:var(--green2)">${okCount}</div>
-        <div class="l">En objetivo</div>
-      </div>
-      <div class="stat-box" style="flex:1">
-        <div class="n" style="color:#e05a4a">${tecs.length-okCount}</div>
-        <div class="l">Por debajo</div>
-      </div>
-    </div>
-
-    <div class="detail-section">Ranking del equipo</div>
-    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;overflow:hidden;margin-top:4px">
-      <table style="width:100%;border-collapse:collapse">
-        <thead style="background:var(--dim)">
-          <tr>
-            <th style="padding:8px 6px;font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left">Técnico</th>
-            ${colHeaders}
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    <div style="font-size:.62rem;color:var(--muted);margin-top:10px;text-align:center">
-      ⭐ mejor del equipo · ordenado por ${cfg.title.split('—')[0].trim()}
-    </div>`;
-
-  showPanel('equipoDashPanel');
-  window.scrollTo(0,0);
-}
-
-
-// ══════════════════════════════════════════════
-//  DOCUMENTACIÓN PENDIENTE
-// ══════════════════════════════════════════════
-function renderDocsPendientes(tecId, containerId){
-  const id = String(tecId).trim().toUpperCase();
-  const container = document.getElementById(containerId);
-  if(!container) return;
-  const docs = DOCS_DATA.filter(d=>String(d.mat).trim().toUpperCase()===id);
-  console.log(`Docs para ${id}: ${docs.length} de ${DOCS_DATA.length} totales`);
-  if(!DOCS_DATA.length){
-    container.innerHTML=`<div class="section-head" style="margin-top:20px">📋 Documentación pendiente</div>
-      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:.75rem;color:var(--muted)">Cargando datos...</div>`;
-    return;
-  }
-  if(!docs.length){
-    container.innerHTML='';
-    return;
-  }
-  const rows = docs.map(d=>`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border)">
-      <div>
-        <div style="font-size:.65rem;font-weight:700;color:var(--text)">${d.tipo||'—'}</div>
-        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${d.origen||'—'}</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:.65rem;font-weight:700;color:var(--gold2)">${d.nMant||'—'}</div>
-        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${d.fecha||'—'}</div>
-      </div>
-    </div>`).join('');
-
-  container.innerHTML=`
-    <div class="section-head" style="margin-top:20px">📋 Documentación pendiente · ${docs.length} elemento${docs.length!==1?'s':''}</div>
-    <div style="background:var(--s1);border:1px solid #3d2800;border-radius:14px;overflow:hidden;position:relative">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--orange),transparent)"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 12px;background:var(--dim)">
-        <div style="font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">Tipo · Origen</div>
-        <div style="font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:right">Nº Mant · Fecha</div>
-      </div>
-      ${rows}
-    </div>`;
-}
-
-function renderDocsEquipo(jeId, containerId){
-  const ids = (JERARQUIA[jeId]||[]).map(id=>id.toUpperCase());
-  // Agrupar por técnico
-  const byTec = {};
-  DOCS_DATA.forEach(d=>{
-    const mat = String(d.mat).trim().toUpperCase();
-    if(ids.includes(mat)){
-      if(!byTec[mat]) byTec[mat]=[];
-      byTec[mat].push(d);
-    }
-  });
-  const container = document.getElementById(containerId);
-  if(!container) return;
-  const tecsConDocs = Object.keys(byTec);
-  if(!tecsConDocs.length){ container.innerHTML=''; return; }
-
-  const tecs = CURRENT_DATA.tecnicos;
-  const rows = tecsConDocs.map(mat=>{
-    const tec = tecs.find(t=>t.id.toUpperCase()===mat);
-    const nombre = tec ? tec.nombre.trim().split(' ').slice(0,2).join(' ') : mat;
-    const n = byTec[mat].length;
-    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
-      <div>
-        <div style="font-size:.78rem;font-weight:700;color:var(--text)">${nombre}</div>
-        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${mat}</div>
-      </div>
-      <div style="background:rgba(212,131,26,.15);border:1px solid #3d2800;border-radius:20px;padding:3px 12px;font-size:.72rem;font-weight:700;color:var(--orange)">${n} pendiente${n!==1?'s':''}</div>
-    </div>`;
-  }).join('');
-
-  const total = DOCS_DATA.filter(d=>ids.includes(String(d.mat).trim().toUpperCase())).length;
-  container.innerHTML=`
-    <div class="section-head" style="margin-top:20px">📋 Documentación pendiente del equipo · ${total} elemento${total!==1?'s':''}</div>
-    <div style="background:var(--s1);border:1px solid #3d2800;border-radius:14px;overflow:hidden;position:relative">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--orange),transparent)"></div>
-      ${rows}
-    </div>`;
-}
-
-
-// ══════════════════════════════════════════════
-//  FLOTA
-// ══════════════════════════════════════════════
-async function loadFlota(){
-  try{
-    const res=await fetch(FLOTA_URL+'&t='+Date.now(),{cache:'no-store'});
-    if(!res.ok) return;
-    const data=await res.json();
-    if(data && typeof data==='object' && Object.keys(data).length>0){
-      FLOTA_DATA=data;
-      console.log('Flota cargada:',Object.keys(FLOTA_DATA).length,'técnicos');
-    }
-  }catch(e){console.log('Flota error:',e.message);}
-}
-
-function renderFlota(tecId, containerId){
-  const container=document.getElementById(containerId);
-  if(!container) return;
-  const id=String(tecId).trim().toUpperCase();
-  const coche=FLOTA_DATA[id];
-  if(!coche){ container.innerHTML=''; return; }
-  container.innerHTML=`
-    <div class="section-head" style="margin-top:20px">🚗 Vehículo asignado</div>
-    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
-      <div>
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">Matrícula asignada</div>
-        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${coche}</div>
-      </div>
-      <div style="font-size:2.5rem">🚗</div>
-    </div>
-    <div style="background:rgba(212,131,26,.08);border:1px solid #3d2800;border-radius:10px;padding:10px 14px;margin-top:8px;font-size:.72rem;color:var(--orange)">
-      ⚠️ Si este vehículo no es el tuyo, comunícalo a tu jefe de equipo.
-    </div>`;
-}
-
-// ══════════════════════════════════════════════
-//  LOGIN
-// ══════════════════════════════════════════════
-function findUser(q){
-  q=q.trim().toUpperCase();
-  // JR nivel — acceso igual que JR9426
-  const JR_IDS=['JR9426','CM9651','JN4767','GD5381','BLAS.ALVAREZ'];
-  if(JR_IDS.includes(q)) return {type:'jr',id:q};
-  if(JERARQUIA[q]) return {type:'je',id:q};
-  const tec=CURRENT_DATA.tecnicos.find(t=>
-    t.id.toUpperCase()===q||t.raw.toUpperCase().includes(q)||t.nombre.toUpperCase().includes(q));
-  if(tec) return {type:'tecnico',tec};
-  return null;
-}
-
-async function doLogin(){
-  const mat=document.getElementById('matInput').value.trim().toUpperCase();
-  const dni=document.getElementById('dniInput').value.trim().toUpperCase();
-  if(!mat||!dni)return;
-  document.getElementById('spinner').style.display='block';
-  document.getElementById('loginBtn').style.opacity='.5';
-
-  // Cargar datos CSV y autenticación en paralelo
-  // Timeout helper — si tarda más de 8s continúa sin datos
-  const withTimeout = (promise, ms=8000) =>
-    Promise.race([promise, new Promise(r=>setTimeout(r, ms))]);
-
-  await Promise.all([
-    withTimeout(loadSheets()),
-    withTimeout(loadAuth())
-  ]);
-
-  // Si el timeout ganó, reintenta en background y re-renderiza al llegar
-  if(!_datosActualizados){
-    Promise.all([loadSheets(), loadAuth()]).then(()=>{
-      if(CURRENT_TEC) renderMain(CURRENT_TEC);
-      else if(CURRENT_JE_ID){
-        const jeTec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
-        if(jeTec && ACTIVE_TAB==='misDatos') renderMain(jeTec);
-      }
-    });
-  }
-
-  loadDocs().then(()=>{
-    if(CURRENT_TEC) renderDocsPendientes(CURRENT_TEC.id,'docsPendientesMain');
-    if(CURRENT_JE_ID) renderDocsEquipo(CURRENT_JE_ID,'equipoDocsContainer');
-  });
-  loadFlota().then(()=>{
-    if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
-  });
-
-  document.getElementById('spinner').style.display='none';
-  document.getElementById('loginBtn').style.opacity='1';
-
-  // Validar DNI si tenemos datos de auth
-  if(Object.keys(AUTH_DATA).length > 0){
-    const dniEsperado = AUTH_DATA[mat];
-    if(!dniEsperado || dniEsperado.toUpperCase() !== dni.toUpperCase()){
-      document.getElementById('loginError').style.display='block';
-      document.getElementById('matInput').style.borderColor='#c0392b';
-      document.getElementById('dniInput').style.borderColor='#c0392b';
-      return;
-    }
-  }
-
-  const found=findUser(mat);
-  if(!found){
-    document.getElementById('loginError').style.display='block';
-    document.getElementById('matInput').style.borderColor='#c0392b';
-    return;
-  }
-  document.getElementById('loginScreen').style.display='none';
-  document.getElementById('appScreen').style.display='block';
-
-  if(found.type==='jr'){
-    CURRENT_USER_TYPE='jr';
-    const JR_NOMBRES={
-      'JR9426':'Coordinador Regional',
-      'CM9651':'Coordinador Regional',
-      'JN4767':'Coordinador Regional',
-      'GD5381':'Coordinador Regional',
-      'BLAS.ALVAREZ':'Blas Álvarez'
-    };
-    document.getElementById('topbarName').textContent=JR_NOMBRES[found.id]||'Coordinador Regional';
-    document.getElementById('topbarId').textContent=found.id+' · Regional';
-    document.getElementById('scorePill').innerHTML='<span style="color:var(--gold2);font-weight:700">Vista global</span>';
-    document.getElementById('tabsBarJR').style.display='flex';
-    document.getElementById('tabsBar').style.display='none';
-    renderJRPanel();
-    showPanel('jrPanel');
-
-  } else if(found.type==='je'){
-    CURRENT_USER_TYPE='je';
-    CURRENT_JE_ID=found.id;
-    const jeTec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===found.id.toUpperCase());
-    const jeName=JE_NAMES[found.id]||found.id;
-    document.getElementById('topbarName').textContent=jeName;
-    document.getElementById('topbarId').textContent=found.id+' · JE';
-    document.getElementById('tabsBarJR').style.display='none';
-    if(jeTec){
-      document.getElementById('tabsBar').style.display='flex';
-      document.getElementById('tabMisDatos').style.display='';
-      document.getElementById('tabMisDatos').classList.add('active');
-      document.getElementById('tabEquipo').classList.remove('active');
-      renderMain(jeTec);
-      ACTIVE_TAB='misDatos';
-    } else {
-      document.getElementById('tabsBar').style.display='none';
-      renderEquipoPanel(found.id);
-      showPanel('equipoPanel');
-      ACTIVE_TAB='equipo';
-    }
-    document.getElementById('scorePill').innerHTML=`<span style="color:var(--gold2);font-weight:700">JE</span>`;
-
-  } else {
-    // Técnico normal
-    CURRENT_USER_TYPE='tecnico';
-    document.getElementById('tabsBar').style.display='none';
-    document.getElementById('tabsBarJR').style.display='none';
-    renderMain(found.tec);
-  }
-}
-
-// ── Botón volver ──
-document.getElementById('backBtn').addEventListener('click',()=>{
-  showPanel('mainPanel'); window.scrollTo(0,0);
-});
-document.getElementById('backTecBtn').addEventListener('click',()=>{
-  // Default: volver a equipo si es JE
-  if(CURRENT_USER_TYPE==='je') { showPanel('equipoPanel'); }
-  else showPanel('mainPanel');
-  window.scrollTo(0,0);
-});
-document.getElementById('backJRBtn').addEventListener('click',()=>{
-  showPanel('jrPanel'); window.scrollTo(0,0);
-});
-
-document.getElementById('backDashBtn').addEventListener('click',()=>{
-  showPanel('equipoPanel'); window.scrollTo(0,0);
-});
-document.getElementById('backRMBtn').addEventListener('click',()=>{
-  showPanel(_rmBackPanel); window.scrollTo(0,0);
-});
-document.getElementById('backCumBtn').addEventListener('click',()=>{
-  showPanel(_cumBackPanel); window.scrollTo(0,0);
-});
-
-// ── CUM DASHBOARD ──
-let _cumBackPanel = 'mainPanel';
-function showCumDashFromTec(tecId){ _cumBackPanel='tecDetailPanel'; _openCumDash(tecId); }
-function showCumDash(tecId){ _cumBackPanel='mainPanel'; _openCumDash(tecId); }
-function _openCumDash(tecId){
-  const id=String(tecId).trim();
-  const cum=CUM_DATA[id]||CUM_DATA[id.toUpperCase()];
-  const tec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
-  if(!cum){ alert('No hay datos de cumplimiento para este técnico ('+id+').'); return; }
-  const pctOk=cum.pct>=90;
-  const col=pctOk?'var(--green2)':'#e05a4a';
-  const circ=2*Math.PI*28, offset=circ-(cum.pct/100)*circ;
-  const nombre=tec?tec.nombre.trim():id;
-  const maxRazon=cum.topRazones&&cum.topRazones[0]?cum.topRazones[0][1]:1;
-
-  function barras(arr,maxV,color){
-    if(!arr||!arr.length) return '<div style="color:var(--green2);font-size:.75rem">✓ Sin incumplimientos</div>';
-    return arr.map(([m,n])=>`
-      <div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-          <div style="font-size:.72rem;color:var(--text);font-weight:600">${m||'Sin especificar'}</div>
-          <div style="font-size:.72rem;font-weight:700;color:${color}">${n}</div>
-        </div>
-        <div style="background:var(--dim);border-radius:4px;height:6px;overflow:hidden">
-          <div style="width:${Math.round(n/maxV*100)}%;height:100%;background:${color};border-radius:4px"></div>
-        </div>
-      </div>`).join('');
-  }
-
-  document.getElementById('cumDashContent').innerHTML=`
-    <div class="detail-hero">
-      <div class="detail-hero-title">✅ Dashboard Cumplimiento · ${nombre}</div>
-      <div class="detail-hero-val" style="color:${col}">${cum.pct}%</div>
-      <div class="detail-hero-sub">Visitas cumplidas · objetivo ≥ 90%</div>
-    </div>
-    <div style="display:flex;gap:9px;margin-bottom:16px">
-      <div class="stat-box" style="flex:1"><div class="n">${cum.total}</div><div class="l">Total<br>visitas</div></div>
-      <div class="stat-box" style="flex:1"><div class="n" style="color:var(--green2)">${cum.ok}</div><div class="l">Cumplidas</div></div>
-      <div class="stat-box" style="flex:1"><div class="n" style="color:#e05a4a">${cum.noOk}</div><div class="l">No<br>cumplidas</div></div>
-    </div>
-    <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
-      <div style="position:relative;width:70px;height:70px;flex-shrink:0">
-        <svg width="70" height="70" viewBox="0 0 70 70" style="transform:rotate(-90deg)">
-          <circle fill="none" stroke="var(--dim)" stroke-width="8" cx="35" cy="35" r="28"/>
-          <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
-            cx="35" cy="35" r="28" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-        </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${cum.pct}%</div>
-      </div>
-      <div>
-        <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
-        <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-          Objetivo: ≥ 90% · ${pctOk?`Margen de ${(cum.pct-90).toFixed(1)} puntos`:`Faltan ${(90-cum.pct).toFixed(1)} puntos`}
-        </div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:12px">
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">Averías</div>
-        <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:4px"><span style="color:var(--green2)">✓ Cumplidas</span><span style="font-weight:700;color:var(--green2)">${cum.avOk}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:.75rem"><span style="color:#e05a4a">✗ No cumplidas</span><span style="font-weight:700;color:#e05a4a">${cum.avNo}</span></div>
-      </div>
-      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:12px">
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">No Averías</div>
-        <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:4px"><span style="color:var(--green2)">✓ Cumplidas</span><span style="font-weight:700;color:var(--green2)">${cum.noavOk}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:.75rem"><span style="color:#e05a4a">✗ No cumplidas</span><span style="font-weight:700;color:#e05a4a">${cum.noavNo}</span></div>
-      </div>
-    </div>
-    <div class="detail-section">Razones de incumplimiento</div>
-    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px">
-      ${barras(cum.topRazones,maxRazon,'#e05a4a')}
-    </div>`;
-  showPanel('cumDashPanel'); window.scrollTo(0,0);
-}
-
-function doLogout(){
-  document.getElementById('appScreen').style.display='none';
-  document.getElementById('loginScreen').style.display='flex';
-  document.getElementById('matInput').value='';
-  document.getElementById('dniInput').value='';
-  document.getElementById('tabsBar').style.display='none';
-  document.getElementById('tabsBarJR').style.display='none';
-  CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
-  hideAllPanels();
-  document.getElementById('mainPanel').style.display='block';
-}
-document.getElementById('logoutBtn').addEventListener('click',doLogout);
-
-// ── Events ──
-document.getElementById('loginBtn').addEventListener('click',doLogin);
-document.getElementById('matInput').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-document.getElementById('matInput').addEventListener('input',()=>{
-  document.getElementById('loginError').style.display='none';
-  document.getElementById('matInput').style.borderColor='';
-  document.getElementById('dniInput').style.borderColor='';
-});
-document.getElementById('dniInput').addEventListener('input',()=>{
-  document.getElementById('loginError').style.display='none';
-  document.getElementById('dniInput').style.borderColor='';
-});
-document.getElementById('dniInput').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-
-// Auto-logout 5 min
-let autoLogout;
-function resetTimer(){
-  clearTimeout(autoLogout);
-  autoLogout=setTimeout(()=>{doLogout();alert('Sesión cerrada por inactividad.');},30*60*1000);
-}
-document.addEventListener('click',resetTimer);
-document.addEventListener('touchstart',resetTimer);
-</script>
-
-
-</body></html>
-// ════════════════════════════════════════════════════════
-//  CFL MEDALIA (Notas globales de encuestas)
-// ════════════════════════════════════════════════════════
-let MEDALIA_DATA = [];
+const SHEET_API = 'AKfycbx4XzqEycpeg9AeSVuZON-xjX-fOA-yzLSNygtA3YGg52HwmIWtr4barsn76_je2f6v';
+let CURRENT_DATA = {}, CUM_DATA = {}, RM_DATA = {}, DOCS_DATA = {}, FLOTA_DATA = {}, MEDALIA_DATA = [];
+let CURRENT_USER_TYPE = null, CURRENT_TEC = null, CURRENT_JE_ID = null, ACTIVE_TAB = 'misDatos';
 let CURRENT_CFL_ZONA = 'Zona 4-5';
 
-async function cargarMedalia() {
+// ════ CARGAR TODOS LOS DATOS ════
+async function cargarDatos() {
   try {
-    const url = 'AKfycbx4XzqEycpeg9AeSVuZON-xjX-fOA-yzLSNygtA3YGg52HwmIWtr4barsn76_je2f6v?type=medalia';
-    const response = await fetch(url);
-    const medalia = await response.json();
-    MEDALIA_DATA = medalia;
-    console.log('✓ Datos Medalia cargados:', medalia.length);
-    mostrarCFLSiCoordinador();
-  } catch(e) {
-    console.error('Error cargando Medalia:', e);
-    MEDALIA_DATA = [];
+    const [csv, cum, rm, docs, flota, medalia] = await Promise.all([
+      fetch(SHEET_API+'?type=csv').then(r => r.text()),
+      fetch(SHEET_API+'?type=cumplimiento').then(r => r.text()),
+      fetch(SHEET_API+'?type=rm').then(r => r.text()),
+      fetch(SHEET_API+'?type=docs').then(r => r.json()),
+      fetch(SHEET_API+'?type=flota').then(r => r.json()),
+      fetch(SHEET_API+'?type=medalia').then(r => r.json())
+    ]);
+    
+    CURRENT_DATA = parseCSV(csv);
+    CUM_DATA = parseCumplimiento(cum);
+    RM_DATA = parseRM(rm);
+    DOCS_DATA = docs || {};
+    FLOTA_DATA = flota || {};
+    MEDALIA_DATA = medalia || [];
+    
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleString('es-ES', {dateStyle:'short', timeStyle:'short'});
+  } catch(e) { console.error('Error cargando:', e); }
+}
+
+function parseCSV(text) {
+  const lines = text.split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  const tecnicos = [];
+  lines.slice(1).forEach(line => {
+    if(!line.trim()) return;
+    const vals = line.split(',').map(v => v.trim());
+    const tec = {};
+    headers.forEach((h, i) => tec[h] = vals[i] || '');
+    if(tec.id) tecnicos.push(tec);
+  });
+  return { tecnicos };
+}
+
+function parseCumplimiento(text) {
+  const lines = text.split('\n');
+  const result = {};
+  lines.slice(1).forEach(line => {
+    const parts = line.split(',');
+    if(parts[0]) result[parts[0].trim()] = { pct: parseInt(parts[1]) || 0 };
+  });
+  return result;
+}
+
+function parseRM(text) {
+  const lines = text.split('\n');
+  const result = {};
+  lines.slice(1).forEach(line => {
+    const parts = line.split(',');
+    if(parts[0]) result[parts[0].trim()] = { pct: parseInt(parts[1]) || 0 };
+  });
+  return result;
+}
+
+// ════ LOGIN ════
+async function doLogin() {
+  const mat = document.getElementById('matInput').value.trim();
+  const dni = document.getElementById('dniInput').value.trim();
+  if(!mat || !dni) return;
+  
+  document.getElementById('spinner').style.display = 'block';
+  
+  const auth = await fetch(SHEET_API+'?type=auth').then(r => r.json()).catch(() => ({}));
+  const ok = auth[mat.toUpperCase()] === dni.toUpperCase();
+  
+  document.getElementById('spinner').style.display = 'none';
+  
+  if(!ok) {
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+  
+  doShowApp(mat);
+}
+
+function doShowApp(mat) {
+  const tec = CURRENT_DATA.tecnicos.find(t => t.id && t.id.toUpperCase() === mat.toUpperCase());
+  
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+  document.getElementById('topbarName').textContent = tec ? tec.nombre : mat;
+  document.getElementById('topbarId').textContent = mat;
+  
+  const coords = ['JR9426','CM9651','JN476','GD5381','BLAS.ALVAREZ'];
+  if(coords.includes(mat.toUpperCase())) {
+    CURRENT_USER_TYPE = 'jr';
+    document.getElementById('tabsBarJR').style.display = 'flex';
+    document.getElementById('tabsBar').style.display = 'none';
+    document.getElementById('tabCFL').style.display = '';
+    renderJRPanel();
+    showPanel('jrPanel');
+  } else {
+    CURRENT_USER_TYPE = 'tecnico';
+    document.getElementById('tabsBar').style.display = 'none';
+    document.getElementById('tabsBarJR').style.display = 'none';
+    CURRENT_TEC = tec;
+    renderMain(tec);
   }
 }
 
-function mostrarCFLSiCoordinador() {
-  if(CURRENT_USER_TYPE === 'jr') {
-    const coordinadores = ['JR9426', 'CM9651', 'JN476', 'GD5381', 'BLAS.ALVAREZ'];
-    const userId = document.getElementById('topbarId').textContent.split(' ')[0].toUpperCase();
-    if(coordinadores.includes(userId)) {
-      document.getElementById('tabCFL').style.display = '';
-      console.log('✓ CFL visible para:', userId);
-    } else {
-      document.getElementById('tabCFL').style.display = 'none';
-      console.log('✗ CFL no visible para:', userId);
-    }
-  }
+// ════ TABS & PANELS ════
+function switchTab(tab) {
+  hideAllPanels();
+  ACTIVE_TAB = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if(tab === 'misDatos') { document.getElementById('tabMisDatos').classList.add('active'); showPanel('mainPanel'); }
+  else if(tab === 'equipo') { document.getElementById('tabEquipo').classList.add('active'); renderEquipoPanel(CURRENT_JE_ID); showPanel('equipoPanel'); }
+  else if(tab === 'jes') { document.getElementById('tabJEs').classList.add('active'); renderJRPanel(); showPanel('jrPanel'); }
+  else if(tab === 'cfl') { document.getElementById('tabCFL').classList.add('active'); renderCFLPanel(); showPanel('cflPanel'); }
 }
 
+function showPanel(id) {
+  hideAllPanels();
+  const p = document.getElementById(id);
+  if(p) p.style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+function hideAllPanels() {
+  ['mainPanel','equipoPanel','jrPanel','cflPanel','detailPanel','tecDetailPanel','equipoDashPanel','jrDetailPanel','rmDashPanel','cumDashPanel'].forEach(id => {
+    const p = document.getElementById(id);
+    if(p) p.style.display = 'none';
+  });
+}
+
+// ════ RENDER PRINCIPAL ════
+function renderMain(tec) {
+  if(!tec) return;
+  showPanel('mainPanel');
+  
+  // Aquí irían los datos del técnico
+  const cum = CUM_DATA[tec.id] || { pct: 0 };
+  const rm = RM_DATA[tec.id] || { pct: 0 };
+  
+  document.getElementById('heroMetrics').innerHTML = `
+    <div class="hero-card">
+      <div class="label">Cumplimiento</div>
+      <div class="value" style="color:${cum.pct >= 90 ? 'var(--green2)' : '#e05a4a'}">${cum.pct}%</div>
+    </div>
+    <div class="hero-card">
+      <div class="label">RM</div>
+      <div class="value" style="color:var(--gold2)">${rm.pct}%</div>
+    </div>
+  `;
+}
+
+function renderEquipoPanel(jeId) {
+  if(!jeId) return;
+  const equipo = CURRENT_DATA.tecnicos.filter(t => t.je === jeId);
+  
+  let html = '<div class="tec-list">';
+  equipo.forEach(tec => {
+    const cum = CUM_DATA[tec.id] || { pct: 0 };
+    html += `<div class="tec-item" onclick="showTecDetail('${tec.id}')">
+      <div class="name">${tec.nombre}</div>
+      <div class="metrics">Cumplimiento: ${cum.pct}%</div>
+    </div>`;
+  });
+  html += '</div>';
+  
+  document.getElementById('tecList').innerHTML = html;
+}
+
+function renderJRPanel() {
+  const jes = [...new Set(CURRENT_DATA.tecnicos.map(t => t.je))].filter(Boolean);
+  
+  let html = '<div class="je-list">';
+  jes.forEach(je => {
+    const equipo = CURRENT_DATA.tecnicos.filter(t => t.je === je);
+    const cumPromedio = equipo.reduce((s, t) => s + (CUM_DATA[t.id]?.pct || 0), 0) / equipo.length || 0;
+    
+    html += `<div class="je-item" onclick="showJEDetail('${je}')">
+      <div class="name">JE ${je}</div>
+      <div class="sub">Cumplimiento promedio: ${cumPromedio.toFixed(1)}%</div>
+      <div class="sub">${equipo.length} técnicos</div>
+    </div>`;
+  });
+  html += '</div>';
+  
+  document.getElementById('jeList').innerHTML = html;
+}
+
+// ════ CFL MEDALIA ════
 function switchCFLZona(zona) {
   CURRENT_CFL_ZONA = zona;
-  const buttons = document.querySelectorAll('#cflZonaTabs .tab-btn');
-  buttons.forEach(btn => {
-    if(btn.dataset.zona === zona) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
-  });
+  document.querySelectorAll('#cflZonaTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.zona === zona));
   renderCFLPanel();
 }
 
 function renderCFLPanel() {
-  const zonaData = MEDALIA_DATA.filter(m => m.zona === CURRENT_CFL_ZONA);
+  const zona = MEDALIA_DATA.filter(m => m.zona === CURRENT_CFL_ZONA);
+  if(!zona.length) return;
   
-  if(!zonaData || zonaData.length === 0) {
-    document.getElementById('cflResumen').innerHTML = '<div style="color:var(--muted)">Sin datos para esta zona</div>';
-    document.getElementById('cflTecSelect').innerHTML = '<option value="">Sin datos</option>';
-    document.getElementById('cflTecDetail').innerHTML = '';
-    return;
-  }
-  
-  // Resumen por tipo CFL
-  const resumenPorTipo = {};
-  zonaData.forEach(m => {
-    if(!resumenPorTipo[m.tipoCFL]) {
-      resumenPorTipo[m.tipoCFL] = { count: 0, total: 0 };
-    }
-    resumenPorTipo[m.tipoCFL].count++;
-    resumenPorTipo[m.tipoCFL].total += m.nota;
+  const resumen = {};
+  zona.forEach(m => {
+    if(!resumen[m.tipoCFL]) resumen[m.tipoCFL] = {count:0, total:0};
+    resumen[m.tipoCFL].count++;
+    resumen[m.tipoCFL].total += m.nota;
   });
   
-  let resumenHTML = '';
-  Object.keys(resumenPorTipo).forEach(tipo => {
-    const notaPromedio = (resumenPorTipo[tipo].total / resumenPorTipo[tipo].count).toFixed(2);
-    const count = resumenPorTipo[tipo].count;
-    resumenHTML += '<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px;text-align:center">';
-    resumenHTML += '<div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px">' + tipo + '</div>';
-    resumenHTML += '<div style="font-size:1.4rem;font-weight:700;color:var(--gold2)">' + notaPromedio + '</div>';
-    resumenHTML += '<div style="font-size:.65rem;color:var(--muted);margin-top:4px">' + count + ' encuesta' + (count !== 1 ? 's' : '') + '</div>';
-    resumenHTML += '</div>';
-  });
+  document.getElementById('cflResumen').innerHTML = Object.entries(resumen).map(([tipo, d]) => 
+    `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px;text-align:center">
+      <div style="font-size:.65rem;color:var(--muted);font-weight:600;text-transform:uppercase">${tipo}</div>
+      <div style="font-size:1.4rem;font-weight:700;color:var(--gold2)">${(d.total/d.count).toFixed(2)}</div>
+      <div style="font-size:.65rem;color:var(--muted)">${d.count} encuesta${d.count>1?'s':''}</div>
+    </div>`
+  ).join('');
   
-  document.getElementById('cflResumen').innerHTML = resumenHTML;
+  const unicos = [...new Set(zona.map(m => m.nombre))].sort();
+  document.getElementById('cflTecSelect').innerHTML = '<option>Selecciona...</option>' + 
+    unicos.map(n => `<option>${n}</option>`).join('');
   
-  // Desplegable de técnicos
-  const tecnicoSelect = document.getElementById('cflTecSelect');
-  const tecnicosUnicos = [...new Set(zonaData.map(m => m.nombre))].sort();
-  
-  let selectHTML = '<option value="">Selecciona un técnico...</option>';
-  tecnicosUnicos.forEach(nombre => {
-    selectHTML += '<option value="' + nombre + '">' + nombre + '</option>';
-  });
-  tecnicoSelect.innerHTML = selectHTML;
-  
-  tecnicoSelect.onchange = function(e) {
+  document.getElementById('cflTecSelect').onchange = (e) => {
     const nombre = e.target.value;
-    if(!nombre) { 
-      document.getElementById('cflTecDetail').innerHTML = ''; 
-      return; 
-    }
+    if(nombre === 'Selecciona...') return;
+    const tec = zona.filter(m => m.nombre === nombre);
+    const nota = (tec.reduce((s,m) => s+m.nota, 0) / tec.length).toFixed(2);
+    const tipos = {};
+    tec.forEach(m => tipos[m.tipoCFL] = (tipos[m.tipoCFL]||0)+1);
     
-    const tecData = zonaData.filter(m => m.nombre === nombre);
-    const notaPromedio = (tecData.reduce((sum, m) => sum + m.nota, 0) / tecData.length).toFixed(2);
+    let html = `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${nombre}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+        <div><div style="font-size:.65rem;color:var(--muted);text-transform:uppercase">Nota</div><div style="font-size:1.3rem;font-weight:700;color:var(--gold2)">${nota}/10</div></div>
+        <div><div style="font-size:.65rem;color:var(--muted);text-transform:uppercase">Encuestas</div><div style="font-size:1.3rem;font-weight:700">${tec.length}</div></div>
+      </div>`;
     
-    let detalleHTML = '<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:14px">';
-    detalleHTML += '<div style="font-size:.85rem;font-weight:700;color:var(--gold2);margin-bottom:10px">' + nombre + '</div>';
-    detalleHTML += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
-    detalleHTML += '<div><div style="font-size:.65rem;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Nota promedio</div>';
-    detalleHTML += '<div style="font-size:1.3rem;font-weight:700;color:var(--gold2)">' + notaPromedio + '/10</div></div>';
-    detalleHTML += '<div><div style="font-size:.65rem;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Encuestas</div>';
-    detalleHTML += '<div style="font-size:1.3rem;font-weight:700;color:var(--text)">' + tecData.length + '</div></div>';
-    detalleHTML += '</div>';
-    
-    detalleHTML += '<div style="margin-top:12px">';
-    detalleHTML += '<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">Desglose por tipo CFL</div>';
-    
-    const tipoCounts = {};
-    tecData.forEach(m => {
-      tipoCounts[m.tipoCFL] = (tipoCounts[m.tipoCFL] || 0) + 1;
+    html += `<div style="margin-top:12px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Tipos CFL</div>`;
+    Object.entries(tipos).forEach(([t,c]) => {
+      html += `<div style="display:flex;justify-content:space-between;font-size:.73rem;margin-bottom:4px"><span>${t}</span><span style="color:var(--gold2)">${c}</span></div>`;
     });
     
-    Object.keys(tipoCounts).forEach(tipo => {
-      detalleHTML += '<div style="display:flex;justify-content:space-between;font-size:.73rem;margin-bottom:4px;padding:4px 0">';
-      detalleHTML += '<span>' + tipo + '</span>';
-      detalleHTML += '<span style="font-weight:700;color:var(--gold2)">' + tipoCounts[tipo] + '</span>';
-      detalleHTML += '</div>';
-    });
+    html += `</div><div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-top:14px">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Comentarios</div>`;
     
-    detalleHTML += '</div></div>';
-    
-    detalleHTML += '<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px">';
-    detalleHTML += '<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px">Comentarios</div>';
-    
-    const conComentarios = tecData.filter(m => m.comentario && m.comentario.trim());
-    if(conComentarios.length > 0) {
-      conComentarios.forEach(m => {
-        detalleHTML += '<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);font-size:.78rem;line-height:1.5;color:var(--text)">';
-        detalleHTML += '<div style="color:var(--muted);font-size:.65rem;margin-bottom:3px">' + m.tipoCFL + '</div>';
-        detalleHTML += '"' + m.comentario + '"</div>';
+    const comentarios = tec.filter(m => m.comentario && m.comentario.trim());
+    if(comentarios.length) {
+      comentarios.forEach(m => {
+        html += `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);font-size:.78rem;line-height:1.5">
+          <div style="color:var(--muted);font-size:.65rem;margin-bottom:3px">${m.tipoCFL}</div>
+          "${m.comentario}"
+        </div>`;
       });
     } else {
-      detalleHTML += '<div style="color:var(--muted);font-size:.78rem">Sin comentarios</div>';
+      html += '<div style="color:var(--muted);font-size:.78rem">Sin comentarios</div>';
     }
     
-    detalleHTML += '</div>';
-    
-    document.getElementById('cflTecDetail').innerHTML = detalleHTML;
+    html += '</div>';
+    document.getElementById('cflTecDetail').innerHTML = html;
   };
-  
-  document.getElementById('cflTecDetail').innerHTML = '';
 }
 
-// Cargar al inicio
-cargarMedalia();
+// ════ EVENTS ════
+document.getElementById('loginBtn').addEventListener('click', doLogin);
+document.getElementById('matInput').addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
+document.getElementById('dniInput').addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
 
-// Manejar cambio de tab para CFL
-const originalSwitchTab = window.switchTab;
-window.switchTab = function(tab) {
-  if(tab === 'cfl') {
-    hideAllPanels();
-    document.getElementById('cflPanel').style.display = 'block';
-    renderCFLPanel();
-    window.scrollTo(0,0);
-    ACTIVE_TAB = 'cfl';
-  } else {
-    originalSwitchTab(tab);
-  }
-};
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('matInput').value = '';
+  document.getElementById('dniInput').value = '';
+  hideAllPanels();
+  CURRENT_USER_TYPE = null;
+  CURRENT_TEC = null;
+  CURRENT_JE_ID = null;
+});
 
+// ════ INIT ════
+cargarDatos();
+const today = new Date();
+document.getElementById('monthTitle').textContent = today.toLocaleString('es-ES', {month:'long', year:'numeric'});
+
+</script>
+
+</body></html>
