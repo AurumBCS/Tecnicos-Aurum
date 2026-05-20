@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_CFL.html -->
+<!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_20.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Aurum BC">
 <title>Aurum BC Security</title>
 <link rel="preconnect" href="https://fonts.googleapis.com/">
-<link href="file:///C:/Users/Viatek/Downloads/Index_files/css2" rel="stylesheet">
+<link href="./Index_files/css2" rel="stylesheet">
 <style>
 :root{
   --bg:#0a0a0a;--s1:#111;--s2:#181818;
@@ -339,7 +339,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <!-- Tabs para JR -->
   <div class="tabs-bar" id="tabsBarJR" style="display:none">
     <button class="tab-btn active" id="tabJEs" onclick="switchTab(&#39;jes&#39;)">Jefes de equipo</button>
-    <button class="tab-btn" id="tabCFL" onclick="switchTab(&#39;cfl&#39;)">CFL Medalia</button>
+    <button class="tab-btn" id="tabCFL" onclick="switchTab('cfl')">CFL Medalia</button>
   </div>
 
   <!-- Panel técnico normal -->
@@ -459,8 +459,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       
       <!-- Tabs por zona -->
       <div class="tabs-bar" id="cflZonaTabs" style="gap:4px;overflow-x:auto;border-bottom:1px solid var(--border)">
-        <button class="tab-btn active" data-zona="Zona 4-5" onclick="switchCFLZona(&#39;Zona 4-5&#39;)">Zona 4-5</button>
-        <button class="tab-btn" data-zona="Zona 6-7" onclick="switchCFLZona(&#39;Zona 6-7&#39;)">Zona 6-7</button>
+        <button class="tab-btn active" data-zona="Zona 4-5" onclick="switchCFLZona('Zona 4-5')">Zona 4-5</button>
+        <button class="tab-btn" data-zona="Zona 6-7" onclick="switchCFLZona('Zona 6-7')">Zona 6-7</button>
       </div>
       
       <!-- Resumen por tipo CFL -->
@@ -2116,7 +2116,7 @@ document.addEventListener('touchstart',resetTimer);
 </script>
 
 
-
+</body></html>
 // ════════════════════════════════════════════════════════
 //  CFL MEDALIA (Notas globales de encuestas)
 // ════════════════════════════════════════════════════════
@@ -2130,116 +2130,17 @@ async function cargarMedalia() {
     const medalia = await response.json();
     MEDALIA_DATA = medalia;
     console.log('✓ Datos Medalia cargados:', medalia.length);
+    mostrarCFLSiCoordinador();
   } catch(e) {
     console.error('Error cargando Medalia:', e);
     MEDALIA_DATA = [];
   }
 }
 
-function switchCFLZona(zona) {
-  CURRENT_CFL_ZONA = zona;
-  document.querySelectorAll('#cflZonaTabs .tab-btn').forEach(btn =&gt; {
-    btn.classList.toggle('active', btn.dataset.zona === zona);
-  });
-  renderCFLPanel();
-}
-
-function renderCFLPanel() {
-  const zonaData = MEDALIA_DATA.filter(m =&gt; m.zona === CURRENT_CFL_ZONA);
-  
-  // Resumen por tipo CFL
-  const resumenPorTipo = {};
-  zonaData.forEach(m =&gt; {
-    if(!resumenPorTipo[m.tipoCFL]) {
-      resumenPorTipo[m.tipoCFL] = { count: 0, notaPromedio: 0, total: 0 };
-    }
-    resumenPorTipo[m.tipoCFL].count++;
-    resumenPorTipo[m.tipoCFL].total += m.nota;
-  });
-  
-  Object.keys(resumenPorTipo).forEach(tipo =&gt; {
-    resumenPorTipo[tipo].notaPromedio = (resumenPorTipo[tipo].total / resumenPorTipo[tipo].count).toFixed(2);
-  });
-  
-  const resumenHTML = Object.entries(resumenPorTipo).map(([tipo, datos]) =&gt; `
-    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px;text-align:center">
-      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px">${tipo}</div>
-      <div style="font-size:1.4rem;font-weight:700;color:var(--gold2)">${datos.notaPromedio}</div>
-      <div style="font-size:.65rem;color:var(--muted);margin-top:4px">${datos.count} encuesta${datos.count !== 1 ? 's' : ''}</div>
-    </div>
-  `).join('');
-  
-  document.getElementById('cflResumen').innerHTML = resumenHTML || '<div style="color:var(--muted)">Sin datos para esta zona</div>';
-  
-  // Desplegable de técnicos
-  const tecnicoSelect = document.getElementById('cflTecSelect');
-  const tecnicosUnicos = [...new Set(zonaData.map(m =&gt; m.nombre))].sort();
-  
-  tecnicoSelect.innerHTML = '<option value="">Selecciona un técnico...</option>' + 
-    tecnicosUnicos.map(nombre =&gt; `<option value="${nombre}">${nombre}</option>`).join('');
-  
-  tecnicoSelect.onchange = (e) =&gt; {
-    const nombre = e.target.value;
-    if(!nombre) { document.getElementById('cflTecDetail').innerHTML = ''; return; }
-    
-    const tecData = zonaData.filter(m =&gt; m.nombre === nombre);
-    const notaPromedio = (tecData.reduce((sum, m) =&gt; sum + m.nota, 0) / tecData.length).toFixed(2);
-    
-    const detalleHTML = `
-      <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:14px">
-        <div style="font-size:.85rem;font-weight:700;color:var(--gold2);margin-bottom:10px">${nombre}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-          <div>
-            <div style="font-size:.65rem;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Nota promedio</div>
-            <div style="font-size:1.3rem;font-weight:700;color:var(--gold2)">${notaPromedio}/10</div>
-          </div>
-          <div>
-            <div style="font-size:.65rem;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Encuestas</div>
-            <div style="font-size:1.3rem;font-weight:700;color:var(--text)">${tecData.length}</div>
-          </div>
-        </div>
-        
-        <div style="margin-top:12px">
-          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">Desglose por tipo CFL</div>
-          ${tecData.reduce((acc, m) =&gt; {
-            const existing = acc.find(x =&gt; x.tipo === m.tipoCFL);
-            if(existing) existing.count++;
-            else acc.push({ tipo: m.tipoCFL, count: 1 });
-            return acc;
-          }, []).map(x =&gt; `
-            <div style="display:flex;justify-content:space-between;font-size:.73rem;margin-bottom:4px;padding:4px 0">
-              <span>${x.tipo}</span>
-              <span style="font-weight:700;color:var(--gold2)">${x.count}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-      
-      <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px">
-        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px">Comentarios</div>
-        ${tecData.filter(m =&gt; m.comentario &amp;&amp; m.comentario.trim()).map((m, i) =&gt; `
-          <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);font-size:.78rem;line-height:1.5;color:var(--text)">
-            <div style="color:var(--muted);font-size:.65rem;margin-bottom:3px">${m.tipoCFL}</div>
-            "${m.comentario}"
-          </div>
-        `).join('') || '<div style="color:var(--muted);font-size:.78rem">Sin comentarios</div>}
-      </div>
-    `;
-    
-    document.getElementById('cflTecDetail').innerHTML = detalleHTML;
-  };
-  
-  document.getElementById('cflTecDetail').innerHTML = '';
-}
-
-// Cargar al inicio
-// Cargar al inicio
-cargarMedalia().then(() => {
+function mostrarCFLSiCoordinador() {
   if(CURRENT_USER_TYPE === 'jr') {
-    // Solo mostrar CFL para coordinadores
     const coordinadores = ['JR9426', 'CM9651', 'JN476', 'GD5381', 'BLAS.ALVAREZ'];
     const userId = document.getElementById('topbarId').textContent.split(' ')[0].toUpperCase();
-    console.log('User ID:', userId, 'Es coordinador?', coordinadores.includes(userId));
     if(coordinadores.includes(userId)) {
       document.getElementById('tabCFL').style.display = '';
       console.log('✓ CFL visible para:', userId);
@@ -2248,7 +2149,124 @@ cargarMedalia().then(() => {
       console.log('✗ CFL no visible para:', userId);
     }
   }
-});
+}
+
+function switchCFLZona(zona) {
+  CURRENT_CFL_ZONA = zona;
+  const buttons = document.querySelectorAll('#cflZonaTabs .tab-btn');
+  buttons.forEach(btn => {
+    if(btn.dataset.zona === zona) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  renderCFLPanel();
+}
+
+function renderCFLPanel() {
+  const zonaData = MEDALIA_DATA.filter(m => m.zona === CURRENT_CFL_ZONA);
+  
+  if(!zonaData || zonaData.length === 0) {
+    document.getElementById('cflResumen').innerHTML = '<div style="color:var(--muted)">Sin datos para esta zona</div>';
+    document.getElementById('cflTecSelect').innerHTML = '<option value="">Sin datos</option>';
+    document.getElementById('cflTecDetail').innerHTML = '';
+    return;
+  }
+  
+  // Resumen por tipo CFL
+  const resumenPorTipo = {};
+  zonaData.forEach(m => {
+    if(!resumenPorTipo[m.tipoCFL]) {
+      resumenPorTipo[m.tipoCFL] = { count: 0, total: 0 };
+    }
+    resumenPorTipo[m.tipoCFL].count++;
+    resumenPorTipo[m.tipoCFL].total += m.nota;
+  });
+  
+  let resumenHTML = '';
+  Object.keys(resumenPorTipo).forEach(tipo => {
+    const notaPromedio = (resumenPorTipo[tipo].total / resumenPorTipo[tipo].count).toFixed(2);
+    const count = resumenPorTipo[tipo].count;
+    resumenHTML += '<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px;text-align:center">';
+    resumenHTML += '<div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px">' + tipo + '</div>';
+    resumenHTML += '<div style="font-size:1.4rem;font-weight:700;color:var(--gold2)">' + notaPromedio + '</div>';
+    resumenHTML += '<div style="font-size:.65rem;color:var(--muted);margin-top:4px">' + count + ' encuesta' + (count !== 1 ? 's' : '') + '</div>';
+    resumenHTML += '</div>';
+  });
+  
+  document.getElementById('cflResumen').innerHTML = resumenHTML;
+  
+  // Desplegable de técnicos
+  const tecnicoSelect = document.getElementById('cflTecSelect');
+  const tecnicosUnicos = [...new Set(zonaData.map(m => m.nombre))].sort();
+  
+  let selectHTML = '<option value="">Selecciona un técnico...</option>';
+  tecnicosUnicos.forEach(nombre => {
+    selectHTML += '<option value="' + nombre + '">' + nombre + '</option>';
+  });
+  tecnicoSelect.innerHTML = selectHTML;
+  
+  tecnicoSelect.onchange = function(e) {
+    const nombre = e.target.value;
+    if(!nombre) { 
+      document.getElementById('cflTecDetail').innerHTML = ''; 
+      return; 
+    }
+    
+    const tecData = zonaData.filter(m => m.nombre === nombre);
+    const notaPromedio = (tecData.reduce((sum, m) => sum + m.nota, 0) / tecData.length).toFixed(2);
+    
+    let detalleHTML = '<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:14px">';
+    detalleHTML += '<div style="font-size:.85rem;font-weight:700;color:var(--gold2);margin-bottom:10px">' + nombre + '</div>';
+    detalleHTML += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
+    detalleHTML += '<div><div style="font-size:.65rem;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Nota promedio</div>';
+    detalleHTML += '<div style="font-size:1.3rem;font-weight:700;color:var(--gold2)">' + notaPromedio + '/10</div></div>';
+    detalleHTML += '<div><div style="font-size:.65rem;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Encuestas</div>';
+    detalleHTML += '<div style="font-size:1.3rem;font-weight:700;color:var(--text)">' + tecData.length + '</div></div>';
+    detalleHTML += '</div>';
+    
+    detalleHTML += '<div style="margin-top:12px">';
+    detalleHTML += '<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">Desglose por tipo CFL</div>';
+    
+    const tipoCounts = {};
+    tecData.forEach(m => {
+      tipoCounts[m.tipoCFL] = (tipoCounts[m.tipoCFL] || 0) + 1;
+    });
+    
+    Object.keys(tipoCounts).forEach(tipo => {
+      detalleHTML += '<div style="display:flex;justify-content:space-between;font-size:.73rem;margin-bottom:4px;padding:4px 0">';
+      detalleHTML += '<span>' + tipo + '</span>';
+      detalleHTML += '<span style="font-weight:700;color:var(--gold2)">' + tipoCounts[tipo] + '</span>';
+      detalleHTML += '</div>';
+    });
+    
+    detalleHTML += '</div></div>';
+    
+    detalleHTML += '<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px">';
+    detalleHTML += '<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px">Comentarios</div>';
+    
+    const conComentarios = tecData.filter(m => m.comentario && m.comentario.trim());
+    if(conComentarios.length > 0) {
+      conComentarios.forEach(m => {
+        detalleHTML += '<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);font-size:.78rem;line-height:1.5;color:var(--text)">';
+        detalleHTML += '<div style="color:var(--muted);font-size:.65rem;margin-bottom:3px">' + m.tipoCFL + '</div>';
+        detalleHTML += '"' + m.comentario + '"</div>';
+      });
+    } else {
+      detalleHTML += '<div style="color:var(--muted);font-size:.78rem">Sin comentarios</div>';
+    }
+    
+    detalleHTML += '</div>';
+    
+    document.getElementById('cflTecDetail').innerHTML = detalleHTML;
+  };
+  
+  document.getElementById('cflTecDetail').innerHTML = '';
+}
+
+// Cargar al inicio
+cargarMedalia();
 
 // Manejar cambio de tab para CFL
 const originalSwitchTab = window.switchTab;
@@ -2264,4 +2282,3 @@ window.switchTab = function(tab) {
   }
 };
 
-</body></html>
