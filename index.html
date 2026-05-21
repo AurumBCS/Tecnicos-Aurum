@@ -718,7 +718,7 @@ async function loadRM(){
         const tecnico=String(row['Técnico']||'').trim().toUpperCase();
         const repetido=String(row['¿Repetido?']||'').toLowerCase()==='sí';
         const motivo=String(row['Motivo']||'').trim();
-        const motivoPost=String(row['Mnto Post']||'').trim();
+        const motivoPost=String(row['Motivo Post']||'').trim();
         const duracion=parseFloat(String(row['Duración']||'0').replace(',','.'));
 
         if(tecnico){
