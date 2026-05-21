@@ -482,7 +482,7 @@ const JE_NAMES = {
 };
 
 const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycby0c3pbKzmHl_BjHnMj6f_yp3hIjez3KrnBgUpzS02EdYpL0ALn5xpmN176fQL9OGHD/exec?type=csv";
-const AUTH_URL = "https://script.google.com/macros/s/AKfycby0c3pbKzmHl_BjHnMj6f_yp3hIjez3KrnBgUpzS02EdYpL0ALn5xpmN176fQL9OGHD/exec?type=auth";
+const AUTH_URL = "https://script.google.com/macros/s/AKfycbxlBlt49M3gJHBYcUkuY4l7oHbzIg8nwHujuNsL8voXQ4XlHtSZ5KqY7f-iC5CgjuQ7/exec?type=auth";
 const DOCS_URL = "https://script.google.com/macros/s/AKfycby0c3pbKzmHl_BjHnMj6f_yp3hIjez3KrnBgUpzS02EdYpL0ALn5xpmN176fQL9OGHD/exec?type=docs";
 const FLOTA_URL = "https://script.google.com/macros/s/AKfycby0c3pbKzmHl_BjHnMj6f_yp3hIjez3KrnBgUpzS02EdYpL0ALn5xpmN176fQL9OGHD/exec?type=flota";
 const VACACIONES_URL = "https://script.google.com/macros/s/AKfycby0c3pbKzmHl_BjHnMj6f_yp3hIjez3KrnBgUpzS02EdYpL0ALn5xpmN176fQL9OGHD/exec?type=vacaciones";
@@ -680,9 +680,21 @@ async function loadAuth(){
   try{
     const res=await fetch(AUTH_URL,{cache:'no-store'});
     if(!res.ok) return;
-    const data=await res.json();
-    if(data && typeof data==='object' && Object.keys(data).length>0){
-      AUTH_DATA=data;
+    const csv=await res.text();
+    const lines=csv.trim().split('\n');
+    if(lines.length>1){
+      // Saltamos header, procesamos datos
+      for(let i=1;i<lines.length;i++){
+        const cols=lines[i].split(',');
+        if(cols.length>8){
+          const matricula=String(cols[4]||'').trim().toUpperCase();
+          const dni=String(cols[8]||'').trim().toUpperCase();
+          if(matricula && dni && matricula !== '****'){
+            AUTH_DATA[matricula]=dni;
+          }
+        }
+      }
+      console.log('Auth CSV cargado:',Object.keys(AUTH_DATA).length,'matrículas');
     }
   }catch(e){console.log('Auth no disponible',e.message);}
   // Añadir usuarios especiales siempre (aunque falle el script)
