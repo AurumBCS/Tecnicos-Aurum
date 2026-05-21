@@ -879,8 +879,8 @@ function renderMain(tec, returnToEquipo=false){
     const tapHint = rmHasData||cumHasData
       ? '<div class="kpi-tap">→ dashboard</div>'
       : k.detail ? '<div class="kpi-tap">→ detalle</div>' : '';
-    const extraContent = k.key === 'conv' ? `<a href="https://docs.google.com/forms/d/1LCVEq3ayLzIkpf7mZcaaNZC7NRACWGQe1ql7UKtEExI/viewform" target="_blank" style="display:block;margin-top:8px;background:var(--green2);color:white;padding:6px 10px;border-radius:6px;text-align:center;font-weight:700;font-size:.65rem;text-decoration:none;width:100%;box-sizing:border-box">📊 Registro Ventas</a>` : '';
-    return`<div class="kpi-card ${s} fade-up" ${clickFn}>
+    const extraContent = k.key === 'conv' ? `<a href="https://docs.google.com/forms/d/1LCVEq3ayLzIkpf7mZcaaNZC7NRACWGQe1ql7UKtEExI/viewform" target="_blank" onclick="event.stopPropagation()" style="position:absolute;top:8px;right:8px;background:var(--green2);color:white;padding:4px 8px;border-radius:6px;text-align:center;font-weight:700;font-size:.6rem;text-decoration:none;border:none;cursor:pointer">📊 Registro</a>` : '';
+    return`<div class="kpi-card ${s} fade-up" ${clickFn} style="position:relative">
       <span class="kpi-icon">${k.icon}</span>
       <div class="kpi-name">${k.label}</div>
       <div class="kpi-val ${s}">${disp}<span class="kpi-unit">${k.unit}</span></div>
