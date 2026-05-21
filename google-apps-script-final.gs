@@ -431,7 +431,7 @@ function servirCumplimiento() {
 
   try {
     const ss = SpreadsheetApp.openById(SHEET_CUMPLIMIENTO_ID);
-    const sheet = ss.getSheetByName('Cumplimiento');
+    const sheet = ss.getSheetByName('Cumplimiento_Aurum');
     const data = sheet.getDataRange().getDisplayValues();
 
     const rows = [['mat', 'territorial', 'averia', 'cumplido', 'razon']];
@@ -465,7 +465,7 @@ function servirRM() {
 
   try {
     const ss = SpreadsheetApp.openById(SHEET_RM_ID);
-    const sheet = ss.getSheets()[0];
+    const sheet = ss.getSheetByName('Hoja 1');
     const data = sheet.getDataRange().getDisplayValues();
 
     const rows = [['nMant', 'motivo', 'tecnico', 'territorial', 'repetido', 'motivo_post', 'averia']];
