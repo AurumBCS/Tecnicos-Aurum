@@ -2175,23 +2175,24 @@ function renderFlota(tecId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
   const id=String(tecId).trim().toUpperCase();
-  const coche=FLOTA_DATA[id];
-  if(!coche){ container.innerHTML=''; return; }
+  const flotaObj=FLOTA_DATA[id];
+  if(!flotaObj){ container.innerHTML=''; return; }
+  const coche=flotaObj.coche||flotaObj;
   const vacaciones=VACACIONES_DATA[id];
   let vacacionesHtml='';
-  if(vacaciones){
+  if(vacaciones && (vacaciones.disfrutados!==undefined || vacaciones.restantes!==undefined)){
     vacacionesHtml=`
     <div class="section-head" style="margin-top:20px">🏖️ Vacaciones</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;justify-content:space-around;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#4a90e2,transparent)"></div>
       <div style="text-align:center">
         <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Disfrutados</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#4a90e2">${vacaciones.disfrutados}</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#4a90e2">${vacaciones.disfrutados||0}</div>
       </div>
       <div style="border-left:1px solid var(--border2);"></div>
       <div style="text-align:center">
         <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Restantes</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#27ae60">${vacaciones.restantes}</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#27ae60">${vacaciones.restantes||0}</div>
       </div>
     </div>`;
   }
@@ -2218,8 +2219,9 @@ function renderFlotaJE(jeId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
   const id=String(jeId).trim().toUpperCase();
-  const coche=FLOTA_DATA[id];
-  if(!coche){ container.innerHTML=''; return; }
+  const flotaObj=FLOTA_DATA[id];
+  if(!flotaObj){ container.innerHTML=''; return; }
+  const coche=flotaObj.coche||flotaObj;
   container.innerHTML=`
     <div class="section-head" style="margin-top:20px">🚗 Tu vehículo asignado</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden">
