@@ -1920,6 +1920,8 @@ function findUser(q){
   const tec=CURRENT_DATA.tecnicos.find(t=>
     t.id.toUpperCase()===q||t.raw.toUpperCase().includes(q)||t.nombre.toUpperCase().includes(q));
   if(tec) return {type:'tecnico',tec};
+  // Si autenticó pero no tiene datos, crear registro fantasma
+  if(AUTH_DATA[q]) return {type:'tecnico',tec:{id:q,nombre:q,provincia:'--',mlv:0,mab:0}};
   return null;
 }
 
