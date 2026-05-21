@@ -839,14 +839,16 @@ async function loadDocs(){
   try{
     const res=await fetch(DOCS_URL,{cache:'no-store'});
     if(!res.ok) return;
-    const text=await res.text();
-    const data=JSON.parse(text);
-    if(Array.isArray(data)&&data.length>0){
-      // Limpiar fecha: tomar solo la parte de fecha corta
-      DOCS_DATA=data.map(d=>({
-        ...d,
-        fecha: d.fecha ? d.fecha.toString().substring(0,15) : '—'
-      }));
+    const csv=await res.text();
+    const rows=parseCSV(csv);
+    if(rows.length>0){
+      DOCS_DATA=rows.map(r=>({
+        matricula:String(r['mat']||'').trim().toUpperCase(),
+        nMant:String(r['nMant']||'').trim(),
+        fecha:String(r['fecha']||'').trim(),
+        tipo:String(r['tipo']||'').trim(),
+        origen:String(r['origen']||'').trim()
+      })).filter(d=>d.matricula);
       console.log('Docs cargados:',DOCS_DATA.length,'pendientes');
     }
   }catch(e){console.log('Docs error:',e.message);}
@@ -2115,11 +2117,20 @@ function renderDocsEquipoCollapsible(jeId, containerId){
 // ══════════════════════════════════════════════
 async function loadFlota(){
   try{
-    const res=await fetch(FLOTA_URL+'&t='+Date.now(),{cache:'no-store'});
+    const res=await fetch(FLOTA_URL,{cache:'no-store'});
     if(!res.ok) return;
-    const data=await res.json();
-    if(data && typeof data==='object' && Object.keys(data).length>0){
-      FLOTA_DATA=data;
+    const csv=await res.text();
+    const rows=parseCSV(csv);
+    if(rows.length>0){
+      const flotaByTec={};
+      rows.forEach(row=>{
+        const mat=String(row['mat']||'').trim().toUpperCase();
+        const coche=String(row['coche']||'').trim();
+        if(mat && coche){
+          flotaByTec[mat]={mat,coche};
+        }
+      });
+      FLOTA_DATA=flotaByTec;
       console.log('Flota cargada:',Object.keys(FLOTA_DATA).length,'técnicos');
     }
   }catch(e){console.log('Flota error:',e.message);}
@@ -2127,15 +2138,21 @@ async function loadFlota(){
 
 async function loadVacaciones(){
   try{
-    const res=await fetch(VACACIONES_URL+'&t='+Date.now(),{cache:'no-store'});
+    const res=await fetch(VACACIONES_URL,{cache:'no-store'});
     if(!res.ok) return;
-    const data=await res.json();
-    if(data && typeof data==='object' && Object.keys(data).length>0){
-      Object.keys(data).forEach(mat=>{
-        VACACIONES_DATA[mat.toUpperCase()]={
-          disfrutados:data[mat].consumido,
-          restantes:data[mat].disponible
-        };
+    const csv=await res.text();
+    const rows=parseCSV(csv);
+    if(rows.length>0){
+      rows.forEach(row=>{
+        const matricula=String(row['Matrícula']||row['MATRICULA']||row['mat']||'').trim().toUpperCase();
+        if(matricula){
+          const consumidos=parseFloat(String(row['Consumidos']||row['Consumido']||'0').replace(',','.')) || 0;
+          const disponibles=parseFloat(String(row['Disponibles']||row['Disponible']||'0').replace(',','.')) || 0;
+          VACACIONES_DATA[matricula]={
+            disfrutados:consumidos,
+            restantes:disponibles
+          };
+        }
       });
       console.log('Vacaciones cargadas:',Object.keys(VACACIONES_DATA).length,'técnicos');
     }
