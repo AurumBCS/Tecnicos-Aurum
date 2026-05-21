@@ -1980,11 +1980,20 @@ function renderDocsEquipoCollapsible(jeId, containerId){
 // ══════════════════════════════════════════════
 async function loadFlota(){
   try{
-    const res=await fetch(FLOTA_URL+'&t='+Date.now(),{cache:'no-store'});
+    const res=await fetch(FLOTA_URL,{cache:'no-store'});
     if(!res.ok) return;
-    const data=await res.json();
-    if(data && typeof data==='object' && Object.keys(data).length>0){
-      FLOTA_DATA=data;
+    const csv=await res.text();
+    const rows=parseCSV(csv);
+    if(rows.length>0){
+      const flotaByTec={};
+      rows.forEach(row=>{
+        const mat=String(row['mat']||'').trim().toUpperCase();
+        const coche=String(row['coche']||'').trim();
+        if(mat && coche){
+          flotaByTec[mat]={mat,coche};
+        }
+      });
+      FLOTA_DATA=flotaByTec;
       console.log('Flota cargada:',Object.keys(FLOTA_DATA).length,'técnicos');
     }
   }catch(e){console.log('Flota error:',e.message);}
