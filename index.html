@@ -2032,7 +2032,7 @@ function renderFlota(tecId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
   const id=String(tecId).trim().toUpperCase();
-  const coche=FLOTA_DATA[id];
+  const coche=FLOTA_DATA[id]?.coche;
   if(!coche){ container.innerHTML=''; return; }
   const vacaciones=VACACIONES_DATA[id];
   let vacacionesHtml='';
@@ -2075,7 +2075,7 @@ function renderFlotaJE(jeId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
   const id=String(jeId).trim().toUpperCase();
-  const coche=FLOTA_DATA[id];
+  const coche=FLOTA_DATA[id]?.coche;
   if(!coche){ container.innerHTML=''; return; }
   container.innerHTML=`
     <div class="section-head" style="margin-top:20px">🚗 Tu vehículo asignado</div>
