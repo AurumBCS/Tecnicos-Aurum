@@ -285,14 +285,6 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .fade-up:nth-child(1){animation-delay:.04s}.fade-up:nth-child(2){animation-delay:.08s}
 .fade-up:nth-child(3){animation-delay:.12s}.fade-up:nth-child(4){animation-delay:.16s}
 .fade-up:nth-child(5){animation-delay:.20s}.fade-up:nth-child(6){animation-delay:.24s}
-
-/* Ocultar paneles de MEDALIA y CFL */
-#cflResumen, #medaliPanel, [id*="medalia"], [class*="cfl"], [class*="medalia"] {
-  display: none !important;
-}
-div[innerHTML*="MEDALIA"], div[innerHTML*="Notas globales de encuestas"] {
-  display: none !important;
-}
 </style>
 </head>
 <body>
@@ -489,9 +481,11 @@ const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbyrDjD23yIhg72ee
 const AUTH_URL = "https://script.google.com/macros/s/AKfycbyrDjD23yIhg72ee7hEKKpGCQYwjfcELbIJB3iFQvqg2KQVfrJPRngEb4qH1ujlQh9C/exec?type=auth";
 const DOCS_URL = "https://script.google.com/macros/s/AKfycbyrDjD23yIhg72ee7hEKKpGCQYwjfcELbIJB3iFQvqg2KQVfrJPRngEb4qH1ujlQh9C/exec?type=docs";
 const FLOTA_URL = "https://script.google.com/macros/s/AKfycbyrDjD23yIhg72ee7hEKKpGCQYwjfcELbIJB3iFQvqg2KQVfrJPRngEb4qH1ujlQh9C/exec?type=flota";
+const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbxvQZTsQRKBouLJ0h_edRoEJWSpk5rMuHgU6BVnYgzSy77Tt7C5VD08rWvoMn01RXOq/exec?type=vacaciones";
 let AUTH_DATA = {};
 let FLOTA_DATA = {};
 let DOCS_DATA = [];
+let VACACIONES_DATA = {};
 let _datosActualizados = false;
 
 // ── Fallback mínimo (se rellena con los datos del CSV real) ──
@@ -1814,31 +1808,16 @@ async function loadVacaciones(){
   try{
     const res=await fetch(VACACIONES_URL+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok) return;
-    const text=await res.text();
-    const lines=text.trim().split('\n');
-    if(lines.length<2) return;
-    
-    const headers=lines[0].split(',').map(h=>h.trim());
-    const matriculaIdx=headers.findIndex(h=>h.toLowerCase().includes('matrícula'));
-    const consumidoIdx=headers.findIndex(h=>h.toLowerCase().includes('consumido'));
-    const dispoIdx=headers.findIndex(h=>h.toLowerCase().includes('dispo'));
-    const apIdx=headers.findIndex(h=>h===h.toUpperCase() && h==='AP');
-    
-    if(matriculaIdx===-1) return;
-    
-    for(let i=1;i<lines.length;i++){
-      const cells=lines[i].split(',').map(c=>c.trim());
-      if(cells.length<matriculaIdx+1) continue;
-      const mat=cells[matriculaIdx].toUpperCase();
-      if(!mat) continue;
-      
-      VACACIONES_DATA[mat]={
-        consumido: consumidoIdx!==-1 ? parseInt(cells[consumidoIdx])||0 : 0,
-        disponible: dispoIdx!==-1 ? parseInt(cells[dispoIdx])||0 : 0,
-        ap: apIdx!==-1 ? parseInt(cells[apIdx])||0 : 0
-      };
+    const data=await res.json();
+    if(data && typeof data==='object' && Object.keys(data).length>0){
+      Object.keys(data).forEach(mat=>{
+        VACACIONES_DATA[mat.toUpperCase()]={
+          disfrutados:data[mat].consumido,
+          restantes:data[mat].disponible
+        };
+      });
+      console.log('Vacaciones cargadas:',Object.keys(VACACIONES_DATA).length,'técnicos');
     }
-    console.log('Vacaciones cargadas para',Object.keys(VACACIONES_DATA).length,'técnicos');
   }catch(e){console.log('Vacaciones error:',e.message);}
 }
 
@@ -1847,10 +1826,26 @@ function renderFlota(tecId, containerId){
   if(!container) return;
   const id=String(tecId).trim().toUpperCase();
   const coche=FLOTA_DATA[id];
-  
-  let html=``;
-  if(coche){
-    html+=`
+  if(!coche){ container.innerHTML=''; return; }
+  const vacaciones=VACACIONES_DATA[id];
+  let vacacionesHtml='';
+  if(vacaciones){
+    vacacionesHtml=`
+    <div class="section-head" style="margin-top:20px">🏖️ Vacaciones</div>
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;justify-content:space-around;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#4a90e2,transparent)"></div>
+      <div style="text-align:center">
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Disfrutados</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#4a90e2">${vacaciones.disfrutados}</div>
+      </div>
+      <div style="border-left:1px solid var(--border2);"></div>
+      <div style="text-align:center">
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Restantes</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#27ae60">${vacaciones.restantes}</div>
+      </div>
+    </div>`;
+  }
+  container.innerHTML=`
     <div class="section-head" style="margin-top:20px">🚗 Vehículo asignado</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
@@ -1862,37 +1857,8 @@ function renderFlota(tecId, containerId){
     </div>
     <div style="background:rgba(212,131,26,.08);border:1px solid #3d2800;border-radius:10px;padding:10px 14px;margin-top:8px;font-size:.72rem;color:var(--orange)">
       ⚠️ Si este vehículo no es el tuyo, comunícalo a tu jefe de equipo.
-    </div>`;
-  }
-  
-  const vac=VACACIONES_DATA[id];
-  if(vac){
-    const statusColor=vac.disponible>5?'var(--green2)':vac.disponible>0?'var(--orange)':'#e05a4a';
-    html+=`
-    <div class="section-head" style="margin-top:20px">📅 Vacaciones 2026</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
-      <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;text-align:center;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--green2),transparent)"></div>
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px">Vacaciones</div>
-        <div style="font-size:1.8rem;font-weight:800;color:var(--green2)">${vac.consumido}</div>
-        <div style="font-size:.65rem;color:var(--muted);margin-top:4px">días disfrutados</div>
-      </div>
-      <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;text-align:center;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--orange),transparent)"></div>
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px">Asuntos</div>
-        <div style="font-size:1.8rem;font-weight:800;color:var(--orange)">${vac.ap}</div>
-        <div style="font-size:.65rem;color:var(--muted);margin-top:4px">días personales</div>
-      </div>
-      <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px;text-align:center;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${statusColor},transparent)"></div>
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px">Disponibles</div>
-        <div style="font-size:1.8rem;font-weight:800;color:${statusColor}">${vac.disponible}</div>
-        <div style="font-size:.65rem;color:var(--muted);margin-top:4px">días restantes</div>
-      </div>
-    </div>`;
-  }
-  
-  container.innerHTML=html;
+    </div>
+    ${vacacionesHtml}`;
 }
 
 // ══════════════════════════════════════════════
@@ -1942,16 +1908,12 @@ async function doLogin(){
     if(CURRENT_TEC) renderDocsPendientes(CURRENT_TEC.id,'docsPendientesMain');
     if(CURRENT_JE_ID) renderDocsEquipo(CURRENT_JE_ID,'equipoDocsContainer');
   });
-  loadFlota().then(()=>{
-    if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
-  });
-  loadVacaciones().then(()=>{
+  Promise.all([loadVacaciones(), loadFlota()]).then(()=>{
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
 
   document.getElementById('spinner').style.display='none';
   document.getElementById('loginBtn').style.opacity='1';
-  startAutoRefresh();
 
   // Validar DNI si tenemos datos de auth
   if(Object.keys(AUTH_DATA).length > 0){
@@ -2122,7 +2084,6 @@ function _openCumDash(tecId){
 }
 
 function doLogout(){
-  if(autoRefreshInterval) clearInterval(autoRefreshInterval);
   document.getElementById('appScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('matInput').value='';
@@ -2134,58 +2095,6 @@ function doLogout(){
   document.getElementById('mainPanel').style.display='block';
 }
 document.getElementById('logoutBtn').addEventListener('click',doLogout);
-
-// ── ACTUALIZACIÓN AUTOMÁTICA DE DATOS ──
-let autoRefreshInterval = null;
-let isRefreshing = false;
-
-async function refreshData(){
-  if(isRefreshing || !CURRENT_TEC) return;
-  isRefreshing = true;
-
-  try {
-    const banner = document.querySelector('.data-banner');
-    if(banner) {
-      banner.style.opacity = '0.6';
-      banner.innerHTML = `<div class="sync-dot"></div>Actualizando datos...`;
-    }
-
-    await Promise.all([
-      loadSheets(),
-      loadAuth(),
-      loadDocs(),
-      loadFlota(),
-      loadVacaciones()
-    ]);
-
-    if(CURRENT_TEC) {
-      renderMain(CURRENT_TEC);
-    } else if(CURRENT_JE_ID) {
-      renderEquipoPanel(CURRENT_JE_ID);
-    }
-
-    const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    const ahora = new Date();
-    const mesActual = meses[ahora.getMonth()];
-    const anioActual = ahora.getFullYear();
-    if(banner) {
-      banner.style.opacity = '1';
-      if(_datosActualizados){
-        banner.innerHTML = `<div class="sync-dot"></div>Datos actualizados desde Google Sheets · ${mesActual} ${anioActual}`;
-      }
-    }
-  } catch(e) {
-    console.error('Error al actualizar:', e);
-  } finally {
-    isRefreshing = false;
-  }
-}
-
-function startAutoRefresh(){
-  if(autoRefreshInterval) clearInterval(autoRefreshInterval);
-  autoRefreshInterval = setInterval(refreshData, 5*60*1000);
-}
-
 
 // ── Events ──
 document.getElementById('loginBtn').addEventListener('click',doLogin);
