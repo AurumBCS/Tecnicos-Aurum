@@ -355,9 +355,6 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div class="kpi-grid" id="kpiGrid"></div>
     <div class="section-head">Resto de indicadores</div>
     <div class="other-grid" id="otherGrid"></div>
-    <div id="formulariosJEContainer"></div>
-    <div id="tecnicosEquipoContainer"></div>
-    <div id="docsEquipoJEContainer"></div>
     <div id="docsPendientesMain"></div>
     <div id="flotaMain"></div>
   </div>
@@ -378,15 +375,20 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="section-head">KPIs del equipo</div>
       <div class="kpi-grid" id="equipoKpis"></div>
 
+      <!-- Formularios JE (Ocupaciones y Sábados) -->
+      <div id="formulariosJEContainer"></div>
+
       <!-- RM global del equipo (se rellena dinámicamente) -->
       <div id="equipoRMGlobal"></div>
 
       <!-- Docs pendientes del equipo -->
       <div id="equipoDocsContainer"></div>
 
-      <!-- Lista técnicos -->
-      <div class="section-head">Técnicos del equipo</div>
-      <div class="tec-list" id="tecList"></div>
+      <!-- Desplegable técnicos del equipo -->
+      <div id="tecnicosEquipoContainer"></div>
+
+      <!-- Desplegable documentación del equipo -->
+      <div id="docsEquipoJEContainer"></div>
 
       <!-- Vehículo y vacaciones del JE -->
       <div id="equipoFlotaJEContainer"></div>
@@ -919,13 +921,6 @@ function renderMain(tec, returnToEquipo=false){
     });
   }
 
-  // Si es JE, mostrar formularios y desplegables
-  if(CURRENT_USER_TYPE==='je'&&CURRENT_JE_ID){
-    renderFormulariosJE('formulariosJEContainer');
-    renderTecnicosEquipoCollapsible(CURRENT_JE_ID,'tecnicosEquipoContainer');
-    renderDocsEquipoCollapsible(CURRENT_JE_ID,'docsEquipoJEContainer');
-  }
-
   showPanel('mainPanel');
 }
 
@@ -1092,6 +1087,11 @@ function renderEquipoPanel(jeId){
       </div>
     </div>`;
   }).join('');
+
+  // Formularios y desplegables del JE
+  renderFormulariosJE('formulariosJEContainer');
+  renderTecnicosEquipoCollapsible(jeId, 'tecnicosEquipoContainer');
+  renderDocsEquipoCollapsible(jeId, 'docsEquipoJEContainer');
 
   // Mostrar vehículo y vacaciones del JE
   renderFlotaJE(jeId, 'equipoFlotaJEContainer');
