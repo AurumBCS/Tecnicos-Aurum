@@ -2013,9 +2013,11 @@ async function loadMedialiaCoord(){
   try{
     const res=await fetch(MEDALIA_COORD_URL+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok) return;
-    const data=await res.json();
-    if(data && typeof data==='object' && Object.keys(data).length>0){
-      MEDALIA_COORD_DATA=data;
+    const text=await res.text();
+    const rows=parseCSV(text);
+    if(Array.isArray(rows)&&rows.length>0){
+      MEDALIA_COORD_DATA={};
+      rows.forEach(r=>{MEDALIA_COORD_DATA[r.territorio]=r;});
       console.log('Medalia coordinadores cargada:',Object.keys(MEDALIA_COORD_DATA).length,'grupos');
     }
   }catch(e){console.log('Medalia error:',e.message);}
