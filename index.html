@@ -879,6 +879,7 @@ function renderMain(tec, returnToEquipo=false){
     const tapHint = rmHasData||cumHasData
       ? '<div class="kpi-tap">→ dashboard</div>'
       : k.detail ? '<div class="kpi-tap">→ detalle</div>' : '';
+    const extraContent = k.key === 'conv' ? `<a href="https://docs.google.com/forms/d/1LCVEq3ayLzIkpf7mZcaaNZC7NRACWGQe1ql7UKtEExI/viewform" target="_blank" style="display:block;margin-top:8px;background:var(--green2);color:white;padding:6px 10px;border-radius:6px;text-align:center;font-weight:700;font-size:.65rem;text-decoration:none;width:100%;box-sizing:border-box">📊 Registro Ventas</a>` : '';
     return`<div class="kpi-card ${s} fade-up" ${clickFn}>
       <span class="kpi-icon">${k.icon}</span>
       <div class="kpi-name">${k.label}</div>
@@ -887,6 +888,7 @@ function renderMain(tec, returnToEquipo=false){
       <div class="kpi-status ${s}">${statusLabel(s)}</div>
       <div class="kpi-bar"><div class="kpi-bar-fill ${s}" style="width:${bp}%"></div></div>
       ${tapHint}
+      ${extraContent}
     </div>`;
   }).join('');
 
@@ -1774,6 +1776,7 @@ function renderDocsPendientes(tecId, containerId){
 
   container.innerHTML=`
     <div class="section-head" style="margin-top:20px">📋 Documentación pendiente · ${docs.length} elemento${docs.length!==1?'s':''}</div>
+    <a href="https://docs.google.com/forms/d/1Ip5nyE1ebdheD1TxRVby1QRSH-qXcSwU1J9Usqun8fg/viewform" target="_blank" style="display:inline-block;width:100%;margin-bottom:10px;background:var(--orange);color:white;padding:10px 14px;border-radius:10px;text-align:center;font-weight:700;font-size:.75rem;text-decoration:none;border:none;cursor:pointer">📤 Registrar Devolución</a>
     <div style="background:var(--s1);border:1px solid #3d2800;border-radius:14px;overflow:hidden;position:relative">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--orange),transparent)"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 12px;background:var(--dim)">
