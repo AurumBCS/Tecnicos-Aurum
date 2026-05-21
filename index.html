@@ -839,16 +839,14 @@ async function loadDocs(){
   try{
     const res=await fetch(DOCS_URL,{cache:'no-store'});
     if(!res.ok) return;
-    const csv=await res.text();
-    const rows=parseCSV(csv);
-    if(rows.length>0){
-      DOCS_DATA=rows.map(r=>({
-        matricula:String(r['mat']||'').trim().toUpperCase(),
-        nMant:String(r['nMant']||'').trim(),
-        fecha:String(r['fecha']||'').trim(),
-        tipo:String(r['tipo']||'').trim(),
-        origen:String(r['origen']||'').trim()
-      })).filter(d=>d.matricula);
+    const text=await res.text();
+    const data=JSON.parse(text);
+    if(Array.isArray(data)&&data.length>0){
+      // Limpiar fecha: tomar solo la parte de fecha corta
+      DOCS_DATA=data.map(d=>({
+        ...d,
+        fecha: d.fecha ? d.fecha.toString().substring(0,15) : '—'
+      }));
       console.log('Docs cargados:',DOCS_DATA.length,'pendientes');
     }
   }catch(e){console.log('Docs error:',e.message);}
