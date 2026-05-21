@@ -355,6 +355,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div class="kpi-grid" id="kpiGrid"></div>
     <div class="section-head">Resto de indicadores</div>
     <div class="other-grid" id="otherGrid"></div>
+    <div id="formulariosJEContainer"></div>
+    <div id="tecnicosEquipoContainer"></div>
+    <div id="docsEquipoJEContainer"></div>
     <div id="docsPendientesMain"></div>
     <div id="flotaMain"></div>
   </div>
@@ -911,6 +914,14 @@ function renderMain(tec, returnToEquipo=false){
       renderDocsPendientes(_tecId,'docsPendientesMain');
     });
   }
+
+  // Si es JE, mostrar formularios y desplegables
+  if(CURRENT_USER_TYPE==='je'&&CURRENT_JE_ID){
+    renderFormulariosJE('formulariosJEContainer');
+    renderTecnicosEquipoCollapsible(CURRENT_JE_ID,'tecnicosEquipoContainer');
+    renderDocsEquipoCollapsible(CURRENT_JE_ID,'docsEquipoJEContainer');
+  }
+
   showPanel('mainPanel');
 }
 
@@ -1826,6 +1837,110 @@ function renderDocsEquipo(jeId, containerId){
     </div>`;
 }
 
+// ══════════════════════════════════════════════
+//  FORMULARIOS JE (OCUPACIONES Y SÁBADOS)
+// ══════════════════════════════════════════════
+function renderFormulariosJE(containerId){
+  const container=document.getElementById(containerId);
+  if(!container||CURRENT_USER_TYPE!=='je') return;
+
+  container.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:20px">
+      <a href="https://docs.google.com/forms/d/e/1FAIpQLSelMBOyqs5DzJmhXihRyruEruqN43qx0qrJch1k_wG0hL0hcQ/viewform" target="_blank" style="background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:13px 11px 10px;text-align:center;text-decoration:none;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s;min-height:120px">
+        <div style="font-size:1.8rem;margin-bottom:6px">📋</div>
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:4px">Ocupaciones</div>
+        <div style="font-size:.6rem;color:var(--text);font-weight:600">Rellenar formulario</div>
+      </a>
+      <a href="https://docs.google.com/forms/d/e/1FAIpQLSeHWFGQrevdL_t1BsqpapxLaZjM4tYg_7mLSW4uO1CAp0ehjA/viewform" target="_blank" style="background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:13px 11px 10px;text-align:center;text-decoration:none;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s;min-height:120px">
+        <div style="font-size:1.8rem;margin-bottom:6px">📅</div>
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:4px">Sábados</div>
+        <div style="font-size:.6rem;color:var(--text);font-weight:600">Rellenar formulario</div>
+      </a>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════
+//  TÉCNICOS DEL EQUIPO (DESPLEGABLE)
+// ══════════════════════════════════════════════
+function renderTecnicosEquipoCollapsible(jeId, containerId){
+  const container=document.getElementById(containerId);
+  if(!container||CURRENT_USER_TYPE!=='je') return;
+
+  const ids=(JERARQUIA[jeId]||[]).map(id=>id.toUpperCase());
+  const tecs=CURRENT_DATA.tecnicos.filter(t=>ids.includes(t.id.toUpperCase())).sort((a,b)=>b.mlv-a.mlv);
+
+  if(!tecs.length) return;
+
+  const tecRows=tecs.map(t=>`
+    <div onclick="showDetail('tec','${t.id}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;background:var(--s1);margin-bottom:1px;border-radius:6px;transition:background .15s">
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text)">${t.nombre.trim()}</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${t.id} · ${t.provincia}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:.75rem;font-weight:800;color:var(--gold2)">${(t.mlv||0).toFixed(2)}</div>
+        <div style="font-size:.55rem;color:var(--muted)">ML-V</div>
+      </div>
+    </div>`).join('');
+
+  container.innerHTML=`
+    <div style="margin-top:20px">
+      <div class="section-head" onclick="document.getElementById('tecnicosList-${jeId}').style.display=document.getElementById('tecnicosList-${jeId}').style.display==='none'?'block':'none';document.getElementById('tecnicosArrow-${jeId}').style.transform=document.getElementById('tecnicosArrow-${jeId}').style.transform==='rotate(180deg)'?'rotate(0deg)':'rotate(180deg)'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        👥 Técnicos del equipo
+        <span id="tecnicosArrow-${jeId}" style="display:inline-block;transition:transform .2s">→</span>
+      </div>
+      <div id="tecnicosList-${jeId}" style="background:var(--dim);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-top:8px;display:none">
+        ${tecRows}
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════
+//  DOCUMENTACIÓN DEL EQUIPO (DESPLEGABLE)
+// ══════════════════════════════════════════════
+function renderDocsEquipoCollapsible(jeId, containerId){
+  const container=document.getElementById(containerId);
+  if(!container||CURRENT_USER_TYPE!=='je') return;
+
+  const ids=(JERARQUIA[jeId]||[]).map(id=>id.toUpperCase());
+  const byTec={};
+  DOCS_DATA.forEach(d=>{
+    const mat=String(d.mat).trim().toUpperCase();
+    if(ids.includes(mat)){
+      if(!byTec[mat]) byTec[mat]=[];
+      byTec[mat].push(d);
+    }
+  });
+
+  const tecsConDocs=Object.keys(byTec);
+  if(!tecsConDocs.length) return;
+
+  const tecs=CURRENT_DATA.tecnicos;
+  const rows=tecsConDocs.map(mat=>{
+    const tec=tecs.find(t=>t.id.toUpperCase()===mat);
+    const nombre=tec?tec.nombre.trim().split(' ').slice(0,2).join(' '):mat;
+    const n=byTec[mat].length;
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--s1);margin-bottom:1px;border-radius:6px">
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text)">${nombre}</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${mat}</div>
+      </div>
+      <div style="background:rgba(212,131,26,.15);border:1px solid #3d2800;border-radius:20px;padding:3px 12px;font-size:.72rem;font-weight:700;color:var(--orange)">${n}</div>
+    </div>`;
+  }).join('');
+
+  const total=DOCS_DATA.filter(d=>ids.includes(String(d.mat).trim().toUpperCase())).length;
+  container.innerHTML=`
+    <div style="margin-top:20px">
+      <div class="section-head" onclick="document.getElementById('docsList-${jeId}').style.display=document.getElementById('docsList-${jeId}').style.display==='none'?'block':'none';document.getElementById('docsArrow-${jeId}').style.transform=document.getElementById('docsArrow-${jeId}').style.transform==='rotate(180deg)'?'rotate(0deg)':'rotate(180deg)'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        📄 Documentación del equipo · ${total}
+        <span id="docsArrow-${jeId}" style="display:inline-block;transition:transform .2s">→</span>
+      </div>
+      <div id="docsList-${jeId}" style="background:var(--dim);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-top:8px;display:none">
+        ${rows}
+      </div>
+    </div>`;
+}
 
 // ══════════════════════════════════════════════
 //  FLOTA
