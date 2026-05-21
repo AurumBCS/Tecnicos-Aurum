@@ -387,6 +387,10 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <!-- Lista técnicos -->
       <div class="section-head">Técnicos del equipo</div>
       <div class="tec-list" id="tecList"></div>
+
+      <!-- Vehículo y vacaciones del JE -->
+      <div id="equipoFlotaJEContainer"></div>
+      <div id="equipoVacacionesJEContainer"></div>
     </div>
   </div>
 
@@ -1088,6 +1092,10 @@ function renderEquipoPanel(jeId){
       </div>
     </div>`;
   }).join('');
+
+  // Mostrar vehículo y vacaciones del JE
+  renderFlotaJE(jeId, 'equipoFlotaJEContainer');
+  renderVacacionesJE(jeId, 'equipoVacacionesJEContainer');
 }
 
 // ══════════════════════════════════════════════
@@ -2024,6 +2032,52 @@ function renderFlota(tecId, containerId){
       ⚠️ Si este vehículo no es el tuyo, comunícalo a tu jefe de equipo.
     </div>
     ${vacacionesHtml}`;
+}
+
+// ══════════════════════════════════════════════
+//  FLOTA JE
+// ══════════════════════════════════════════════
+function renderFlotaJE(jeId, containerId){
+  const container=document.getElementById(containerId);
+  if(!container) return;
+  const id=String(jeId).trim().toUpperCase();
+  const coche=FLOTA_DATA[id];
+  if(!coche){ container.innerHTML=''; return; }
+  container.innerHTML=`
+    <div class="section-head" style="margin-top:20px">🚗 Tu vehículo asignado</div>
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
+      <div>
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">Matrícula asignada</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${coche}</div>
+      </div>
+      <div style="font-size:2.5rem">🚗</div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════
+//  VACACIONES JE
+// ══════════════════════════════════════════════
+function renderVacacionesJE(jeId, containerId){
+  const container=document.getElementById(containerId);
+  if(!container) return;
+  const id=String(jeId).trim().toUpperCase();
+  const vacaciones=VACACIONES_DATA[id];
+  if(!vacaciones){ container.innerHTML=''; return; }
+  container.innerHTML=`
+    <div class="section-head" style="margin-top:20px">🏖️ Tus vacaciones</div>
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;justify-content:space-around;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#4a90e2,transparent)"></div>
+      <div style="text-align:center">
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Disfrutados</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#4a90e2">${vacaciones.disfrutados}</div>
+      </div>
+      <div style="border-left:1px solid var(--border2);"></div>
+      <div style="text-align:center">
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Restantes</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#27ae60">${vacaciones.restantes}</div>
+      </div>
+    </div>`;
 }
 
 // ══════════════════════════════════════════════
