@@ -1685,19 +1685,21 @@ function _openRMDash(tecId){
     </div>
 
     <div class="detail-section">Top motivos de todas las visitas</div>
-    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
-      ${barras(rm.topMotivos, maxMotivo, 'var(--gold3)')}
+    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;min-height:50px;display:flex;align-items:center;justify-content:center">
+      ${rm.topMotivos && rm.topMotivos.length
+        ? barras(rm.topMotivos, maxMotivo, 'var(--gold3)')
+        : '<div style="color:var(--muted);font-size:.75rem">Sin datos de motivos</div>'}
     </div>
 
     <div class="detail-section">Motivo de las visitas repetidas (RM)</div>
-    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;min-height:50px;display:flex;align-items:center;justify-content:center">
       ${rm.motivosRM && rm.motivosRM.length
         ? barras(rm.motivosRM, maxRMmot, '#e05a4a')
         : '<div style="color:var(--green2);font-size:.75rem">✓ Sin repeticiones registradas</div>'}
     </div>
 
     <div class="detail-section">Causa raíz del post-mantenimiento</div>
-    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;min-height:50px;display:flex;align-items:center;justify-content:center">
       ${rm.topPost && rm.topPost.length
         ? barras(rm.topPost, maxPost, 'var(--orange)')
         : '<div style="color:var(--muted);font-size:.75rem">Sin datos de causa raíz</div>'}
@@ -2462,8 +2464,8 @@ function _openCumDash(tecId){
         <div style="display:flex;justify-content:space-between;font-size:.75rem"><span style="color:#e05a4a">✗ No cumplidas</span><span style="font-weight:700;color:#e05a4a">${cum.noavNo}</span></div>
       </div>
     </div>
-    <div class="detail-section">Razones de incumplimiento</div>
-    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px">
+    <div class="detail-section">Razones de incumplimiento ${cum.topRazones&&cum.topRazones.length?'':'✓'}</div>
+    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;min-height:50px;display:flex;align-items:center;justify-content:center">
       ${barras(cum.topRazones,maxRazon,'#e05a4a')}
     </div>`;
   showPanel('cumDashPanel'); window.scrollTo(0,0);
