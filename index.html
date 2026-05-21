@@ -707,10 +707,9 @@ async function loadDocs(){
     const res=await fetch(DOCS_URL,{cache:'no-store'});
     if(!res.ok) return;
     const text=await res.text();
-    const data=JSON.parse(text);
-    if(Array.isArray(data)&&data.length>0){
-      // Limpiar fecha: tomar solo la parte de fecha corta
-      DOCS_DATA=data.map(d=>({
+    const rows=parseCSV(text);
+    if(Array.isArray(rows)&&rows.length>0){
+      DOCS_DATA=rows.map(d=>({
         ...d,
         fecha: d.fecha ? d.fecha.toString().substring(0,15) : '—'
       }));
@@ -2003,12 +2002,13 @@ async function loadVacaciones(){
   try{
     const res=await fetch(VACACIONES_URL+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok) return;
-    const data=await res.json();
-    if(data && typeof data==='object' && Object.keys(data).length>0){
-      Object.keys(data).forEach(mat=>{
-        VACACIONES_DATA[mat.toUpperCase()]={
-          disfrutados:data[mat].consumido,
-          restantes:data[mat].disponible
+    const text=await res.text();
+    const rows=parseCSV(text);
+    if(Array.isArray(rows)&&rows.length>0){
+      rows.forEach(r=>{
+        VACACIONES_DATA[r.mat.toUpperCase()]={
+          disfrutados:r.consumido,
+          restantes:r.disponible
         };
       });
       console.log('Vacaciones cargadas:',Object.keys(VACACIONES_DATA).length,'técnicos');

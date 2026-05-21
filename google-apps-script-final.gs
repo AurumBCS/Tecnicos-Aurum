@@ -85,28 +85,26 @@ function servirDocs() {
   const cache = CacheService.getScriptCache();
   const cacheKey = 'docs_data';
   let cached = cache.get(cacheKey);
-  if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+  if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.TEXT);
 
   const sheet = SpreadsheetApp.openById(SHEET_DOCS_ID).getSheets()[0];
   const data = sheet.getDataRange().getValues();
 
-  const docs = [];
+  let csv = 'mat,nMant,fecha,tipo,origen\n';
   for (let i = 1; i < data.length; i++) {
     const mat = String(data[i][0] || '').trim();
+    const nMant = String(data[i][1] || '').trim();
+    const fecha = String(data[i][2] || '').trim();
+    const tipo = String(data[i][3] || '').trim();
+    const origen = String(data[i][4] || '').trim();
+
     if (mat) {
-      docs.push({
-        mat: mat,
-        nMant: String(data[i][1] || '').trim(),
-        fecha: String(data[i][2] || '').trim(),
-        tipo: String(data[i][3] || '').trim(),
-        origen: String(data[i][4] || '').trim()
-      });
+      csv += `${mat},"${nMant}","${fecha}","${tipo}","${origen}"\n`;
     }
   }
 
-  const json = JSON.stringify(docs);
-  cache.put(cacheKey, json, 3600); // 1 hour
-  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  cache.put(cacheKey, csv, 3600); // 1 hour
+  return ContentService.createTextOutput(csv).setMimeType(ContentService.MimeType.TEXT);
 }
 
 // ─── FLOTA: Vehicle assignments ───
@@ -140,36 +138,32 @@ function servirVacaciones() {
   const cache = CacheService.getScriptCache();
   const cacheKey = 'vacaciones_data';
   let cached = cache.get(cacheKey);
-  if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+  if (cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.TEXT);
 
   try {
     // Fetch from published sheet
     const response = UrlFetchApp.fetch(SHEET_VACACIONES_URL, {muteHttpExceptions: true});
     const csvText = response.getContentText();
 
-    // Parse and reformat as JSON object
+    // Parse and reformat as CSV
     const lines = csvText.split('\n');
-    const vacaciones = {};
+    let csv = 'mat,consumido,disponible\n';
 
     for (let i = 1; i < lines.length; i++) {
       if (!lines[i].trim()) continue;
       const cells = parseCSVLine(lines[i]);
       if (cells.length >= 3) {
-        const mat = cells[0].trim().toUpperCase();
-        if (mat) {
-          vacaciones[mat] = {
-            consumido: cells[1].trim(),
-            disponible: cells[2].trim()
-          };
-        }
+        const mat = cells[0].trim();
+        const consumido = cells[1].trim();
+        const disponible = cells[2].trim();
+        if (mat) csv += `${mat},${consumido},${disponible}\n`;
       }
     }
 
-    const json = JSON.stringify(vacaciones);
-    cache.put(cacheKey, json, 3600);
-    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+    cache.put(cacheKey, csv, 3600);
+    return ContentService.createTextOutput(csv).setMimeType(ContentService.MimeType.TEXT);
   } catch(err) {
-    return ContentService.createTextOutput('{}').setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput('mat,consumido,disponible\n').setMimeType(ContentService.MimeType.TEXT);
   }
 }
 
