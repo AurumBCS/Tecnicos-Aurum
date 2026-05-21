@@ -2138,21 +2138,15 @@ async function loadFlota(){
 
 async function loadVacaciones(){
   try{
-    const res=await fetch(VACACIONES_URL,{cache:'no-store'});
+    const res=await fetch(VACACIONES_URL+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok) return;
-    const csv=await res.text();
-    const rows=parseCSV(csv);
-    if(rows.length>0){
-      rows.forEach(row=>{
-        const matricula=String(row['Matrícula']||row['MATRICULA']||row['mat']||'').trim().toUpperCase();
-        if(matricula){
-          const consumidos=parseFloat(String(row['Consumidos']||row['Consumido']||'0').replace(',','.')) || 0;
-          const disponibles=parseFloat(String(row['Disponibles']||row['Disponible']||'0').replace(',','.')) || 0;
-          VACACIONES_DATA[matricula]={
-            disfrutados:consumidos,
-            restantes:disponibles
-          };
-        }
+    const data=await res.json();
+    if(data && typeof data==='object' && Object.keys(data).length>0){
+      Object.keys(data).forEach(mat=>{
+        VACACIONES_DATA[mat.toUpperCase()]={
+          disfrutados:data[mat].consumido,
+          restantes:data[mat].disponible
+        };
       });
       console.log('Vacaciones cargadas:',Object.keys(VACACIONES_DATA).length,'técnicos');
     }
