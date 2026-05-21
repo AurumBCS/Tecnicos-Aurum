@@ -2257,7 +2257,11 @@ function findUser(q){
 async function doLogin(){
   const mat=document.getElementById('matInput').value.trim().toUpperCase();
   const dni=document.getElementById('dniInput').value.trim().toUpperCase();
-  if(!mat||!dni)return;
+  console.log('doLogin: mat=',mat,'dni=',dni);
+  if(!mat||!dni){
+    console.log('Campos vacíos');
+    return;
+  }
   document.getElementById('spinner').style.display='block';
   document.getElementById('loginBtn').style.opacity='.5';
 
