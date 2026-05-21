@@ -681,19 +681,16 @@ async function loadAuth(){
     const res=await fetch(AUTH_URL,{cache:'no-store'});
     if(!res.ok) return;
     const csv=await res.text();
-    const lines=csv.trim().split('\n');
-    if(lines.length>1){
-      // Saltamos header, procesamos datos
-      for(let i=1;i<lines.length;i++){
-        const cols=lines[i].split(',');
-        if(cols.length>8){
-          const matricula=String(cols[4]||'').trim().toUpperCase();
-          const dni=String(cols[8]||'').trim().toUpperCase();
-          if(matricula && dni && matricula !== '****'){
-            AUTH_DATA[matricula]=dni;
-          }
+    // Usar parseCSV para manejar correctamente campos con comillas
+    const rows=parseCSV(csv);
+    if(rows.length>0){
+      rows.forEach(row=>{
+        const matricula=String(row['Matrícula']||'').trim().toUpperCase();
+        const dni=String(row['DNI']||'').trim().toUpperCase();
+        if(matricula && dni && matricula !== '****'){
+          AUTH_DATA[matricula]=dni;
         }
-      }
+      });
       console.log('Auth CSV cargado:',Object.keys(AUTH_DATA).length,'matrículas');
     }
   }catch(e){console.log('Auth no disponible',e.message);}
