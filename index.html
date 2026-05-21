@@ -712,19 +712,60 @@ async function loadRM(){
     const csv=await res.text();
     const rows=parseCSV(csv);
     if(rows.length>0){
-      // Agrupar por técnico (columna 'Técnico')
+      // Agrupar por técnico con cálculos completos
       const rmByTec={};
       rows.forEach(row=>{
         const tecnico=String(row['Técnico']||'').trim().toUpperCase();
-        const repetido=String(row['¿Repetido?']||'').toLowerCase()==='sí'?1:0;
+        const repetido=String(row['¿Repetido?']||'').toLowerCase()==='sí';
+        const motivo=String(row['Motivo']||'').trim();
+        const motivoPost=String(row['Mnto Post']||'').trim();
+        const duracion=parseFloat(String(row['Duración']||'0').replace(',','.'));
+
         if(tecnico){
           if(!rmByTec[tecnico]){
-            rmByTec[tecnico]={total:0,reps:0};
+            rmByTec[tecnico]={
+              total:0,reps:0,pctRM:0,durMedia:0,
+              duraciones:[],
+              topMotivos:{},motivosRM:{},topPost:{}
+            };
           }
+
           rmByTec[tecnico].total++;
-          rmByTec[tecnico].reps+=repetido;
+          if(repetido) rmByTec[tecnico].reps++;
+          if(duracion>0) rmByTec[tecnico].duraciones.push(duracion);
+
+          // Agrupar motivos
+          if(motivo){
+            rmByTec[tecnico].topMotivos[motivo]=(rmByTec[tecnico].topMotivos[motivo]||0)+1;
+          }
+
+          // Motivos de RM (solo si es repetido)
+          if(repetido && motivo){
+            rmByTec[tecnico].motivosRM[motivo]=(rmByTec[tecnico].motivosRM[motivo]||0)+1;
+          }
+
+          // Top Post (solo si tiene Mnto Post)
+          if(motivoPost){
+            rmByTec[tecnico].topPost[motivoPost]=(rmByTec[tecnico].topPost[motivoPost]||0)+1;
+          }
         }
       });
+
+      // Calcular métricas finales y convertir objetos a arrays
+      Object.keys(rmByTec).forEach(tec=>{
+        const data=rmByTec[tec];
+        data.pctRM=data.total>0?(data.reps/data.total*100).toFixed(1):0;
+        data.durMedia=data.duraciones.length>0?(data.duraciones.reduce((a,b)=>a+b,0)/data.duraciones.length).toFixed(1):0;
+
+        // Convertir objetos a arrays de [key, count], ordenados por frecuencia
+        data.topMotivos=Object.entries(data.topMotivos).sort((a,b)=>b[1]-a[1]);
+        data.motivosRM=Object.entries(data.motivosRM).sort((a,b)=>b[1]-a[1]);
+        data.topPost=Object.entries(data.topPost).sort((a,b)=>b[1]-a[1]);
+
+        // Limpiar datos temporales
+        delete data.duraciones;
+      });
+
       RM_DATA=rmByTec;
       console.log('RM CSV cargado:',Object.keys(RM_DATA).length,'técnicos');
     }
