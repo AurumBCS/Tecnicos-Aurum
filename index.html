@@ -489,12 +489,14 @@ const FLOTA_URL = "https://script.google.com/macros/s/AKfycby0c3pbKzmHl_BjHnMj6f
 const VACACIONES_URL = "https://script.google.com/macros/s/AKfycby0c3pbKzmHl_BjHnMj6f_yp3hIjez3KrnBgUpzS02EdYpL0ALn5xpmN176fQL9OGHD/exec?type=vacaciones";
 const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycby0c3pbKzmHl_BjHnMj6f_yp3hIjez3KrnBgUpzS02EdYpL0ALn5xpmN176fQL9OGHD/exec?type=medalia-coord";
 const RM_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVDFiOmr7q76bIyy_ZM37BjusotzsFZVsut7U7XG83jsIl1y5Hz503Igjn3DGNTTLKn7TbSMmGjv-5/pub?output=csv";
+const CUM_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnEsNP3XdtoejG0_my4TTbnR4EHl50iFL0AVBSK_vHg5xVm2xz7fxWiRl4GrPS45G-bpFWWzFws2qt/pub?output=csv";
 let AUTH_DATA = {};
 let FLOTA_DATA = {};
 let DOCS_DATA = [];
 let VACACIONES_DATA = {};
 let MEDALIA_COORD_DATA = {};
 let RM_DATA = {};
+let CUM_DATA = {};
 let _datosActualizados = false;
 
 // ── Fallback mínimo (se rellena con los datos del CSV real) ──
@@ -770,6 +772,66 @@ async function loadRM(){
       console.log('RM CSV cargado:',Object.keys(RM_DATA).length,'técnicos');
     }
   }catch(e){console.log('RM no disponible',e.message);}
+}
+
+async function loadCUM(){
+  try{
+    const res=await fetch(CUM_CSV_URL,{cache:'no-store'});
+    if(!res.ok) return;
+    const csv=await res.text();
+    const rows=parseCSV(csv);
+    if(rows.length>0){
+      // Agrupar por técnico (MATRICULA)
+      const cumByTec={};
+      rows.forEach(row=>{
+        const matricula=String(row['MATRICULA']||'').trim().toUpperCase();
+        const cumplido=String(row['Cumplido?']||'').toUpperCase()==='SI';
+        const esAveria=String(row['Avería/ No Avería']||'').toUpperCase()==='AVERIA';
+        const razon=String(row['Razón_suspensión']||'').trim();
+
+        if(matricula){
+          if(!cumByTec[matricula]){
+            cumByTec[matricula]={
+              total:0,ok:0,noOk:0,pct:0,
+              avOk:0,avNo:0,noavOk:0,noavNo:0,
+              topRazones:{}
+            };
+          }
+
+          cumByTec[matricula].total++;
+          if(cumplido){
+            cumByTec[matricula].ok++;
+          } else {
+            cumByTec[matricula].noOk++;
+          }
+
+          // Desglose por avería/no avería
+          if(esAveria){
+            if(cumplido) cumByTec[matricula].avOk++;
+            else cumByTec[matricula].avNo++;
+          } else {
+            if(cumplido) cumByTec[matricula].noavOk++;
+            else cumByTec[matricula].noavNo++;
+          }
+
+          // Top razones (solo si no cumplió)
+          if(!cumplido && razon){
+            cumByTec[matricula].topRazones[razon]=(cumByTec[matricula].topRazones[razon]||0)+1;
+          }
+        }
+      });
+
+      // Calcular porcentaje y convertir topRazones a array
+      Object.keys(cumByTec).forEach(tec=>{
+        const data=cumByTec[tec];
+        data.pct=data.total>0?(data.ok/data.total*100).toFixed(1):0;
+        data.topRazones=Object.entries(data.topRazones).sort((a,b)=>b[1]-a[1]);
+      });
+
+      CUM_DATA=cumByTec;
+      console.log('CUM CSV cargado:',Object.keys(CUM_DATA).length,'técnicos');
+    }
+  }catch(e){console.log('CUM no disponible',e.message);}
 }
 
 async function loadDocs(){
@@ -2207,12 +2269,13 @@ async function doLogin(){
   await Promise.all([
     withTimeout(loadSheets()),
     withTimeout(loadAuth()),
-    withTimeout(loadRM())
+    withTimeout(loadRM()),
+    withTimeout(loadCUM())
   ]);
 
   // Si el timeout ganó, reintenta en background y re-renderiza al llegar
   if(!_datosActualizados){
-    Promise.all([loadSheets(), loadAuth(), loadRM()]).then(()=>{
+    Promise.all([loadSheets(), loadAuth(), loadRM(), loadCUM()]).then(()=>{
       if(CURRENT_TEC) renderMain(CURRENT_TEC);
       else if(CURRENT_JE_ID){
         const jeTec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
