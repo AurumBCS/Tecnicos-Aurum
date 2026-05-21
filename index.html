@@ -375,24 +375,14 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="section-head">KPIs del equipo</div>
       <div class="kpi-grid" id="equipoKpis"></div>
 
-      <!-- Formularios JE (Ocupaciones y Sábados) -->
-      <div id="formulariosJEContainer"></div>
-
       <!-- RM global del equipo (se rellena dinámicamente) -->
       <div id="equipoRMGlobal"></div>
 
-      <!-- Docs pendientes del equipo -->
+      <!-- Docs pendientes del equipo (colapsable) -->
       <div id="equipoDocsContainer"></div>
 
-      <!-- Desplegable técnicos del equipo -->
-      <div id="tecnicosEquipoContainer"></div>
-
-      <!-- Lista técnicos -->
-      <div class="section-head">Técnicos del equipo</div>
-      <div class="tec-list" id="tecList"></div>
-
-      <!-- Desplegable documentación del equipo -->
-      <div id="docsEquipoJEContainer"></div>
+      <!-- Lista técnicos (colapsable) -->
+      <div id="tecList"></div>
 
       <!-- Vehículo y vacaciones del JE -->
       <div id="equipoFlotaJEContainer"></div>
@@ -960,7 +950,7 @@ function renderEquipoPanel(jeId){
     {key:'conv', label:'Conversión',   icon:'💰', unit:'%',min:15.0, dash:'conv'},
     {key:'ppa',  label:'PPA',          icon:'⭐', unit:'%',min:10.0, dash:null},
   ];
-  document.getElementById('equipoKpis').innerHTML=JE_KPI_KEYS.map(k=>{
+  let kpiHtml = JE_KPI_KEYS.map(k=>{
     const val=av[k.key]||0,s=getStatus(k,val),bp=getBarPct(k,val);
     const disp=val.toFixed(2);
     const clickAttr=k.dash?`onclick="showEquipoDash('${k.dash}','${jeId}')" style="cursor:pointer"`:'';
@@ -975,6 +965,22 @@ function renderEquipoPanel(jeId){
       ${tap}
     </div>`;
   }).join('');
+
+  // Agregar botones de formularios al grid
+  kpiHtml += `
+    <a href="https://docs.google.com/forms/d/e/1FAIpQLSelMBOyqs5DzJmhXihRyruEruqN43qx0qrJch1k_wG0hL0hcQ/viewform" target="_blank" style="background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:13px 11px 10px;text-align:center;text-decoration:none;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s;min-height:120px">
+      <div style="font-size:1.8rem;margin-bottom:6px">📋</div>
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:4px">Ocupaciones</div>
+      <div style="font-size:.6rem;color:var(--text);font-weight:600">Rellenar formulario</div>
+    </a>
+    <a href="https://docs.google.com/forms/d/e/1FAIpQLSeHWFGQrevdL_t1BsqpapxLaZjM4tYg_7mLSW4uO1CAp0ehjA/viewform" target="_blank" style="background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:13px 11px 10px;text-align:center;text-decoration:none;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s;min-height:120px">
+      <div style="font-size:1.8rem;margin-bottom:6px">📅</div>
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:4px">Sábados</div>
+      <div style="font-size:.6rem;color:var(--text);font-weight:600">Rellenar formulario</div>
+    </a>
+  `;
+
+  document.getElementById('equipoKpis').innerHTML = kpiHtml;
 
   // ── RM Global del equipo (desde Excel) ──
   const tecIds = tecs.map(t=>t.id);
@@ -1053,10 +1059,10 @@ function renderEquipoPanel(jeId){
 
     // Inyectar en contenedor dedicado
     document.getElementById('equipoRMGlobal').innerHTML=rmSection;
-  renderDocsEquipo(jeId,'equipoDocsContainer');
+  renderDocsEquipoCollapsible(jeId,'equipoDocsContainer');
   } else {
     document.getElementById('equipoRMGlobal').innerHTML='';
-    if(document.getElementById('equipoDocsContainer')) renderDocsEquipo(jeId,'equipoDocsContainer');
+    if(document.getElementById('equipoDocsContainer')) renderDocsEquipoCollapsible(jeId,'equipoDocsContainer');
   }
 
   // Lista de técnicos ordenados por ML-V desc — mejor con estrella
@@ -1069,7 +1075,7 @@ function renderEquipoPanel(jeId){
   }
   const bestId=sorted.reduce((best,t)=>tecScore(t)>tecScore(best)?t:best,sorted[0])?.id;
 
-  document.getElementById('tecList').innerHTML=sorted.map((t,i)=>{
+  const tecRows = sorted.map((t,i)=>{
     const g=getGrade(t.mlv);
     const col=gradeColor(g);
     const nombre=t.nombre.trim();
@@ -1092,10 +1098,18 @@ function renderEquipoPanel(jeId){
     </div>`;
   }).join('');
 
-  // Formularios y desplegables del JE
-  renderFormulariosJE('formulariosJEContainer');
-  renderTecnicosEquipoCollapsible(jeId, 'tecnicosEquipoContainer');
-  renderDocsEquipoCollapsible(jeId, 'docsEquipoJEContainer');
+  document.getElementById('tecList').innerHTML=`
+    <div style="margin-top:20px">
+      <div class="section-head" onclick="document.getElementById('tecList-${jeId}').style.display=document.getElementById('tecList-${jeId}').style.display==='none'?'block':'none';document.getElementById('tecArrow-${jeId}').style.transform=document.getElementById('tecArrow-${jeId}').style.transform==='rotate(180deg)'?'rotate(0deg)':'rotate(180deg)'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        👥 Técnicos del equipo · ${sorted.length}
+        <span id="tecArrow-${jeId}" style="display:inline-block;transition:transform .2s">→</span>
+      </div>
+      <div id="tecList-${jeId}" style="background:var(--dim);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-top:8px;display:none;padding:0 !important">
+        <div class="tec-list">
+          ${tecRows}
+        </div>
+      </div>
+    </div>`;
 
   // Mostrar vehículo y vacaciones del JE
   renderFlotaJE(jeId, 'equipoFlotaJEContainer');
