@@ -487,11 +487,15 @@ const DOCS_URL = "https://script.google.com/macros/s/AKfycbyLM20bo338pNkSmZUuAqe
 const FLOTA_URL = "https://script.google.com/macros/s/AKfycbyLM20bo338pNkSmZUuAqeOkFGQBmx7-_qmm5of1mBQiKT8o03iWEHUKvtPJ1gI5UuX/exec?type=flota";
 const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbyLM20bo338pNkSmZUuAqeOkFGQBmx7-_qmm5of1mBQiKT8o03iWEHUKvtPJ1gI5UuX/exec?type=vacaciones";
 const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbyLM20bo338pNkSmZUuAqeOkFGQBmx7-_qmm5of1mBQiKT8o03iWEHUKvtPJ1gI5UuX/exec?type=medalia-coord";
+const CUM_URL = "https://script.google.com/macros/s/AKfycbyLM20bo338pNkSmZUuAqeOkFGQBmx7-_qmm5of1mBQiKT8o03iWEHUKvtPJ1gI5UuX/exec?type=cumplimiento";
+const RM_URL = "https://script.google.com/macros/s/AKfycbyLM20bo338pNkSmZUuAqeOkFGQBmx7-_qmm5of1mBQiKT8o03iWEHUKvtPJ1gI5UuX/exec?type=rm";
 let AUTH_DATA = {};
 let FLOTA_DATA = {};
 let DOCS_DATA = [];
 let VACACIONES_DATA = {};
 let MEDALIA_COORD_DATA = {};
+let CUM_DATA = {};
+let RM_DATA = {};
 let _datosActualizados = false;
 
 // ── Fallback mínimo (se rellena con los datos del CSV real) ──
@@ -2023,6 +2027,67 @@ async function loadMedialiaCoord(){
   }catch(e){console.log('Medalia error:',e.message);}
 }
 
+async function loadCumplimiento(){
+  try{
+    const res=await fetch(CUM_URL+'&t='+Date.now(),{cache:'no-store'});
+    if(!res.ok) return;
+    const text=await res.text();
+    const rows=parseCSV(text);
+    if(Array.isArray(rows)&&rows.length>0){
+      CUM_DATA={};
+      rows.forEach(r=>{
+        const mat=r.mat.toUpperCase();
+        if(!CUM_DATA[mat]) CUM_DATA[mat]={total:0,ok:0,noOk:0,pct:0,topRazones:[],avOk:0,avNo:0,noavOk:0,noavNo:0};
+        CUM_DATA[mat].total++;
+        if(r.cumplido.toUpperCase().includes('SÍ')) CUM_DATA[mat].ok++;
+        else CUM_DATA[mat].noOk++;
+        const isAveria=r.averia.toUpperCase().includes('Averia');
+        const avOkFlag=r.cumplido.toUpperCase().includes('SÍ');
+        if(isAveria&&avOkFlag) CUM_DATA[mat].avOk++;
+        else if(isAveria&&!avOkFlag) CUM_DATA[mat].avNo++;
+        else if(!isAveria&&avOkFlag) CUM_DATA[mat].noavOk++;
+        else CUM_DATA[mat].noavNo++;
+      });
+      Object.keys(CUM_DATA).forEach(mat=>{
+        const c=CUM_DATA[mat];
+        c.pct=c.total>0?(c.ok/c.total*100).toFixed(1):0;
+      });
+      console.log('Cumplimiento cargado:',Object.keys(CUM_DATA).length,'técnicos');
+    }
+  }catch(e){console.log('Cumplimiento error:',e.message);}
+}
+
+async function loadRM(){
+  try{
+    const res=await fetch(RM_URL+'&t='+Date.now(),{cache:'no-store'});
+    if(!res.ok) return;
+    const text=await res.text();
+    const rows=parseCSV(text);
+    if(Array.isArray(rows)&&rows.length>0){
+      RM_DATA={};
+      const motorivos={},motMotivos={},topPostMotivos={};
+      rows.forEach(r=>{
+        const mat=r.tecnico.toUpperCase();
+        if(!RM_DATA[mat]) RM_DATA[mat]={total:0,reps:0,pctRM:0,durMedia:0,topMotivos:[],motivosRM:[],topPost:[]};
+        RM_DATA[mat].total++;
+        if(r.repetido.toUpperCase().includes('SÍ')) RM_DATA[mat].reps++;
+        const motivo=r.motivo.trim(),mPost=r.motivo_post.trim();
+        motorivos[motivo]=(motorivos[motivo]||0)+1;
+        if(r.repetido.toUpperCase().includes('SÍ')) motMotivos[motivo]=(motMotivos[motivo]||0)+1;
+        if(mPost) topPostMotivos[mPost]=(topPostMotivos[mPost]||0)+1;
+      });
+      Object.keys(RM_DATA).forEach(mat=>{
+        const r=RM_DATA[mat];
+        r.pctRM=r.total>0?((r.total-r.reps)/r.total*100).toFixed(1):0;
+        r.topMotivos=Object.entries(motorivos).sort((a,b)=>b[1]-a[1]).slice(0,6).map(e=>[e[0],e[1]]);
+        r.motivosRM=Object.entries(motMotivos).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>[e[0],e[1]]);
+        r.topPost=Object.entries(topPostMotivos).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>[e[0],e[1]]);
+      });
+      console.log('RM cargado:',Object.keys(RM_DATA).length,'técnicos');
+    }
+  }catch(e){console.log('RM error:',e.message);}
+}
+
 function renderFlota(tecId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
@@ -2158,7 +2223,7 @@ async function doLogin(){
     if(CURRENT_TEC) renderDocsPendientes(CURRENT_TEC.id,'docsPendientesMain');
     if(CURRENT_JE_ID) renderDocsEquipo(CURRENT_JE_ID,'equipoDocsContainer');
   });
-  Promise.all([loadVacaciones(), loadFlota()]).then(()=>{
+  Promise.all([loadVacaciones(), loadFlota(), loadCumplimiento(), loadRM()]).then(()=>{
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
 

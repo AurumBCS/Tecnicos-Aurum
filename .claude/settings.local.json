@@ -31,7 +31,14 @@
       "Bash(curl -L -s \"https://script.google.com/macros/s/AKfycby0c3pbKzmHl_BjHnMj6f_yp3hIjez3KrnBgUpzS02EdYpL0ALn5xpmN176fQL9OGHD/exec?type=auth\")",
       "Bash(awk -F',' '{print $5}')",
       "Bash(curl -L -s \"https://script.google.com/macros/s/AKfycbysSIdy31SdRL78We6K6Mhaext8WFNR5GyNxJqmWEbemJjuKwP-PxpcmOwXZT_ecZm9/exec?type=auth\")",
-      "Bash(curl -L -s \"https://script.google.com/macros/s/AKfycbxlBlt49M3gJHBYcUkuY4l7oHbzIg8nwHujuNsL8voXQ4XlHtSZ5KqY7f-iC5CgjuQ7/exec?type=auth\")"
+      "Bash(curl -L -s \"https://script.google.com/macros/s/AKfycbxlBlt49M3gJHBYcUkuY4l7oHbzIg8nwHujuNsL8voXQ4XlHtSZ5KqY7f-iC5CgjuQ7/exec?type=auth\")",
+      "Bash(curl -s \"https://docs.google.com/spreadsheets/d/e/2PACX-1vRVDFiOmr7q76bIyy_ZM37BjusotzsFZVsut7U7XG83jsIl1y5Hz503Igjn3DGNTTLKn7TbSMmGjv-5/pub?output=csv\")",
+      "Bash(curl -L -s \"https://docs.google.com/spreadsheets/d/e/2PACX-1vRVDFiOmr7q76bIyy_ZM37BjusotzsFZVsut7U7XG83jsIl1y5Hz503Igjn3DGNTTLKn7TbSMmGjv-5/pub?output=csv\")",
+      "Bash(curl -L -s \"https://docs.google.com/spreadsheets/d/e/2PACX-1vSnEsNP3XdtoejG0_my4TTbnR4EHl50iFL0AVBSK_vHg5xVm2xz7fxWiRl4GrPS45G-bpFWWzFws2qt/pub?output=csv\")",
+      "mcp__Claude_in_Chrome__switch_browser",
+      "WebFetch(domain:script.google.com)",
+      "Bash(git show *)",
+      "Bash(grep -E \"\\\\.\\(gs|txt|js\\)$\")"
     ]
   }
 }
