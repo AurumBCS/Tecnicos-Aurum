@@ -483,7 +483,7 @@ function servirCumplimiento() {
 
     const rows = [['mat', 'territorial', 'averia', 'cumplido', 'razon']];
     data.slice(1).forEach(row => {
-      const mat = String(row[3]||'').trim();
+      const mat = String(row[3]||'').trim().toUpperCase();
       const territorial = String(row[4]||'').trim();
       const averia = String(row[7]||'').trim();
       const cumplido = String(row[8]||'').trim();
@@ -517,9 +517,9 @@ function servirRM() {
 
     const rows = [['nMant', 'motivo', 'tecnico', 'territorial', 'repetido', 'motivo_post', 'averia']];
     data.slice(1).forEach(row => {
-      const nMant = String(row[3]||'').trim();
+      const nMant = String(row[4]||'').trim();
       const motivo = String(row[6]||'').trim();
-      const tecnico = String(row[7]||'').trim();
+      const tecnico = String(row[7]||'').trim().toUpperCase();
       const territorial = String(row[8]||'').trim();
       const repetido = String(row[11]||'').trim();
       const motivo_post = String(row[14]||'').trim();
