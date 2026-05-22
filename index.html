@@ -2216,6 +2216,39 @@ function findUser(q){
   return null;
 }
 
+// ════════════════════════════════════════════════════════
+// AUTO-REFRESH: Martes y Jueves 16:00-23:00 cada 15 min
+// ════════════════════════════════════════════════════════
+let _autoRefreshInterval = null;
+
+function startAutoRefresh() {
+  if(_autoRefreshInterval) clearInterval(_autoRefreshInterval);
+
+  const checkAndRefresh = () => {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+    const hour = now.getHours();
+    const isTuesOrThurs = (dayOfWeek === 2 || dayOfWeek === 4);
+    const isInWindow = (hour >= 16 && hour < 23);
+
+    if(isTuesOrThurs && isInWindow) {
+      console.log('🔄 Auto-refresh: recargando datos...');
+      Promise.all([loadSheets(), loadAuth(), loadDocs(), loadVacaciones(), loadFlota(), loadCumplimiento(), loadRM()]).then(()=>{
+        if(CURRENT_TEC) renderMain(CURRENT_TEC);
+        else if(CURRENT_JE_ID) {
+          const jeTec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
+          if(jeTec && ACTIVE_TAB==='misDatos') renderMain(jeTec);
+        }
+        console.log('✓ Datos actualizados a las ' + now.toLocaleTimeString('es-ES'));
+      });
+    }
+  };
+
+  // Verificar cada 15 minutos
+  _autoRefreshInterval = setInterval(checkAndRefresh, 15 * 60 * 1000);
+  console.log('✓ Auto-refresh activado (mar/jue 16:00-23:00, cada 15 min)');
+}
+
 async function doLogin(){
   const mat=document.getElementById('matInput').value.trim().toUpperCase();
   const dni=document.getElementById('dniInput').value.trim().toUpperCase();
@@ -2329,6 +2362,9 @@ async function doLogin(){
     document.getElementById('tabsBarJR').style.display='none';
     renderMain(found.tec);
   }
+
+  // Iniciar auto-refresh programado (mar/jue 16:00-23:00)
+  startAutoRefresh();
 }
 
 // ── Botón volver ──
