@@ -320,7 +320,10 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         <div class="topbar-id" id="topbarId">—</div>
       </div>
     </div>
-    <button class="topbar-logout" id="logoutBtn">Salir</button>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="topbar-refresh" id="refreshDataBtn" style="display:none; padding:8px 12px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:600;">🔄 Actualizar</button>
+      <button class="topbar-logout" id="logoutBtn">Salir</button>
+    </div>
   </div>
 
   <div class="month-banner">
@@ -2328,6 +2331,12 @@ async function doLogin(){
     document.getElementById('scorePill').innerHTML='<span style="color:var(--gold2);font-weight:700">Vista global</span>';
     document.getElementById('tabsBarJR').style.display='flex';
     document.getElementById('tabsBar').style.display='none';
+
+    // Mostrar botón de refresco solo para GD5381
+    if(found.id === 'GD5381') {
+      document.getElementById('refreshDataBtn').style.display='block';
+    }
+
     renderJRPanel();
     loadMedialiaCoord().then(()=>renderMedialiaCoord());
     showPanel('jrPanel');
@@ -2477,7 +2486,38 @@ function doLogout(){
   hideAllPanels();
   document.getElementById('mainPanel').style.display='block';
 }
+
+// ── Refresco manual de datos (GD5381) ──
+async function doManualRefresh() {
+  const btn = document.getElementById('refreshDataBtn');
+  btn.style.opacity = '0.5';
+  btn.textContent = '⏳ Actualizando...';
+  btn.disabled = true;
+
+  try {
+    await Promise.all([loadSheets(), loadAuth(), loadDocs(), loadVacaciones(), loadFlota(), loadCumplimiento(), loadRM()]);
+
+    // Re-renderizar la vista actual
+    if(CURRENT_TEC) renderMain(CURRENT_TEC);
+    else if(CURRENT_JE_ID) {
+      const jeTec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
+      if(jeTec && ACTIVE_TAB==='misDatos') renderMain(jeTec);
+    }
+
+    console.log('✓ Datos actualizados manualmente por GD5381');
+    alert('✓ Datos actualizados correctamente');
+  } catch(e) {
+    console.error('✗ Error al actualizar datos:', e.message);
+    alert('✗ Error al actualizar datos. Intenta de nuevo.');
+  } finally {
+    btn.style.opacity = '1';
+    btn.textContent = '🔄 Actualizar';
+    btn.disabled = false;
+  }
+}
+
 document.getElementById('logoutBtn').addEventListener('click',doLogout);
+document.getElementById('refreshDataBtn').addEventListener('click',doManualRefresh);
 
 // ── Events ──
 document.getElementById('loginBtn').addEventListener('click',doLogin);
