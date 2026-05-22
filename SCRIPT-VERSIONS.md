@@ -2,6 +2,34 @@
 
 Este archivo documenta qué deployment ID corresponde a cada versión estable del script.
 
+## v1.0.2-stable
+
+**Fecha:** 2026-05-22
+**Archivo local:** `google-apps-script-final.gs`
+**Deployment ID:** `AKfycbz0lVQF2dmoXNQ5mKYJpyEjrUubsxWxjaow27KE1pC3eLbmHQSbwRbgDUOnG5xcxti_`
+**Endpoints funcionando:**
+- Auth: CSV ✓ (usuarios BAJA excluidos)
+- CSV (datos técnicos): CSV ✓
+- Docs: CSV ✓
+- Flota: CSV ✓
+- Vacaciones: CSV ✓
+- Medalia: CSV ✓
+- Medalia Coordinadores: CSV ✓
+- Cumplimiento: CSV ✓ (carga dinámica)
+- RM: CSV ✓ (carga dinámica)
+
+**Cambios en esta versión:**
+- ✓ Usuarios con BAJA excluidos del Auth endpoint
+- ✓ Auth endpoint retorna CSV (no JSON)
+- ✓ RM y Cumplimiento cargan dinámicamente en la app
+- ✓ Todos los endpoints retornan CSV sin errores CORS
+- ✓ Verificado: 8/8 endpoints respondiendo correctamente
+
+**Comit Git:** pendiente
+**Tag Git:** `v1.0.2-stable`
+
+---
+
 ## v1.0.1-stable
 
 **Fecha:** 2026-05-22
