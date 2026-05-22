@@ -2052,6 +2052,7 @@ async function loadMedialiaCoord(){
 //  CARGAR CUMPLIMIENTO (CSV dinámico)
 // ════════════════════════════════════════════════════════
 async function loadCumplimiento(){
+  console.log('📥 Iniciando loadCumplimiento...');
   try{
     const res=await fetch(CUMPLIMIENTO_URL+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok){
@@ -2081,6 +2082,7 @@ async function loadCumplimiento(){
 //  CARGAR RM (CSV dinámico)
 // ════════════════════════════════════════════════════════
 async function loadRM(){
+  console.log('📥 Iniciando loadRM...');
   try{
     const res=await fetch(RM_URL+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok){
