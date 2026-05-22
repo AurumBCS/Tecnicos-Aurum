@@ -2040,15 +2040,59 @@ async function loadMedialiaCoord(){
     const rows=parseCSV(csv);
     if(rows.length>1){
       MEDALIA_COORD_DATA={};
+      const byTerritory={};
+      // Filtrar solo "CFL Empleado" (interacción)
+      // Columns: Tipo_CFL, Fecha_Encuesta, Mantenimiento, Cliente, MATRICULA, TERRITORIAL, ORIGEN, preguntas satisfacción...
       rows.slice(1).forEach(row=>{
-        const territorio=String(row[0]||'').trim();
-        const promedio=parseFloat(row[1])||0;
-        const cantidad=parseInt(row[2])||0;
-        if(territorio && cantidad>0){
-          MEDALIA_COORD_DATA[territorio]={promedio,cantidad};
+        const tipo=String(row['Tipo_CFL']||'').trim();
+        const territorial=String(row['TERRITORIAL']||'').trim();
+
+        if(tipo==='CFL Empleado' && territorial){
+          // Obtener valores de satisfacción (columnas 15-20 aprox, o buscar por header)
+          const satisfacciones=[];
+          [
+            'Valore su grado de satisfacción con la visita del asesor técnico',
+            'Valore de 0 a 10 la rapidez de la compañía en el envío del aseso',
+            'Valore de 0 a 10 la facilidad para conseguir la visita del aseso',
+            'Valore de 0 a 10 si nos hemos adaptado a sus necesidades horaria',
+            'Valore de 0 a 10 su grado de satisfacción con la gestión de nues',
+            'Por favor, valore su grado de satisfacción con el técnico que ha'
+          ].forEach(col=>{
+            const val=parseFloat(row[col])||0;
+            if(val>0) satisfacciones.push(val);
+          });
+
+          if(satisfacciones.length>0){
+            if(!byTerritory[territorial]) byTerritory[territorial]={vals:[],qty:0};
+            byTerritory[territorial].vals.push(...satisfacciones);
+            byTerritory[territorial].qty++;
+          }
         }
       });
-      console.log('Medalia coordinadores cargada:',Object.keys(MEDALIA_COORD_DATA).length,'grupos');
+
+      // Agrupar por zonas: 3304+3305, 3306+3307, otros
+      const zones={'Zona 1 (3304-3305)':[],'Zona 2 (3306-3307)':[],'Otras zonas':[]};
+      Object.keys(byTerritory).forEach(terr=>{
+        const data=byTerritory[terr];
+        const promedio=Math.round((data.vals.reduce((a,b)=>a+b,0)/data.vals.length)*10)/10;
+        if(terr.includes('3304')||terr.includes('3305')){
+          zones['Zona 1 (3304-3305)'].push({territorio:terr,promedio,qty:data.qty});
+        } else if(terr.includes('3306')||terr.includes('3307')){
+          zones['Zona 2 (3306-3307)'].push({territorio:terr,promedio,qty:data.qty});
+        } else {
+          zones['Otras zonas'].push({territorio:terr,promedio,qty:data.qty});
+        }
+      });
+
+      // Calcular promedios por zona
+      Object.keys(zones).forEach(zona=>{
+        if(zones[zona].length>0){
+          const promedio=Math.round((zones[zona].reduce((a,t)=>a+t.promedio,0)/zones[zona].length)*10)/10;
+          MEDALIA_COORD_DATA[zona]={promedio,cantidad:zones[zona].reduce((a,t)=>a+t.qty,0),territorios:zones[zona]};
+        }
+      });
+
+      console.log('Medalia coordinadores cargada:',Object.keys(MEDALIA_COORD_DATA).length,'zonas');
     }
   }catch(e){console.log('Medalia error:',e.message);}
 }
@@ -2068,13 +2112,20 @@ async function loadCumplimiento(){
     const rows=parseCSV(csv);
     if(rows.length>1){
       CUM_DATA={};
+      const cumByTec={};
+      // Headers: Monitorized Date MD, Installation Number, Code Maintenance IBS, MATRICULA, TERRITORIAL, ORIGEN, Provincia_Mantenimiento, Avería/ No Avería, Cumplido?, Razón_suspensión
       rows.slice(1).forEach(row=>{
-        const mat=String(row[0]||'').trim().toUpperCase();
-        const total=parseInt(row[1])||0;
-        const ok=parseInt(row[2])||0;
-        if(mat && total>0){
-          CUM_DATA[mat]={total,ok,pct:Math.round((ok/total)*100)};
+        const mat=String(row['MATRICULA']||'').trim().toUpperCase();
+        const cumplido=String(row['Cumplido?']||'').trim().toUpperCase()==='SI'?1:0;
+        if(mat){
+          if(!cumByTec[mat]){cumByTec[mat]={total:0,ok:0};}
+          cumByTec[mat].total++;
+          cumByTec[mat].ok+=cumplido;
         }
+      });
+      Object.keys(cumByTec).forEach(mat=>{
+        const c=cumByTec[mat];
+        CUM_DATA[mat]={total:c.total,ok:c.ok,pct:Math.round((c.ok/c.total)*100)};
       });
       console.log('✓ Cumplimiento cargado:',Object.keys(CUM_DATA).length,'técnicos');
     } else {
@@ -2099,11 +2150,15 @@ async function loadRM(){
     if(rows.length>1){
       RM_DATA={};
       rows.slice(1).forEach(row=>{
-        const mat=String(row[2]||'').trim().toUpperCase();
-        const nMant=String(row[0]||'').trim();
+        // Columns: Año, Mes, Finalización, Instalación, Mantenimiento, Av/NoAv, Motivo, Técnico, Territorial, Provincia, Empresa, ¿Repetido?, Mnto Post, ...
+        const mat=String(row['Técnico']||'').trim().toUpperCase();
+        const nMant=String(row['Mantenimiento']||'').trim();
+        const motivo=String(row['Motivo']||'').trim();
+        const territorial=String(row['Territorial']||'').trim();
+        const repetido=String(row['¿Repetido?']||'').trim().toUpperCase()==='NO'?0:1;
         if(mat && nMant){
           if(!RM_DATA[mat]) RM_DATA[mat]=[];
-          RM_DATA[mat].push({nMant,motivo:row[1]||'',territorial:row[3]||''});
+          RM_DATA[mat].push({nMant,motivo,territorial,repetido});
         }
       });
       console.log('✓ RM cargado:',Object.keys(RM_DATA).length,'técnicos');
