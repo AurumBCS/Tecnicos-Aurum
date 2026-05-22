@@ -1529,9 +1529,13 @@ function _openRMDash(tecId){
       motivos[r.motivo]=(motivos[r.motivo]||0)+1;
       if(r.repetido===1) rmMotivos[r.motivo]=(rmMotivos[r.motivo]||0)+1;
     }
+    if(r.motivoPost){
+      postMotivos[r.motivoPost]=(postMotivos[r.motivoPost]||0)+1;
+    }
   });
 
   rm.topMotivos = Object.entries(motivos).map(([m,n])=>[m,n]).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  rm.topPost = Object.entries(postMotivos).map(([m,n])=>[m,n]).sort((a,b)=>b[1]-a[1]).slice(0,5);
   rm.motivosRM = Object.entries(rmMotivos).map(([m,n])=>[m,n]).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
   const pctOk = rm.pctRM >= 89.5;
@@ -2177,15 +2181,16 @@ async function loadRM(){
     if(rows.length>1){
       RM_DATA={};
       rows.slice(1).forEach(row=>{
-        // Columns: Año, Mes, Finalización, Instalación, Mantenimiento, Av/NoAv, Motivo, Técnico, Territorial, Provincia, Empresa, ¿Repetido?, Mnto Post, ...
+        // Columns: Año, Mes, Finalización, Instalación, Mantenimiento, Av/NoAv, Motivo, Técnico, Territorial, Provincia, Empresa, ¿Repetido?, Mnto Post, Apertura Mnto Post, Motivo Post, ...
         const mat=String(row['Técnico']||'').trim().toUpperCase();
         const nMant=String(row['Mantenimiento']||'').trim();
         const motivo=String(row['Motivo']||'').trim();
+        const motivoPost=String(row['Motivo Post']||'').trim();
         const territorial=String(row['Territorial']||'').trim();
         const repetido=String(row['¿Repetido?']||'').trim().toUpperCase()==='NO'?0:1;
         if(mat && nMant){
           if(!RM_DATA[mat]) RM_DATA[mat]=[];
-          RM_DATA[mat].push({nMant,motivo,territorial,repetido});
+          RM_DATA[mat].push({nMant,motivo,motivoPost,territorial,repetido});
         }
       });
       console.log('✓ RM cargado:',Object.keys(RM_DATA).length,'técnicos');
