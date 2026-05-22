@@ -132,15 +132,18 @@ function servirAuth() {
     const data = parseCSV(csv);
 
     const rows = [['Matricula', 'DNI']];
-    // CUADRANTE: Jerarquia, Provincia, Territorial, JDE, Matricula, Tecnico, Email Securitas, Direccion, DNI...
+    // CUADRANTE: Jerarquia, Provincia, Territorial, JDE, Matricula, Tecnico, Email Securitas, Direccion, DNI, ... F Baja
     // Matricula = índice 4
     // DNI = índice 8
+    // F Baja = índice 19 (si tiene valor → usuario de baja, se excluye)
 
     data.slice(1).forEach(row => {
       const matricula = (row[4] || '').trim().toUpperCase();
       const dni = (row[8] || '').trim().toUpperCase();
+      const fechaBaja = (row[19] || '').trim();
 
-      if(matricula && dni && matricula !== '****') {
+      // Solo incluir si: tiene matrícula, DNI, NO es ****, y NO está de baja
+      if(matricula && dni && matricula !== '****' && !fechaBaja) {
         rows.push([matricula, dni]);
       }
     });
