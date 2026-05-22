@@ -1369,22 +1369,26 @@ function renderMedialiaCoord(){
 
   let html=`<div class="section-head" style="margin-top:20px">🏆 Medalia - Promedio de satisfacción</div>`;
 
-  ['3304-3305','3306-3307'].forEach(territorio=>{
-    const data=MEDALIA_COORD_DATA[territorio];
+  const zonas = [
+    {key:'Zona 1 (3304-3305)', nombre:'Zona 1 (3304-3305)'},
+    {key:'Zona 2 (3306-3307)', nombre:'Zona 2 (3306-3307)'}
+  ];
+
+  zonas.forEach(zona=>{
+    const data=MEDALIA_COORD_DATA[zona.key];
     if(!data) return;
 
     const color=data.promedio>=8.5?'var(--green2)':data.promedio>=8?'var(--orange)':'#e05a4a';
-    const nombre=territorio==='3304-3305'?'Zonas 4-5':'Zonas 6-7';
 
     html+=`
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${color},transparent)"></div>
       <div>
-        <div style="font-size:.88rem;font-weight:700;color:var(--muted);margin-bottom:6px">${nombre}</div>
-        <div style="font-size:.72rem;color:var(--muted)">${data.cantidad} encuestas</div>
+        <div style="font-size:.88rem;font-weight:700;color:var(--muted);margin-bottom:6px">${zona.nombre}</div>
+        <div style="font-size:.72rem;color:var(--muted)">${data.cantidad||0} encuestas</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:2rem;font-weight:800;color:${color}">${data.promedio}</div>
+        <div style="font-size:2rem;font-weight:800;color:${color}">${(data.promedio||0).toFixed(1)}</div>
         <div style="font-size:.62rem;color:var(--muted)">Puntuación promedio</div>
       </div>
     </div>`;
@@ -1495,10 +1499,10 @@ function showRMDash(tecId){
 
 function _openRMDash(tecId){
   const id = String(tecId).trim();
-  const rm = RM_DATA[id] || RM_DATA[id.toUpperCase()];
+  const rmList = RM_DATA[id] || RM_DATA[id.toUpperCase()];
   // Buscar técnico siempre por id, no depender de CURRENT_TEC
   const tec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
-  if(!rm){
+  if(!rmList || rmList.length===0){
     alert('No hay datos de RMs disponibles para este técnico (' + id + ').');
     return;
   }
@@ -1506,6 +1510,29 @@ function _openRMDash(tecId){
     alert('Técnico no encontrado: ' + id);
     return;
   }
+
+  // Procesar array de RM para calcular métricas
+  const rm = {
+    total: rmList.length,
+    reps: rmList.filter(r=>r.repetido===1).length,
+    pctRM: tec.pRM || 0,  // Usar pRM del Resumen CSV
+    topMotivos: [],
+    topPost: [],
+    motivosRM: [],
+    durMedia: 0
+  };
+
+  // Contar motivos
+  const motivos = {}, postMotivos = {}, rmMotivos = {};
+  rmList.forEach(r=>{
+    if(r.motivo){
+      motivos[r.motivo]=(motivos[r.motivo]||0)+1;
+      if(r.repetido===1) rmMotivos[r.motivo]=(rmMotivos[r.motivo]||0)+1;
+    }
+  });
+
+  rm.topMotivos = Object.entries(motivos).map(([m,n])=>[m,n]).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  rm.motivosRM = Object.entries(rmMotivos).map(([m,n])=>[m,n]).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
   const pctOk = rm.pctRM >= 89.5;
   const col = pctOk ? 'var(--green2)' : '#e05a4a';
