@@ -80,7 +80,45 @@ function servirDocs() {
 }
 
 // ════════════════════════════════════════════════════════
-//  SERVIR AUTH (JSON)
+//  PARSEAR CSV RESPETANDO COMILLAS
+// ════════════════════════════════════════════════════════
+function parseCSV(csvText) {
+  const lines = csvText.trim().split('\n');
+  const result = [];
+
+  for(let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const cells = [];
+    let currentCell = '';
+    let insideQuotes = false;
+
+    for(let j = 0; j < line.length; j++) {
+      const char = line[j];
+      const nextChar = line[j + 1];
+
+      if(char === '"') {
+        if(insideQuotes && nextChar === '"') {
+          currentCell += '"';
+          j++;
+        } else {
+          insideQuotes = !insideQuotes;
+        }
+      } else if(char === ',' && !insideQuotes) {
+        cells.push(currentCell.trim());
+        currentCell = '';
+      } else {
+        currentCell += char;
+      }
+    }
+    cells.push(currentCell.trim());
+    result.push(cells);
+  }
+
+  return result;
+}
+
+// ════════════════════════════════════════════════════════
+//  SERVIR AUTH (JSON) - Lee desde CUADRANTE publicado como CSV
 // ════════════════════════════════════════════════════════
 function servirAuth() {
   const cache = CacheService.getScriptCache();
@@ -88,22 +126,28 @@ function servirAuth() {
   if(cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
 
   try {
-    const ss = SpreadsheetApp.openById('1HqOI_kN10tAnBmeTrPqAklEa4f-1-DWQ');
-    const sheet = ss.getSheetByName('CUADRANTE');
-    const data = sheet.getDataRange().getValues();
+    // Usar el CUADRANTE publicado como CSV (sin acentos en headers)
+    const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSvU7Aah_5VokujbrbolwqCAZLRxrDQqrAZiNpgvNZMXeD-KCPLmJqRjIlPGmswlg/pub?output=csv';
+    const csv = UrlFetchApp.fetch(url).getContentText('UTF-8');
+    const data = parseCSV(csv);
 
     const auth = {};
+    // CUADRANTE: Jerarquia, Provincia, Territorial, JDE, Matricula, Tecnico, Email Securitas, Direccion, DNI...
+    // Matricula = índice 4
+    // DNI = índice 8
+
     data.slice(1).forEach(row => {
-      const matricula = String(row[4]||'').trim().toUpperCase();
-      const dni = String(row[8]||'').trim().toUpperCase();
-      if(matricula && dni) {
+      const matricula = (row[4] || '').trim().toUpperCase();
+      const dni = (row[8] || '').trim().toUpperCase();
+
+      if(matricula && dni && matricula !== '****') {
         auth[matricula] = dni;
       }
     });
 
     const json = JSON.stringify(auth);
     cache.put('auth_data', json, 21600);
-    Logger.log('✓ AUTH: ' + Object.keys(auth).length + ' matrículas cargadas');
+    Logger.log('✓ AUTH: ' + Object.keys(auth).length + ' matrículas cargadas desde CUADRANTE CSV');
     return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 
   } catch(e) {
