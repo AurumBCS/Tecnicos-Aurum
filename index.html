@@ -2054,7 +2054,10 @@ async function loadMedialiaCoord(){
 async function loadCumplimiento(){
   try{
     const res=await fetch(CUMPLIMIENTO_URL+'&t='+Date.now(),{cache:'no-store'});
-    if(!res.ok) return;
+    if(!res.ok){
+      console.log('Cumplimiento error: status',res.status);
+      return;
+    }
     const csv=await res.text();
     const rows=parseCSV(csv);
     if(rows.length>1){
@@ -2067,9 +2070,11 @@ async function loadCumplimiento(){
           CUM_DATA[mat]={total,ok,pct:Math.round((ok/total)*100)};
         }
       });
-      console.log('Cumplimiento cargado:',Object.keys(CUM_DATA).length,'técnicos');
+      console.log('✓ Cumplimiento cargado:',Object.keys(CUM_DATA).length,'técnicos');
+    } else {
+      console.log('Cumplimiento: sin datos en respuesta');
     }
-  }catch(e){console.log('Cumplimiento error:',e.message);}
+  }catch(e){console.log('✗ Cumplimiento error:',e.message);}
 }
 
 // ════════════════════════════════════════════════════════
@@ -2078,7 +2083,10 @@ async function loadCumplimiento(){
 async function loadRM(){
   try{
     const res=await fetch(RM_URL+'&t='+Date.now(),{cache:'no-store'});
-    if(!res.ok) return;
+    if(!res.ok){
+      console.log('RM error: status',res.status);
+      return;
+    }
     const csv=await res.text();
     const rows=parseCSV(csv);
     if(rows.length>1){
@@ -2091,9 +2099,11 @@ async function loadRM(){
           RM_DATA[mat].push({nMant,motivo:row[1]||'',territorial:row[3]||''});
         }
       });
-      console.log('RM cargado:',Object.keys(RM_DATA).length,'técnicos');
+      console.log('✓ RM cargado:',Object.keys(RM_DATA).length,'técnicos');
+    } else {
+      console.log('RM: sin datos en respuesta');
     }
-  }catch(e){console.log('RM error:',e.message);}
+  }catch(e){console.log('✗ RM error:',e.message);}
 }
 
 function renderFlota(tecId, containerId){
