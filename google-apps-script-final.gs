@@ -122,8 +122,9 @@ function parseCSV(csvText) {
 // ════════════════════════════════════════════════════════
 function servirAuth() {
   const cache = CacheService.getScriptCache();
-  const cached = cache.get('auth_data');
-  if(cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
+  // COMENTADO PARA DEBUG
+  // const cached = cache.get('auth_data');
+  // if(cached) return ContentService.createTextOutput(cached).setMimeType(ContentService.MimeType.JSON);
 
   try {
     // Usar el CUADRANTE publicado como CSV (sin acentos en headers)
@@ -131,14 +132,20 @@ function servirAuth() {
     const csv = UrlFetchApp.fetch(url).getContentText('UTF-8');
     const data = parseCSV(csv);
 
+    Logger.log('✓ CSV descargado, líneas: ' + data.length);
+    Logger.log('✓ Headers: ' + data[0].join(' | '));
+    Logger.log('✓ Primera fila datos: ' + data[1].join(' | '));
+
     const auth = {};
     // CUADRANTE: Jerarquia, Provincia, Territorial, JDE, Matricula, Tecnico, Email Securitas, Direccion, DNI...
     // Matricula = índice 4
     // DNI = índice 8
 
-    data.slice(1).forEach(row => {
+    data.slice(1).forEach((row, idx) => {
       const matricula = (row[4] || '').trim().toUpperCase();
       const dni = (row[8] || '').trim().toUpperCase();
+
+      if(idx === 0) Logger.log('✓ Fila 1 - Mat: ' + matricula + ' | DNI: ' + dni);
 
       if(matricula && dni && matricula !== '****') {
         auth[matricula] = dni;
@@ -146,12 +153,13 @@ function servirAuth() {
     });
 
     const json = JSON.stringify(auth);
-    cache.put('auth_data', json, 21600);
-    Logger.log('✓ AUTH: ' + Object.keys(auth).length + ' matrículas cargadas desde CUADRANTE CSV');
+    // cache.put('auth_data', json, 21600);
+    Logger.log('✓ AUTH: ' + Object.keys(auth).length + ' matrículas cargadas');
     return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 
   } catch(e) {
     Logger.log('✗ Error AUTH: ' + e.message);
+    Logger.log('✗ Stack: ' + e.stack);
     return ContentService.createTextOutput('{}').setMimeType(ContentService.MimeType.JSON);
   }
 }

@@ -2,7 +2,35 @@
 
 Este archivo documenta qué deployment ID corresponde a cada versión estable del script.
 
-## v1.0.0-stable
+## v1.0.1-stable
+
+**Fecha:** 2026-05-22
+**Archivo local:** `google-apps-script-final.gs`
+**Deployment ID:** `AKfycbzbIz1I7pjuPJ-7FerCeYuJAR2D6Il5Ah5d5_4v7f9Z5rGjDOXV1QCgGKLpe-gdtlgD`
+**Endpoints funcionando:**
+- Auth: JSON ✓ (117 matrículas cargadas)
+- CSV (datos técnicos): CSV ✓ (101 técnicos)
+- Docs: CSV ✓ (66 documentos)
+- Flota: CSV ✓ (105 vehículos)
+- Vacaciones: CSV ✓ (93 técnicos)
+- Medalia: CSV ✓
+- Medalia Coordinadores: CSV ✓
+- Cumplimiento: CSV ✓
+- RM: CSV ✓
+
+**Cambios en esta versión:**
+- ✓ Auth endpoint ahora lee desde CUADRANTE publicado como CSV
+- ✓ parseCSV() parsea correctamente valores entre comillas
+- ✓ Headers sin acentos en CUADRANTE (Jerarquia, Matricula, Tecnico, Direccion, DNI)
+- ✓ Logs detallados en servirAuth() para debugging
+- ✓ Todos los endpoints devuelven CSV sin errores CORS
+
+**Comit Git:** pendiente
+**Tag Git:** `v1.0.1-stable`
+
+---
+
+## v1.0.0-stable (Anterior)
 
 **Fecha:** 2026-05-21
 **Archivo local:** `google-apps-script-v1.0.0-stable.gs`
