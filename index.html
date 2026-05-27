@@ -946,6 +946,14 @@ function renderMain(tec, returnToEquipo=false){
     });
   }
 
+  // Flota + vacaciones: renderizar si ya cargaron, si no reintentar
+  renderFlota(tec.id,'flotaMain');
+  if(!Object.keys(FLOTA_DATA).length || !Object.keys(VACACIONES_DATA).length){
+    Promise.all([loadFlota(), loadVacaciones()]).then(()=>{
+      renderFlota(_tecId,'flotaMain');
+    });
+  }
+
   showPanel('mainPanel');
 }
 
