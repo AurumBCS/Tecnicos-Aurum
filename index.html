@@ -2509,7 +2509,7 @@ async function doRefreshData(){
       const jeTec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
       if(jeTec && ACTIVE_TAB==='misDatos') renderMain(jeTec);
     }
-    if(CURRENT_USER_TYPE === 'jr') renderJRPanel();
+    if(CURRENT_USER_TYPE === 'jr'){ renderJRPanel(); renderMedialiaCoord(); }
     else if(CURRENT_USER_TYPE === 'je' && ACTIVE_TAB === 'equipo') renderEquipoPanel(CURRENT_JE_ID);
 
     console.log('✅ Datos actualizados correctamente');
