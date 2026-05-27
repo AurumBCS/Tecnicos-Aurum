@@ -2103,14 +2103,42 @@ async function loadRM(){
     const rows=parseCSV(csv);
     if(rows.length>1){
       RM_DATA={};
+      const rmByTec={};
+
+      // Procesar cada fila de mantenimiento
       rows.slice(1).forEach(row=>{
         const mat=String(row[2]||'').trim().toUpperCase();
         const nMant=String(row[0]||'').trim();
+        const motivo=String(row[1]||'').trim();
+        const repetido=String(row[4]||'').trim().toUpperCase();
+        const motivo_post=String(row[5]||'').trim();
+
         if(mat && nMant){
-          if(!RM_DATA[mat]) RM_DATA[mat]=[];
-          RM_DATA[mat].push({nMant,motivo:row[1]||'',territorial:row[3]||''});
+          if(!rmByTec[mat]) rmByTec[mat]={visitas:[],reps:0,postMap:{},rmMap:{}};
+          const isRep = repetido==='SI' || repetido==='SÍ' || repetido==='1' || repetido==='TRUE';
+          rmByTec[mat].visitas.push({nMant,motivo,motivo_post,repetido:isRep});
+          if(isRep) rmByTec[mat].reps++;
+          if(motivo_post) rmByTec[mat].postMap[motivo_post]=(rmByTec[mat].postMap[motivo_post]||0)+1;
+          if(motivo) rmByTec[mat].rmMap[motivo]=(rmByTec[mat].rmMap[motivo]||0)+1;
         }
       });
+
+      // Construir RM_DATA con agregados
+      Object.entries(rmByTec).forEach(([mat,data])=>{
+        const total = data.visitas.length;
+        const reps = data.reps;
+        const pctRM = total>0 ? ((total-reps)/total*100) : 0;
+        const topPost = Object.entries(data.postMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        const motivosRM = Object.entries(data.rmMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        const topMotivos = Object.entries(data.rmMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+        RM_DATA[mat]={
+          visitas: data.visitas,
+          total, reps, pctRM,
+          topPost, motivosRM, topMotivos
+        };
+      });
+
       console.log('✓ RM cargado:',Object.keys(RM_DATA).length,'técnicos');
     } else {
       console.log('RM: sin datos en respuesta');
