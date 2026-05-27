@@ -320,8 +320,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         <div class="topbar-id" id="topbarId">—</div>
       </div>
     </div>
-    <div style="display:flex; gap:8px; align-items:center;">
-      <button class="topbar-refresh" id="refreshDataBtn" style="display:none; padding:8px 12px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:600;">🔄 Actualizar</button>
+    <div style="display:flex;gap:6px">
+      <button class="topbar-logout" id="refreshBtn" style="color:var(--gold);border-color:var(--gold3)">🔄</button>
       <button class="topbar-logout" id="logoutBtn">Salir</button>
     </div>
   </div>
@@ -484,14 +484,14 @@ const JE_NAMES = {
   'JR9426': 'Coordinador Regional'
 };
 
-const SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2C6LbbD8ovpTC26ZT-hQZfbGQOWTydMWkQ0d8BiyvDrzgRlN1I1kvaJ0k2Cyl37aeQAXPK2JAjaVC/pub?output=csv";
-const AUTH_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSvU7Aah_5VokujbrbolwqCAZLRxrDQqrAZiNpgvNZMXeD-KCPLmJqRjIlPGmswlg/pub?output=csv";
-const DOCS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTsvNFJI2bMOPnUsEBw98WY--eEIbayh3EhNCx5-I_mR0l_zoQS5uZJhYQBAFvG5ty_NdozwoIfPHmx/pub?output=csv";
-const FLOTA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQUPwezjgylsDv-gkdbMymN7cj6E19u629zfnlTNrAIE99IJE1BeTw7axn4aU4V0fc2LSluKGDDCawS/pub?gid=437169864&single=true&output=csv";
-const VACACIONES_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9A0fhBk2ViKKewyKP8rJz364_MsEwi8CD_DEIjokUAeZiJzieR1k3KuZm6Kx9B68YrNTtalq8peFn/pub?output=csv";
-const MEDALIA_COORD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTIbmLaEbAJoZj7d_lJqtIV-gbx2kTiumryL-Q7fpvkxvCs3PBaMiDCHTYpWHU-SQ1loy9eAT0G1X9n/pub?output=csv";
-const CUMPLIMIENTO_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnEsNP3XdtoejG0_my4TTbnR4EHl50iFL0AVBSK_vHg5xVm2xz7fxWiRl4GrPS45G-bpFWWzFws2qt/pub?output=csv";
-const RM_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRVDFiOmr7q76bIyy_ZM37BjusotzsFZVsut7U7XG83jsIl1y5Hz503Igjn3DGNTTLKn7TbSMmGjv-5/pub?output=csv";
+const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbz0lVQF2dmoXNQ5mKYJpyEjrUubsxWxjaow27KE1pC3eLbmHQSbwRbgDUOnG5xcxti_/exec?type=csv";
+const AUTH_URL = "https://script.google.com/macros/s/AKfycbz0lVQF2dmoXNQ5mKYJpyEjrUubsxWxjaow27KE1pC3eLbmHQSbwRbgDUOnG5xcxti_/exec?type=auth";
+const DOCS_URL = "https://script.google.com/macros/s/AKfycbz0lVQF2dmoXNQ5mKYJpyEjrUubsxWxjaow27KE1pC3eLbmHQSbwRbgDUOnG5xcxti_/exec?type=docs";
+const FLOTA_URL = "https://script.google.com/macros/s/AKfycbz0lVQF2dmoXNQ5mKYJpyEjrUubsxWxjaow27KE1pC3eLbmHQSbwRbgDUOnG5xcxti_/exec?type=flota";
+const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbz0lVQF2dmoXNQ5mKYJpyEjrUubsxWxjaow27KE1pC3eLbmHQSbwRbgDUOnG5xcxti_/exec?type=vacaciones";
+const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbz0lVQF2dmoXNQ5mKYJpyEjrUubsxWxjaow27KE1pC3eLbmHQSbwRbgDUOnG5xcxti_/exec?type=medalia-coord";
+const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbz0lVQF2dmoXNQ5mKYJpyEjrUubsxWxjaow27KE1pC3eLbmHQSbwRbgDUOnG5xcxti_/exec?type=cumplimiento";
+const RM_URL = "https://script.google.com/macros/s/AKfycbz0lVQF2dmoXNQ5mKYJpyEjrUubsxWxjaow27KE1pC3eLbmHQSbwRbgDUOnG5xcxti_/exec?type=rm";
 const VACACIONES_DOCS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9A0fhBk2ViKKewyKP8rJz364_MsEwi8CD_DEIjokUAeZiJzieR1k3KuZm6Kx9B68YrNTtalq8peFn/pub?output=csv";
 let AUTH_DATA = {};
 let FLOTA_DATA = {};
@@ -692,18 +692,17 @@ function csvRow(r){
 }
 async function loadAuth(){
   try{
-    const res=await fetch(AUTH_URL,{cache:'no-store'});
+    const url = AUTH_URL + (AUTH_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+    const res=await fetch(url,{cache:'no-store'});
     if(!res.ok) return;
     const csv=await res.text();
     // Usar parseCSV para manejar correctamente campos con comillas
     const rows=parseCSV(csv);
     if(rows.length>0){
       rows.forEach(row=>{
-        const matricula=String(row['Matricula']||'').trim().toUpperCase();
+        const matricula=String(row['Matrícula']||'').trim().toUpperCase();
         const dni=String(row['DNI']||'').trim().toUpperCase();
-        const fechaBaja=String(row['F Baja']||'').trim();
-        // Incluir si: tiene matricula, DNI, NO es ****, NO está de baja
-        if(matricula && dni && matricula !== '****' && !fechaBaja){
+        if(matricula && dni && matricula !== '****'){
           AUTH_DATA[matricula]=dni;
         }
       });
@@ -720,7 +719,8 @@ async function loadAuth(){
 
 async function loadDocs(){
   try{
-    const res=await fetch(DOCS_URL,{cache:'no-store'});
+    const url = DOCS_URL + (DOCS_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+    const res=await fetch(url,{cache:'no-store'});
     if(!res.ok) return;
     const text=await res.text();
     const rows=parseCSV(text);
@@ -737,6 +737,10 @@ async function loadDocs(){
 async function loadSheets(){
   if(!SHEETS_CSV_URL) return;
 
+  // Agregar timestamp para forzar refetch (evita caching del servidor)
+  const ts = '&t=' + Date.now();
+  const urlWithTimestamp = SHEETS_CSV_URL + (SHEETS_CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+
   // Con Apps Script propio no necesitamos proxy — llamada directa
   const proxies = [
     url => url, // directo (Apps Script ya resuelve el CORS)
@@ -746,7 +750,7 @@ async function loadSheets(){
 
   for(const proxyFn of proxies){
     try{
-      const fetchUrl = proxyFn(SHEETS_CSV_URL);
+      const fetchUrl = proxyFn(urlWithTimestamp);
       const res = await fetch(fetchUrl, {cache: 'no-store'});
       if(!res.ok) continue;
       const text = await res.text();
@@ -1369,26 +1373,22 @@ function renderMedialiaCoord(){
 
   let html=`<div class="section-head" style="margin-top:20px">🏆 Medalia - Promedio de satisfacción</div>`;
 
-  const zonas = [
-    {key:'Zona 1 (3304-3305)', nombre:'Zona 1 (3304-3305)'},
-    {key:'Zona 2 (3306-3307)', nombre:'Zona 2 (3306-3307)'}
-  ];
-
-  zonas.forEach(zona=>{
-    const data=MEDALIA_COORD_DATA[zona.key];
+  ['3304-3305','3306-3307'].forEach(territorio=>{
+    const data=MEDALIA_COORD_DATA[territorio];
     if(!data) return;
 
     const color=data.promedio>=8.5?'var(--green2)':data.promedio>=8?'var(--orange)':'#e05a4a';
+    const nombre=territorio==='3304-3305'?'Zonas 4-5':'Zonas 6-7';
 
     html+=`
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${color},transparent)"></div>
       <div>
-        <div style="font-size:.88rem;font-weight:700;color:var(--muted);margin-bottom:6px">${zona.nombre}</div>
-        <div style="font-size:.72rem;color:var(--muted)">${data.cantidad||0} encuestas</div>
+        <div style="font-size:.88rem;font-weight:700;color:var(--muted);margin-bottom:6px">${nombre}</div>
+        <div style="font-size:.72rem;color:var(--muted)">${data.cantidad} encuestas</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:2rem;font-weight:800;color:${color}">${(data.promedio||0).toFixed(1)}</div>
+        <div style="font-size:2rem;font-weight:800;color:${color}">${data.promedio}</div>
         <div style="font-size:.62rem;color:var(--muted)">Puntuación promedio</div>
       </div>
     </div>`;
@@ -1499,10 +1499,10 @@ function showRMDash(tecId){
 
 function _openRMDash(tecId){
   const id = String(tecId).trim();
-  const rmList = RM_DATA[id] || RM_DATA[id.toUpperCase()];
+  const rm = RM_DATA[id] || RM_DATA[id.toUpperCase()];
   // Buscar técnico siempre por id, no depender de CURRENT_TEC
   const tec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
-  if(!rmList || rmList.length===0){
+  if(!rm){
     alert('No hay datos de RMs disponibles para este técnico (' + id + ').');
     return;
   }
@@ -1510,33 +1510,6 @@ function _openRMDash(tecId){
     alert('Técnico no encontrado: ' + id);
     return;
   }
-
-  // Procesar array de RM para calcular métricas
-  const rm = {
-    total: rmList.length,
-    reps: rmList.filter(r=>r.repetido===1).length,
-    pctRM: tec.pRM || 0,  // Usar pRM del Resumen CSV
-    topMotivos: [],
-    topPost: [],
-    motivosRM: [],
-    durMedia: 0
-  };
-
-  // Contar motivos
-  const motivos = {}, postMotivos = {}, rmMotivos = {};
-  rmList.forEach(r=>{
-    if(r.motivo){
-      motivos[r.motivo]=(motivos[r.motivo]||0)+1;
-      if(r.repetido===1) rmMotivos[r.motivo]=(rmMotivos[r.motivo]||0)+1;
-    }
-    if(r.motivoPost){
-      postMotivos[r.motivoPost]=(postMotivos[r.motivoPost]||0)+1;
-    }
-  });
-
-  rm.topMotivos = Object.entries(motivos).map(([m,n])=>[m,n]).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  rm.topPost = Object.entries(postMotivos).map(([m,n])=>[m,n]).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  rm.motivosRM = Object.entries(rmMotivos).map(([m,n])=>[m,n]).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
   const pctOk = rm.pctRM >= 89.5;
   const col = pctOk ? 'var(--green2)' : '#e05a4a';
@@ -2026,7 +1999,8 @@ function renderDocsEquipoCollapsible(jeId, containerId){
 // ══════════════════════════════════════════════
 async function loadFlota(){
   try{
-    const res=await fetch(FLOTA_URL,{cache:'no-store'});
+    const url = FLOTA_URL + (FLOTA_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+    const res=await fetch(url,{cache:'no-store'});
     if(!res.ok) return;
     const csv=await res.text();
     const rows=parseCSV(csv);
@@ -2071,59 +2045,15 @@ async function loadMedialiaCoord(){
     const rows=parseCSV(csv);
     if(rows.length>1){
       MEDALIA_COORD_DATA={};
-      const byTerritory={};
-      // Filtrar solo "CFL Empleado" (interacción)
-      // Columns: Tipo_CFL, Fecha_Encuesta, Mantenimiento, Cliente, MATRICULA, TERRITORIAL, ORIGEN, preguntas satisfacción...
       rows.slice(1).forEach(row=>{
-        const tipo=String(row['Tipo_CFL']||'').trim();
-        const territorial=String(row['TERRITORIAL']||'').trim();
-
-        if(tipo==='CFL Empleado' && territorial){
-          // Obtener valores de satisfacción (columnas 15-20 aprox, o buscar por header)
-          const satisfacciones=[];
-          [
-            'Valore su grado de satisfacción con la visita del asesor técnico',
-            'Valore de 0 a 10 la rapidez de la compañía en el envío del aseso',
-            'Valore de 0 a 10 la facilidad para conseguir la visita del aseso',
-            'Valore de 0 a 10 si nos hemos adaptado a sus necesidades horaria',
-            'Valore de 0 a 10 su grado de satisfacción con la gestión de nues',
-            'Por favor, valore su grado de satisfacción con el técnico que ha'
-          ].forEach(col=>{
-            const val=parseFloat(row[col])||0;
-            if(val>0) satisfacciones.push(val);
-          });
-
-          if(satisfacciones.length>0){
-            if(!byTerritory[territorial]) byTerritory[territorial]={vals:[],qty:0};
-            byTerritory[territorial].vals.push(...satisfacciones);
-            byTerritory[territorial].qty++;
-          }
+        const territorio=String(row[0]||'').trim();
+        const promedio=parseFloat(row[1])||0;
+        const cantidad=parseInt(row[2])||0;
+        if(territorio && cantidad>0){
+          MEDALIA_COORD_DATA[territorio]={promedio,cantidad};
         }
       });
-
-      // Agrupar por zonas: 3304+3305, 3306+3307, otros
-      const zones={'Zona 1 (3304-3305)':[],'Zona 2 (3306-3307)':[],'Otras zonas':[]};
-      Object.keys(byTerritory).forEach(terr=>{
-        const data=byTerritory[terr];
-        const promedio=Math.round((data.vals.reduce((a,b)=>a+b,0)/data.vals.length)*10)/10;
-        if(terr.includes('3304')||terr.includes('3305')){
-          zones['Zona 1 (3304-3305)'].push({territorio:terr,promedio,qty:data.qty});
-        } else if(terr.includes('3306')||terr.includes('3307')){
-          zones['Zona 2 (3306-3307)'].push({territorio:terr,promedio,qty:data.qty});
-        } else {
-          zones['Otras zonas'].push({territorio:terr,promedio,qty:data.qty});
-        }
-      });
-
-      // Calcular promedios por zona
-      Object.keys(zones).forEach(zona=>{
-        if(zones[zona].length>0){
-          const promedio=Math.round((zones[zona].reduce((a,t)=>a+t.promedio,0)/zones[zona].length)*10)/10;
-          MEDALIA_COORD_DATA[zona]={promedio,cantidad:zones[zona].reduce((a,t)=>a+t.qty,0),territorios:zones[zona]};
-        }
-      });
-
-      console.log('Medalia coordinadores cargada:',Object.keys(MEDALIA_COORD_DATA).length,'zonas');
+      console.log('Medalia coordinadores cargada:',Object.keys(MEDALIA_COORD_DATA).length,'grupos');
     }
   }catch(e){console.log('Medalia error:',e.message);}
 }
@@ -2143,20 +2073,13 @@ async function loadCumplimiento(){
     const rows=parseCSV(csv);
     if(rows.length>1){
       CUM_DATA={};
-      const cumByTec={};
-      // Headers: Monitorized Date MD, Installation Number, Code Maintenance IBS, MATRICULA, TERRITORIAL, ORIGEN, Provincia_Mantenimiento, Avería/ No Avería, Cumplido?, Razón_suspensión
       rows.slice(1).forEach(row=>{
-        const mat=String(row['MATRICULA']||'').trim().toUpperCase();
-        const cumplido=String(row['Cumplido?']||'').trim().toUpperCase()==='SI'?1:0;
-        if(mat){
-          if(!cumByTec[mat]){cumByTec[mat]={total:0,ok:0};}
-          cumByTec[mat].total++;
-          cumByTec[mat].ok+=cumplido;
+        const mat=String(row[0]||'').trim().toUpperCase();
+        const total=parseInt(row[1])||0;
+        const ok=parseInt(row[2])||0;
+        if(mat && total>0){
+          CUM_DATA[mat]={total,ok,pct:Math.round((ok/total)*100)};
         }
-      });
-      Object.keys(cumByTec).forEach(mat=>{
-        const c=cumByTec[mat];
-        CUM_DATA[mat]={total:c.total,ok:c.ok,pct:Math.round((c.ok/c.total)*100)};
       });
       console.log('✓ Cumplimiento cargado:',Object.keys(CUM_DATA).length,'técnicos');
     } else {
@@ -2181,16 +2104,11 @@ async function loadRM(){
     if(rows.length>1){
       RM_DATA={};
       rows.slice(1).forEach(row=>{
-        // Columns: Año, Mes, Finalización, Instalación, Mantenimiento, Av/NoAv, Motivo, Técnico, Territorial, Provincia, Empresa, ¿Repetido?, Mnto Post, Apertura Mnto Post, Motivo Post, ...
-        const mat=String(row['Técnico']||'').trim().toUpperCase();
-        const nMant=String(row['Mantenimiento']||'').trim();
-        const motivo=String(row['Motivo']||'').trim();
-        const motivoPost=String(row['Motivo Post']||'').trim();
-        const territorial=String(row['Territorial']||'').trim();
-        const repetido=String(row['¿Repetido?']||'').trim().toUpperCase()==='NO'?0:1;
+        const mat=String(row[2]||'').trim().toUpperCase();
+        const nMant=String(row[0]||'').trim();
         if(mat && nMant){
           if(!RM_DATA[mat]) RM_DATA[mat]=[];
-          RM_DATA[mat].push({nMant,motivo,motivoPost,territorial,repetido});
+          RM_DATA[mat].push({nMant,motivo:row[1]||'',territorial:row[3]||''});
         }
       });
       console.log('✓ RM cargado:',Object.keys(RM_DATA).length,'técnicos');
@@ -2306,39 +2224,6 @@ function findUser(q){
   return null;
 }
 
-// ════════════════════════════════════════════════════════
-// AUTO-REFRESH: Martes y Jueves 16:00-23:00 cada 15 min
-// ════════════════════════════════════════════════════════
-let _autoRefreshInterval = null;
-
-function startAutoRefresh() {
-  if(_autoRefreshInterval) clearInterval(_autoRefreshInterval);
-
-  const checkAndRefresh = () => {
-    const now = new Date();
-    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-    const hour = now.getHours();
-    const isTuesOrThurs = (dayOfWeek === 2 || dayOfWeek === 4);
-    const isInWindow = (hour >= 16 && hour < 23);
-
-    if(isTuesOrThurs && isInWindow) {
-      console.log('🔄 Auto-refresh: recargando datos...');
-      Promise.all([loadSheets(), loadAuth(), loadDocs(), loadVacaciones(), loadFlota(), loadCumplimiento(), loadRM()]).then(()=>{
-        if(CURRENT_TEC) renderMain(CURRENT_TEC);
-        else if(CURRENT_JE_ID) {
-          const jeTec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
-          if(jeTec && ACTIVE_TAB==='misDatos') renderMain(jeTec);
-        }
-        console.log('✓ Datos actualizados a las ' + now.toLocaleTimeString('es-ES'));
-      });
-    }
-  };
-
-  // Verificar cada 15 minutos
-  _autoRefreshInterval = setInterval(checkAndRefresh, 15 * 60 * 1000);
-  console.log('✓ Auto-refresh activado (mar/jue 16:00-23:00, cada 15 min)');
-}
-
 async function doLogin(){
   const mat=document.getElementById('matInput').value.trim().toUpperCase();
   const dni=document.getElementById('dniInput').value.trim().toUpperCase();
@@ -2418,12 +2303,6 @@ async function doLogin(){
     document.getElementById('scorePill').innerHTML='<span style="color:var(--gold2);font-weight:700">Vista global</span>';
     document.getElementById('tabsBarJR').style.display='flex';
     document.getElementById('tabsBar').style.display='none';
-
-    // Mostrar botón de refresco solo para GD5381
-    if(found.id === 'GD5381') {
-      document.getElementById('refreshDataBtn').style.display='block';
-    }
-
     renderJRPanel();
     loadMedialiaCoord().then(()=>renderMedialiaCoord());
     showPanel('jrPanel');
@@ -2458,9 +2337,6 @@ async function doLogin(){
     document.getElementById('tabsBarJR').style.display='none';
     renderMain(found.tec);
   }
-
-  // Iniciar auto-refresh programado (mar/jue 16:00-23:00)
-  startAutoRefresh();
 }
 
 // ── Botón volver ──
@@ -2562,6 +2438,44 @@ function _openCumDash(tecId){
   showPanel('cumDashPanel'); window.scrollTo(0,0);
 }
 
+async function doRefreshData(){
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+  btn.textContent = '⏳';
+
+  console.log('🔄 Iniciando actualización de datos...');
+
+  try {
+    await Promise.all([
+      loadSheets(),
+      loadAuth(),
+      loadDocs(),
+      loadFlota(),
+      loadVacaciones(),
+      loadMedialiaCoord(),
+      loadCumplimiento(),
+      loadRM()
+    ]);
+
+    if(CURRENT_TEC) renderMain(CURRENT_TEC);
+    else if(CURRENT_JE_ID){
+      const jeTec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
+      if(jeTec && ACTIVE_TAB==='misDatos') renderMain(jeTec);
+    }
+    if(CURRENT_USER_TYPE === 'jr') renderJRPanel();
+    else if(CURRENT_USER_TYPE === 'je' && ACTIVE_TAB === 'equipo') renderEquipoPanel(CURRENT_JE_ID);
+
+    console.log('✅ Datos actualizados correctamente');
+  } catch(e) {
+    console.log('❌ Error actualizando datos:', e.message);
+  } finally {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.textContent = '🔄';
+  }
+}
+
 function doLogout(){
   document.getElementById('appScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
@@ -2573,38 +2487,8 @@ function doLogout(){
   hideAllPanels();
   document.getElementById('mainPanel').style.display='block';
 }
-
-// ── Refresco manual de datos (GD5381) ──
-async function doManualRefresh() {
-  const btn = document.getElementById('refreshDataBtn');
-  btn.style.opacity = '0.5';
-  btn.textContent = '⏳ Actualizando...';
-  btn.disabled = true;
-
-  try {
-    await Promise.all([loadSheets(), loadAuth(), loadDocs(), loadVacaciones(), loadFlota(), loadCumplimiento(), loadRM()]);
-
-    // Re-renderizar la vista actual
-    if(CURRENT_TEC) renderMain(CURRENT_TEC);
-    else if(CURRENT_JE_ID) {
-      const jeTec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
-      if(jeTec && ACTIVE_TAB==='misDatos') renderMain(jeTec);
-    }
-
-    console.log('✓ Datos actualizados manualmente por GD5381');
-    alert('✓ Datos actualizados correctamente');
-  } catch(e) {
-    console.error('✗ Error al actualizar datos:', e.message);
-    alert('✗ Error al actualizar datos. Intenta de nuevo.');
-  } finally {
-    btn.style.opacity = '1';
-    btn.textContent = '🔄 Actualizar';
-    btn.disabled = false;
-  }
-}
-
 document.getElementById('logoutBtn').addEventListener('click',doLogout);
-document.getElementById('refreshDataBtn').addEventListener('click',doManualRefresh);
+document.getElementById('refreshBtn').addEventListener('click',doRefreshData);
 
 // ── Events ──
 document.getElementById('loginBtn').addEventListener('click',doLogin);
