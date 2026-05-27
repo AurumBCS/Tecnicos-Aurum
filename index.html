@@ -1560,7 +1560,6 @@ function _openRMDash(tecId){
       <div class="stat-box" style="flex:1"><div class="n">${rm.total}</div><div class="l">Total<br>visitas</div></div>
       <div class="stat-box" style="flex:1"><div class="n" style="color:#e05a4a">${rm.reps}</div><div class="l">Visitas<br>repetidas</div></div>
       <div class="stat-box" style="flex:1"><div class="n" style="color:var(--green2)">${totalOk}</div><div class="l">Resueltas<br>1ª visita</div></div>
-      <div class="stat-box" style="flex:1"><div class="n" style="color:var(--muted)">${rm.durMedia}<span style="font-size:.7rem">min</span></div><div class="l">Duración<br>media</div></div>
     </div>
 
     <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
@@ -2469,25 +2468,13 @@ function _openCumDash(tecId){
           <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
             cx="35" cy="35" r="28" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
         </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${cum.pct}%</div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${cum.pct.toFixed(2)}%</div>
       </div>
       <div>
         <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
         <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-          Objetivo: ≥ 90% · ${pctOk?`Margen de ${(cum.pct-90).toFixed(1)} puntos`:`Faltan ${(90-cum.pct).toFixed(1)} puntos`}
+          Objetivo: ≥ 90% · ${pctOk?`Margen de ${(cum.pct-90).toFixed(2)} puntos`:`Faltan ${(90-cum.pct).toFixed(2)} puntos`}
         </div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:12px">
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">Averías</div>
-        <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:4px"><span style="color:var(--green2)">✓ Cumplidas</span><span style="font-weight:700;color:var(--green2)">${cum.avOk}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:.75rem"><span style="color:#e05a4a">✗ No cumplidas</span><span style="font-weight:700;color:#e05a4a">${cum.avNo}</span></div>
-      </div>
-      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:12px">
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">No Averías</div>
-        <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:4px"><span style="color:var(--green2)">✓ Cumplidas</span><span style="font-weight:700;color:var(--green2)">${cum.noavOk}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:.75rem"><span style="color:#e05a4a">✗ No cumplidas</span><span style="font-weight:700;color:#e05a4a">${cum.noavNo}</span></div>
       </div>
     </div>
     <div class="detail-section">Razones de incumplimiento</div>
