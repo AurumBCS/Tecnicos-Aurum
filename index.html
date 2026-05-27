@@ -904,15 +904,13 @@ function renderMain(tec, returnToEquipo=false){
     const val=tec[k.key],s=getStatus(k,val),bp=getBarPct(k,val);
     const tgt=k.max!==undefined?`Obj: = ${k.max}`:`Obj: ≥ ${k.min}${k.unit}`;
     const disp=typeof val==='number'&&!Number.isInteger(val)?val.toFixed(2):val;
-    // %RM va directo al dashboard si hay datos, %Cum también
-    const rmHasData = k.detail==='rm' && (RM_DATA[tec.id]||RM_DATA[(tec.id||'').toUpperCase()]);
-    const cumHasData = k.detail==='cum' && (CUM_DATA[tec.id]||CUM_DATA[(tec.id||'').toUpperCase()]);
-    const clickFn = rmHasData
+    // %RM y %Cum siempre van al dashboard (con fallback si los datos no cargaron aún)
+    const clickFn = k.detail==='rm'
       ? `onclick="showRMDash('${tec.id}')"`
-      : cumHasData
+      : k.detail==='cum'
         ? `onclick="showCumDash('${tec.id}')"`
         : k.detail ? `onclick="showDetail('${k.detail}')"` : '';
-    const tapHint = rmHasData||cumHasData
+    const tapHint = (k.detail==='rm'||k.detail==='cum')
       ? '<div class="kpi-tap">→ dashboard</div>'
       : k.detail ? '<div class="kpi-tap">→ detalle</div>' : '';
     const extraContent = k.key === 'conv' ? `<a href="https://docs.google.com/forms/d/1LCVEq3ayLzIkpf7mZcaaNZC7NRACWGQe1ql7UKtEExI/viewform" target="_blank" onclick="event.stopPropagation()" style="position:absolute;top:8px;right:8px;background:var(--green2);color:white;padding:4px 8px;border-radius:6px;text-align:center;font-weight:700;font-size:.6rem;text-decoration:none;border:none;cursor:pointer">📊 Registro</a>` : '';
@@ -1056,7 +1054,7 @@ function renderEquipoPanel(jeId){
               cx="37" cy="37" r="30"
               stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
           </svg>
-          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:1rem;font-weight:700;color:${rmCol}">${pctRMequipo.toFixed(1)}%</div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:1rem;font-weight:700;color:${rmCol}">${pctRMequipo.toFixed(2).replace('.',',')}%</div>
         </div>
         <div style="flex:1">
           <div style="font-family:var(--font);font-size:.85rem;font-weight:700;color:var(--gold2)">%RM global del equipo</div>
@@ -1064,7 +1062,7 @@ function renderEquipoPanel(jeId){
             ${totalVisitas} visitas · <span style="color:#e05a4a;font-weight:600">${totalReps} repetidas</span> · ${rmTecs.length} técnicos con datos
           </div>
           <div style="font-size:.68rem;margin-top:5px;color:${rmCol};font-weight:600">
-            ${pctRMequipo>=89.5?`✓ Equipo en objetivo · +${(pctRMequipo-89.5).toFixed(1)} puntos`:`✗ Por debajo · faltan ${(89.5-pctRMequipo).toFixed(1)} puntos`}
+            ${pctRMequipo>=89.5?`✓ Equipo en objetivo · +${(pctRMequipo-89.5).toFixed(2).replace('.',',')} puntos`:`✗ Por debajo · faltan ${(89.5-pctRMequipo).toFixed(2).replace('.',',')} puntos`}
           </div>
         </div>
       </div>
@@ -1252,7 +1250,7 @@ function buildTecDetailHTML(tec){
                 stroke-dasharray="${(2*Math.PI*23).toFixed(1)}"
                 stroke-dashoffset="${(2*Math.PI*23*(1-rm.pctRM/100)).toFixed(1)}"/>
             </svg>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${rmCol}">${rm.pctRM}%</div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${rmCol}">${rm.pctRM.toFixed(2).replace('.',',')}%</div>
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">🛠️ RMs</div>
@@ -1273,7 +1271,7 @@ function buildTecDetailHTML(tec){
                 stroke-dasharray="${(2*Math.PI*23).toFixed(1)}"
                 stroke-dashoffset="${(2*Math.PI*23*(1-cum.pct/100)).toFixed(1)}"/>
             </svg>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${cumCol}">${cum.pct}%</div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${cumCol}">${cum.pct.toFixed(2).replace('.',',')}%</div>
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">✅ Cumplimiento</div>
@@ -1554,7 +1552,7 @@ function _openRMDash(tecId){
   document.getElementById('rmDashContent').innerHTML = `
     <div class="detail-hero">
       <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
-      <div class="detail-hero-val" style="color:${col}">${rm.pctRM}%</div>
+      <div class="detail-hero-val" style="color:${col}">${rm.pctRM.toFixed(2).replace('.',',')}%</div>
       <div class="detail-hero-sub">%RM del técnico · datos del Excel de mantenimientos</div>
     </div>
 
@@ -1573,12 +1571,12 @@ function _openRMDash(tecId){
             cx="35" cy="35" r="28"
             stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
         </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${rm.pctRM}%</div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${rm.pctRM.toFixed(2).replace('.',',')}%</div>
       </div>
       <div>
         <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
         <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-          Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(rm.pctRM-89.5).toFixed(1)} puntos`:`Faltan ${(89.5-rm.pctRM).toFixed(1)} puntos`}
+          Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(rm.pctRM-89.5).toFixed(2).replace('.',',')} puntos`:`Faltan ${(89.5-rm.pctRM).toFixed(2).replace('.',',')} puntos`}
         </div>
       </div>
     </div>
@@ -1647,7 +1645,10 @@ function showDetail(type){
     <div style="font-size:.8rem;color:var(--muted);line-height:1.7;margin-top:8px">
       ${s==='ok'?`<span style="color:var(--green2)">✓ Cumplimiento por encima del 90%.</span>`
         :`<span style="color:#e05a4a">✗ Cumplimiento por debajo del objetivo.</span>`}
-    </div>`;
+    </div>
+    <button onclick="showCumDash('${tec.id}')" style="margin-top:14px;width:100%;padding:12px;background:linear-gradient(135deg,var(--dim),#1c1400);border:1px solid var(--border2);border-radius:11px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;letter-spacing:.08em;cursor:pointer;text-transform:uppercase">
+      📊 Ver dashboard de Cumplimiento →
+    </button>`;
   } else if(type==='ventas'){
     const pct=tec.conv,s=getStatus({min:15},pct);
     const col=s==='ok'?'var(--green2)':s==='warn'?'var(--orange)':'#e05a4a';
@@ -2101,7 +2102,7 @@ async function loadCumplimiento(){
       CUM_DATA={};
       Object.entries(byTec).forEach(([mat,data])=>{
         const noOk=data.total-data.ok;
-        const pct=data.total>0?Math.round((data.ok/data.total)*100):0;
+        const pct=data.total>0?((data.ok/data.total)*100):0;
         const topRazones=Object.entries(data.razonMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
         CUM_DATA[mat]={total:data.total,ok:data.ok,noOk,pct,topRazones};
       });
@@ -2419,12 +2420,17 @@ document.getElementById('backCumBtn').addEventListener('click',()=>{
 // ── CUM DASHBOARD ──
 let _cumBackPanel = 'mainPanel';
 function showCumDashFromTec(tecId){ _cumBackPanel='tecDetailPanel'; _openCumDash(tecId); }
-function showCumDash(tecId){ _cumBackPanel='mainPanel'; _openCumDash(tecId); }
+function showCumDash(tecId){
+  _cumBackPanel='mainPanel';
+  const id=String(tecId||'').trim().toUpperCase();
+  if(!CUM_DATA[id]&&!CUM_DATA[tecId]){ showDetail('cum'); return; }
+  _openCumDash(tecId);
+}
 function _openCumDash(tecId){
   const id=String(tecId).trim();
   const cum=CUM_DATA[id]||CUM_DATA[id.toUpperCase()];
   const tec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
-  if(!cum){ alert('No hay datos de cumplimiento para este técnico ('+id+').'); return; }
+  if(!cum){ showDetail('cum'); return; }
   const pctOk=cum.pct>=90;
   const col=pctOk?'var(--green2)':'#e05a4a';
   const circ=2*Math.PI*28, offset=circ-(cum.pct/100)*circ;
@@ -2448,7 +2454,7 @@ function _openCumDash(tecId){
   document.getElementById('cumDashContent').innerHTML=`
     <div class="detail-hero">
       <div class="detail-hero-title">✅ Dashboard Cumplimiento · ${nombre}</div>
-      <div class="detail-hero-val" style="color:${col}">${cum.pct}%</div>
+      <div class="detail-hero-val" style="color:${col}">${cum.pct.toFixed(2).replace('.',',')}%</div>
       <div class="detail-hero-sub">Visitas cumplidas · objetivo ≥ 90%</div>
     </div>
     <div style="display:flex;gap:9px;margin-bottom:16px">
