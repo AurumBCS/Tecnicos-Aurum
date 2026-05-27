@@ -2054,12 +2054,12 @@ async function loadMedialiaCoord(){
     if(!res.ok) return;
     const csv=await res.text();
     const rows=parseCSV(csv);
-    if(rows.length>1){
+    if(rows.length>0){
       MEDALIA_COORD_DATA={};
-      rows.slice(1).forEach(row=>{
-        const territorio=String(row[0]||'').trim();
-        const promedio=parseFloat(row[1])||0;
-        const cantidad=parseInt(row[2])||0;
+      rows.forEach(row=>{
+        const territorio=String(row['territorio']||'').trim();
+        const promedio=parseFloat(String(row['promedio']||'0').replace(',','.'))||0;
+        const cantidad=parseInt(row['cantidad'])||0;
         if(territorio && cantidad>0){
           MEDALIA_COORD_DATA[territorio]={promedio,cantidad};
         }
@@ -2082,15 +2082,26 @@ async function loadCumplimiento(){
     }
     const csv=await res.text();
     const rows=parseCSV(csv);
-    if(rows.length>1){
+    if(rows.length>0){
+      // Agrupar por técnico
+      const byTec={};
+      rows.forEach(row=>{
+        const mat=String(row['mat']||'').trim().toUpperCase();
+        const cumplido=String(row['cumplido']||'').trim().toUpperCase();
+        const razon=String(row['razon']||'').trim();
+        if(!mat) return;
+        if(!byTec[mat]) byTec[mat]={total:0,ok:0,razonMap:{}};
+        byTec[mat].total++;
+        const esOk = cumplido==='SI'||cumplido==='SÍ'||cumplido==='S'||cumplido==='1'||cumplido==='TRUE';
+        if(esOk) byTec[mat].ok++;
+        else if(razon) byTec[mat].razonMap[razon]=(byTec[mat].razonMap[razon]||0)+1;
+      });
       CUM_DATA={};
-      rows.slice(1).forEach(row=>{
-        const mat=String(row[0]||'').trim().toUpperCase();
-        const total=parseInt(row[1])||0;
-        const ok=parseInt(row[2])||0;
-        if(mat && total>0){
-          CUM_DATA[mat]={total,ok,pct:Math.round((ok/total)*100)};
-        }
+      Object.entries(byTec).forEach(([mat,data])=>{
+        const noOk=data.total-data.ok;
+        const pct=data.total>0?Math.round((data.ok/data.total)*100):0;
+        const topRazones=Object.entries(data.razonMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        CUM_DATA[mat]={total:data.total,ok:data.ok,noOk,pct,topRazones};
       });
       console.log('✓ Cumplimiento cargado:',Object.keys(CUM_DATA).length,'técnicos');
     } else {
