@@ -2106,12 +2106,13 @@ async function loadRM(){
       const rmByTec={};
 
       // Procesar cada fila de mantenimiento
-      rows.slice(1).forEach(row=>{
-        const mat=String(row[2]||'').trim().toUpperCase();
-        const nMant=String(row[0]||'').trim();
-        const motivo=String(row[1]||'').trim();
-        const repetido=String(row[4]||'').trim().toUpperCase();
-        const motivo_post=String(row[5]||'').trim();
+      // parseCSV ya maneja los headers — devuelve objetos con nombres de columna
+      rows.forEach(row=>{
+        const mat=String(row['tecnico']||'').trim().toUpperCase();
+        const nMant=String(row['nMant']||'').trim();
+        const motivo=String(row['motivo']||'').trim();
+        const repetido=String(row['repetido']||'').trim().toUpperCase();
+        const motivo_post=String(row['motivo_post']||'').trim();
 
         if(mat && nMant){
           if(!rmByTec[mat]) rmByTec[mat]={visitas:[],reps:0,postMap:{},rmMap:{}};
