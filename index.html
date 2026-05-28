@@ -705,8 +705,9 @@ async function loadAuth(){
     const rows=parseCSV(csv);
     if(rows.length>0){
       rows.forEach(row=>{
-        const matricula=String(row['Matrícula']||'').trim().toUpperCase();
-        const dni=String(row['DNI']||'').trim().toUpperCase();
+        // El cuadrante usa 'Matric' como cabecera; también acepta 'Matrícula' por compatibilidad
+        const matricula=String(row['Matric']||row['Matrícula']||row['Matricula']||'').trim().toUpperCase();
+        const dni=String(row['DNI']||row['Dni']||'').trim().toUpperCase();
         if(matricula && dni && matricula !== '****'){
           AUTH_DATA[matricula]=dni;
         }
@@ -714,12 +715,20 @@ async function loadAuth(){
       console.log('Auth CSV cargado:',Object.keys(AUTH_DATA).length,'matrículas');
     }
   }catch(e){console.log('Auth no disponible',e.message);}
-  // Añadir usuarios especiales siempre (aunque falle el script)
+  // Coordinadores y JEs — hardcodeados como fallback (aunque falle el script o el cuadrante)
   AUTH_DATA['CM9651']      = 'Y4798543K';
   AUTH_DATA['JN4767']      = '77843052N';
   AUTH_DATA['GD5381']      = '60233494J';
   AUTH_DATA['BLAS.ALVAREZ']= '80065456H';
-  AUTH_DATA['JR9426']      = 'JR9426'; // contraseña = matrícula
+  AUTH_DATA['JR9426']      = 'JR9426';     // contraseña = matrícula
+  // JEs
+  AUTH_DATA['273371']      = '05323734Q';
+  AUTH_DATA['286800']      = 'Z0952631E';
+  AUTH_DATA['Q29994']      = '60246677V';
+  AUTH_DATA['273379']      = '61653558B';
+  AUTH_DATA['Q28224']      = 'Y6199839L';
+  AUTH_DATA['302154']      = 'Y9078755W';
+  AUTH_DATA['239831']      = '48650727T';
 }
 
 async function loadDocs(){
@@ -2281,9 +2290,16 @@ async function doLogin(){
   const mat=document.getElementById('matInput').value.trim().toUpperCase();
   const dni=document.getElementById('dniInput').value.trim().toUpperCase();
 
+  if(!mat) return;
+
   // Validación básica: si es coordinador o JE, requiere DNI
   const requiereDNI = REQUIEREN_DNI.has(mat);
-  if(!mat || (requiereDNI && !dni)) return;
+  if(requiereDNI && !dni){
+    document.getElementById('loginError').textContent = '🔑 Tu acceso requiere matrícula + contraseña (DNI).';
+    document.getElementById('loginError').style.display='block';
+    document.getElementById('dniInput').style.borderColor='#e67e22';
+    return;
+  }
 
   document.getElementById('spinner').style.display='block';
   document.getElementById('loginBtn').style.opacity='.5';
@@ -2325,7 +2341,15 @@ async function doLogin(){
   // - Coordinadores + JE: REQUIEREN matrícula + DNI
   if(requiereDNI && Object.keys(AUTH_DATA).length > 0){
     const dniEsperado = AUTH_DATA[mat];
-    if(!dniEsperado || dniEsperado.toUpperCase() !== dni.toUpperCase()){
+    console.log('[Login debug] mat='+mat+' | en AUTH_DATA='+(dniEsperado||'NO ENCONTRADO')+' | total entradas auth='+Object.keys(AUTH_DATA).length);
+    if(!dniEsperado){
+      document.getElementById('loginError').textContent = '❌ Matrícula no registrada. Añade la matrícula y DNI en la hoja de autenticación.';
+      document.getElementById('loginError').style.display='block';
+      document.getElementById('matInput').style.borderColor='#c0392b';
+      return;
+    }
+    if(dniEsperado.toUpperCase() !== dni.toUpperCase()){
+      document.getElementById('loginError').textContent = '❌ Contraseña (DNI) incorrecta.';
       document.getElementById('loginError').style.display='block';
       document.getElementById('matInput').style.borderColor='#c0392b';
       document.getElementById('dniInput').style.borderColor='#c0392b';
@@ -2541,11 +2565,13 @@ document.getElementById('loginBtn').addEventListener('click',doLogin);
 document.getElementById('matInput').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.getElementById('matInput').addEventListener('input',()=>{
   document.getElementById('loginError').style.display='none';
+  document.getElementById('loginError').textContent='❌ Matrícula o contraseña incorrecta.';
   document.getElementById('matInput').style.borderColor='';
   document.getElementById('dniInput').style.borderColor='';
 });
 document.getElementById('dniInput').addEventListener('input',()=>{
   document.getElementById('loginError').style.display='none';
+  document.getElementById('loginError').textContent='❌ Matrícula o contraseña incorrecta.';
   document.getElementById('dniInput').style.borderColor='';
 });
 document.getElementById('dniInput').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
