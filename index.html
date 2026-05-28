@@ -2292,10 +2292,9 @@ async function doLogin(){
 
   if(!mat) return;
 
-  // Validación básica: si es coordinador o JE, requiere DNI
-  const requiereDNI = REQUIEREN_DNI.has(mat);
-  if(requiereDNI && !dni){
-    document.getElementById('loginError').textContent = '🔑 Tu acceso requiere matrícula + contraseña (DNI).';
+  // Todos los usuarios requieren matrícula + DNI
+  if(!dni){
+    document.getElementById('loginError').textContent = '🔑 Introduce tu matrícula y contraseña (DNI).';
     document.getElementById('loginError').style.display='block';
     document.getElementById('dniInput').style.borderColor='#e67e22';
     return;
@@ -2336,14 +2335,11 @@ async function doLogin(){
   document.getElementById('spinner').style.display='none';
   document.getElementById('loginBtn').style.opacity='1';
 
-  // ✅ VALIDACIÓN CONDICIONAL:
-  // - Técnicos normales: SOLO validan matrícula (sin DNI)
-  // - Coordinadores + JE: REQUIEREN matrícula + DNI
-  if(requiereDNI && Object.keys(AUTH_DATA).length > 0){
+  // ✅ VALIDACIÓN: todos los usuarios validan matrícula + DNI contra el cuadrante
+  if(Object.keys(AUTH_DATA).length > 0){
     const dniEsperado = AUTH_DATA[mat];
-    console.log('[Login debug] mat='+mat+' | en AUTH_DATA='+(dniEsperado||'NO ENCONTRADO')+' | total entradas auth='+Object.keys(AUTH_DATA).length);
     if(!dniEsperado){
-      document.getElementById('loginError').textContent = '❌ Matrícula no registrada. Añade la matrícula y DNI en la hoja de autenticación.';
+      document.getElementById('loginError').textContent = '❌ Matrícula no registrada.';
       document.getElementById('loginError').style.display='block';
       document.getElementById('matInput').style.borderColor='#c0392b';
       return;
