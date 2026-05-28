@@ -498,7 +498,21 @@ const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbwVkRQOuB0VO1
 const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbwVkRQOuB0VO112pPtMr8ovKcSDMrPKd6S28IhAjqDFKgNAwcVJPN4g-My6PxZ_rud2/exec?type=cumplimiento";
 const RM_URL = "https://script.google.com/macros/s/AKfycbwVkRQOuB0VO112pPtMr8ovKcSDMrPKd6S28IhAjqDFKgNAwcVJPN4g-My6PxZ_rud2/exec?type=rm";
 const VACACIONES_DOCS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9A0fhBk2ViKKewyKP8rJz364_MsEwi8CD_DEIjokUAeZiJzieR1k3KuZm6Kx9B68YrNTtalq8peFn/pub?output=csv";
-let AUTH_DATA = {};
+// Coordinadores y JEs precargados — AUTH_DATA nunca está vacío aunque falle el endpoint
+let AUTH_DATA = {
+  'CM9651':       'Y4798543K',
+  'JN4767':       '77843052N',
+  'GD5381':       '60233494J',
+  'BLAS.ALVAREZ': '80065456H',
+  'JR9426':       'JR9426',
+  '273371':       '05323734Q',
+  '286800':       'Z0952631E',
+  'Q29994':       '60246677V',
+  '273379':       '61653558B',
+  'Q28224':       'Y6199839L',
+  '302154':       'Y9078755W',
+  '239831':       '48650727T'
+};
 let FLOTA_DATA = {};
 let DOCS_DATA = [];
 let VACACIONES_DATA = {};
@@ -715,20 +729,7 @@ async function loadAuth(){
       console.log('Auth CSV cargado:',Object.keys(AUTH_DATA).length,'matrículas');
     }
   }catch(e){console.log('Auth no disponible',e.message);}
-  // Coordinadores y JEs — hardcodeados como fallback (aunque falle el script o el cuadrante)
-  AUTH_DATA['CM9651']      = 'Y4798543K';
-  AUTH_DATA['JN4767']      = '77843052N';
-  AUTH_DATA['GD5381']      = '60233494J';
-  AUTH_DATA['BLAS.ALVAREZ']= '80065456H';
-  AUTH_DATA['JR9426']      = 'JR9426';     // contraseña = matrícula
-  // JEs
-  AUTH_DATA['273371']      = '05323734Q';
-  AUTH_DATA['286800']      = 'Z0952631E';
-  AUTH_DATA['Q29994']      = '60246677V';
-  AUTH_DATA['273379']      = '61653558B';
-  AUTH_DATA['Q28224']      = 'Y6199839L';
-  AUTH_DATA['302154']      = 'Y9078755W';
-  AUTH_DATA['239831']      = '48650727T';
+  // Los JEs y coordinadores ya están en AUTH_DATA desde la inicialización (no se sobreescriben)
 }
 
 async function loadDocs(){
