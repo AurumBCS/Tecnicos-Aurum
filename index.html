@@ -808,9 +808,35 @@ function showPanel(id){
 //  TABS
 // ══════════════════════════════════════════════
 function abrirConfirmaciones(){
-  // Abre la app de confirmaciones con la matrícula del JE pre-cargada
   const matricula = CURRENT_JE_ID || '';
-  window.open('http://localhost:3000?je=' + encodeURIComponent(matricula), '_blank');
+  const url = 'http://localhost:3000?je=' + encodeURIComponent(matricula);
+
+  // Comprobar si el servidor está corriendo antes de abrir
+  fetch('http://localhost:3000/status', { signal: AbortSignal.timeout(2000) })
+    .then(() => window.open(url, '_blank'))
+    .catch(() => {
+      // Servidor no disponible — mostrar aviso
+      const overlay = document.createElement('div');
+      overlay.id = 'wa-server-modal';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center';
+      overlay.innerHTML = `
+        <div style="background:#111;border:1px solid #3d3300;border-radius:16px;padding:32px;max-width:360px;width:90%;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,.8)">
+          <div style="font-size:2.5rem;margin-bottom:12px">📲</div>
+          <h3 style="color:#e8c96a;font-family:'Outfit',sans-serif;margin-bottom:10px;font-size:1rem">Servidor no iniciado</h3>
+          <p style="color:#7a6840;font-size:.82rem;line-height:1.6;margin-bottom:20px">
+            Para usar las Confirmaciones WhatsApp primero tienes que arrancar el servidor.<br><br>
+            <strong style="color:#f0e6c8">Haz doble clic en <code style="background:#1c1800;padding:2px 6px;border-radius:4px;color:#c9a84c">INICIAR.bat</code></strong><br>
+            (o <code style="background:#1c1800;padding:2px 6px;border-radius:4px;color:#c9a84c">INICIAR.sh</code> en Mac)<br><br>
+            Cuando la ventana negra esté abierta, vuelve a pulsar esta pestaña.
+          </p>
+          <button onclick="document.getElementById('wa-server-modal').remove()"
+            style="background:linear-gradient(135deg,#7a5c10,#c9a84c,#e8c96a,#c9a84c,#7a5c10);background-size:200% 100%;color:#0a0a0a;border:none;border-radius:8px;padding:10px 24px;font-family:'Outfit',sans-serif;font-weight:700;font-size:.82rem;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">
+            Entendido
+          </button>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
+    });
 }
 
 function switchTab(tab){
