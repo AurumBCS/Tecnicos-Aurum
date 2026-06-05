@@ -812,7 +812,7 @@ function abrirConfirmaciones(){
   const url = 'http://localhost:3000?je=' + encodeURIComponent(matricula);
 
   // Comprobar si el servidor está corriendo antes de abrir
-  fetch('http://localhost:3000/status', { signal: AbortSignal.timeout(2000) })
+  fetch('http://localhost:3000/status', { signal: AbortSignal.timeout(2000), mode: 'no-cors' })
     .then(() => window.open(url, '_blank'))
     .catch(() => {
       // Servidor no disponible — mostrar aviso
