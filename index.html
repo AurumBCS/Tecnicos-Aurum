@@ -343,6 +343,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <div class="tabs-bar" id="tabsBar" style="display:none">
     <button class="tab-btn" id="tabMisDatos" onclick="switchTab(&#39;misDatos&#39;)">Mis datos</button>
     <button class="tab-btn" id="tabEquipo" onclick="switchTab(&#39;equipo&#39;)">Mi equipo</button>
+    <button class="tab-btn" id="tabConfirmaciones" onclick="abrirConfirmaciones()" style="color:var(--gold3);">📲 Confirmaciones</button>
   </div>
   <!-- Tabs para JR -->
   <div class="tabs-bar" id="tabsBarJR" style="display:none">
@@ -806,6 +807,12 @@ function showPanel(id){
 // ══════════════════════════════════════════════
 //  TABS
 // ══════════════════════════════════════════════
+function abrirConfirmaciones(){
+  // Abre la app de confirmaciones con la matrícula del JE pre-cargada
+  const matricula = CURRENT_JE_ID || '';
+  window.open('http://localhost:3000?je=' + encodeURIComponent(matricula), '_blank');
+}
+
 function switchTab(tab){
   ACTIVE_TAB=tab;
   if(CURRENT_USER_TYPE==='je'){
@@ -2408,15 +2415,15 @@ async function doLogin(){
     document.getElementById('topbarName').textContent=jeName;
     document.getElementById('topbarId').textContent=found.id+' · JE';
     document.getElementById('tabsBarJR').style.display='none';
+    document.getElementById('tabsBar').style.display='flex';
     if(jeTec){
-      document.getElementById('tabsBar').style.display='flex';
       document.getElementById('tabMisDatos').style.display='';
       document.getElementById('tabMisDatos').classList.add('active');
       document.getElementById('tabEquipo').classList.remove('active');
       renderMain(jeTec);
       ACTIVE_TAB='misDatos';
     } else {
-      document.getElementById('tabsBar').style.display='none';
+      document.getElementById('tabMisDatos').style.display='none';
       renderEquipoPanel(found.id);
       showPanel('equipoPanel');
       ACTIVE_TAB='equipo';
