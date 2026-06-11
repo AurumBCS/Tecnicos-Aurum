@@ -348,6 +348,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <!-- Tabs para JR -->
   <div class="tabs-bar" id="tabsBarJR" style="display:none">
     <button class="tab-btn active" id="tabJEs" onclick="switchTab(&#39;jes&#39;)">Jefes de equipo</button>
+    <button class="tab-btn" id="tabUso" onclick="switchTab(&#39;uso&#39;)">Uso de la app</button>
   </div>
 
   <!-- Panel técnico normal -->
@@ -412,6 +413,15 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="je-list" id="jeList"></div>
       <div id="medalliaCoordContainer"></div>
     </div>
+  </div>
+
+  <!-- Panel uso de la app (solo coordinadores) -->
+  <div id="usagePanel" style="display:none;padding:14px 13px 48px;max-width:680px;margin:0 auto">
+    <div class="data-banner" style="margin-bottom:14px">
+      <div class="sync-dot"></div>
+      Conexiones registradas por matrícula
+    </div>
+    <div id="usageContent"><div style="text-align:center;color:var(--text2);padding:40px 0">Cargando datos de uso…</div></div>
   </div>
 
   <!-- Panel detalle KPI (técnico individual) -->
@@ -498,6 +508,8 @@ const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbwVkRQOuB0VO112p
 const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbwVkRQOuB0VO112pPtMr8ovKcSDMrPKd6S28IhAjqDFKgNAwcVJPN4g-My6PxZ_rud2/exec?type=medalia-coord";
 const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbwVkRQOuB0VO112pPtMr8ovKcSDMrPKd6S28IhAjqDFKgNAwcVJPN4g-My6PxZ_rud2/exec?type=cumplimiento";
 const RM_URL = "https://script.google.com/macros/s/AKfycbwVkRQOuB0VO112pPtMr8ovKcSDMrPKd6S28IhAjqDFKgNAwcVJPN4g-My6PxZ_rud2/exec?type=rm";
+const TRACK_URL = "https://script.google.com/macros/s/AKfycbwVkRQOuB0VO112pPtMr8ovKcSDMrPKd6S28IhAjqDFKgNAwcVJPN4g-My6PxZ_rud2/exec?type=track";
+const USAGE_URL = "https://script.google.com/macros/s/AKfycbwVkRQOuB0VO112pPtMr8ovKcSDMrPKd6S28IhAjqDFKgNAwcVJPN4g-My6PxZ_rud2/exec?type=usage";
 const VACACIONES_DOCS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9A0fhBk2ViKKewyKP8rJz364_MsEwi8CD_DEIjokUAeZiJzieR1k3KuZm6Kx9B68YrNTtalq8peFn/pub?output=csv";
 // Coordinadores y JEs precargados — AUTH_DATA nunca está vacío aunque falle el endpoint
 let AUTH_DATA = {
@@ -796,7 +808,7 @@ async function loadSheets(){
 //  PANELS VISIBILITY
 // ══════════════════════════════════════════════
 function hideAllPanels(){
-  ['mainPanel','equipoPanel','jrPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel']
+  ['mainPanel','equipoPanel','jrPanel','usagePanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel']
     .forEach(id=>document.getElementById(id).style.display='none');
 }
 function showPanel(id){
@@ -847,7 +859,10 @@ function switchTab(tab){
     if(tab==='misDatos') showPanel('mainPanel');
     else { showPanel('equipoPanel'); renderEquipoPanel(CURRENT_JE_ID); }
   } else if(CURRENT_USER_TYPE==='jr'){
-    showPanel('jrPanel');
+    document.getElementById('tabJEs').classList.toggle('active', tab==='jes');
+    document.getElementById('tabUso').classList.toggle('active', tab==='uso');
+    if(tab==='uso'){ showPanel('usagePanel'); renderUsagePanel(); }
+    else { showPanel('jrPanel'); }
   }
 }
 
@@ -2175,6 +2190,81 @@ async function loadCumplimiento(){
 }
 
 // ════════════════════════════════════════════════════════
+//  USO DE LA APP (solo coordinadores)
+// ════════════════════════════════════════════════════════
+let USAGE_DATA = null;
+
+async function loadUsage(){
+  try{
+    const res = await fetch(USAGE_URL + '&t=' + Date.now(), {cache:'no-store'});
+    if(!res.ok) return;
+    const text = await res.text();
+    const rows = parseCSV(text);
+    USAGE_DATA = rows.filter(r => r['Matricula']).map(r => ({
+      mat:    String(r['Matricula']||'').trim().toUpperCase(),
+      total:  parseInt(r['Total']||0),
+      ultimo: String(r['UltimoAcceso']||'—')
+    })).sort((a,b) => b.total - a.total);
+  }catch(e){ console.log('Usage error:', e.message); }
+}
+
+function renderUsagePanel(){
+  const el = document.getElementById('usageContent');
+  if(!USAGE_DATA){
+    el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px 0">Cargando…</div>';
+    loadUsage().then(()=> renderUsagePanel());
+    return;
+  }
+  if(!USAGE_DATA.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px 0">Sin datos de acceso aún. Los accesos se registran al hacer login.</div>';
+    return;
+  }
+  const totalConexiones = USAGE_DATA.reduce((s,r)=>s+r.total,0);
+  const totalUsuarios   = USAGE_DATA.length;
+
+  // Buscar nombre del técnico/JE por matrícula
+  const getNombre = mat => {
+    if(JE_NAMES[mat]) return JE_NAMES[mat];
+    const tec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===mat);
+    return tec ? tec.nombre : '—';
+  };
+
+  const filas = USAGE_DATA.map((r,i) => `
+    <tr style="background:${i%2===0?'var(--s1)':'var(--s2)'}">
+      <td style="padding:8px 10px;font-weight:600;color:var(--gold2)">${r.mat}</td>
+      <td style="padding:8px 10px;color:var(--text1);font-size:.85rem">${getNombre(r.mat)}</td>
+      <td style="padding:8px 10px;text-align:center;font-weight:700;color:var(--green)">${r.total}</td>
+      <td style="padding:8px 10px;color:var(--text2);font-size:.8rem">${r.ultimo}</td>
+    </tr>`).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <div style="flex:1;background:var(--s1);border-radius:12px;padding:12px 14px;border:1px solid var(--border2);text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2)">${totalConexiones}</div>
+        <div style="font-size:.78rem;color:var(--text2)">Conexiones totales</div>
+      </div>
+      <div style="flex:1;background:var(--s1);border-radius:12px;padding:12px 14px;border:1px solid var(--border2);text-align:center">
+        <div style="font-size:1.6rem;font-weight:800;color:var(--green)">${totalUsuarios}</div>
+        <div style="font-size:.78rem;color:var(--text2)">Usuarios distintos</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border2)">
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+        <thead>
+          <tr style="background:var(--s2);color:var(--text2);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em">
+            <th style="padding:9px 10px;text-align:left">Matrícula</th>
+            <th style="padding:9px 10px;text-align:left">Nombre</th>
+            <th style="padding:9px 10px;text-align:center">Conexiones</th>
+            <th style="padding:9px 10px;text-align:left">Último acceso</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+    <button onclick="USAGE_DATA=null;renderUsagePanel()" style="margin-top:12px;width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.85rem;cursor:pointer">↻ Actualizar datos</button>`;
+}
+
+// ════════════════════════════════════════════════════════
 //  CARGAR RM (CSV dinámico)
 // ════════════════════════════════════════════════════════
 async function loadRM(){
@@ -2414,6 +2504,10 @@ async function doLogin(){
   }
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('appScreen').style.display='block';
+
+  // Registrar acceso (fire-and-forget)
+  const _trackId = found.type==='tecnico' ? found.tec.id : found.id;
+  fetch(TRACK_URL + '&mat=' + encodeURIComponent(_trackId), {mode:'no-cors'}).catch(()=>{});
 
   if(found.type==='jr'){
     CURRENT_USER_TYPE='jr';
