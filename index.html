@@ -2117,10 +2117,22 @@ async function loadVacaciones(){
     const rows=parseCSV(text);
     if(Array.isArray(rows)&&rows.length>0){
       rows.forEach(r=>{
-        VACACIONES_DATA[r.mat.toUpperCase()]={
-          disfrutados:r.consumido,
-          restantes:r.disponible
+        const mat=(r.mat||'').toUpperCase();
+        if(!mat) return;
+        const entry={
+          disfrutados: parseInt(r.consumido)||0,
+          restantes:   parseInt(r.disponible)||0,
+          ap_total:    parseInt(r.ap_total)||0,
+          meses:{}
         };
+        Object.keys(r).forEach(k=>{
+          const m=k.match(/^([a-z]{3}\d{2})_(vac|ap)$/);
+          if(m){
+            if(!entry.meses[m[1]]) entry.meses[m[1]]={vac:0,ap:0};
+            entry.meses[m[1]][m[2]]=parseInt(r[k])||0;
+          }
+        });
+        VACACIONES_DATA[mat]=entry;
       });
       console.log('Vacaciones cargadas:',Object.keys(VACACIONES_DATA).length,'técnicos');
     }
@@ -2334,17 +2346,25 @@ function renderFlota(tecId, containerId){
   if(vacaciones){
     vacacionesHtml=`
     <div class="section-head" style="margin-top:20px">🏖️ Vacaciones</div>
-    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;justify-content:space-around;position:relative;overflow:hidden">
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#4a90e2,transparent)"></div>
-      <div style="text-align:center">
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Disfrutados</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#4a90e2">${vacaciones.disfrutados}</div>
+      <div style="display:flex;justify-content:space-around">
+        <div style="text-align:center">
+          <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Disfrutados</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#4a90e2">${vacaciones.disfrutados}</div>
+        </div>
+        <div style="border-left:1px solid var(--border2);"></div>
+        <div style="text-align:center">
+          <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Restantes</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#27ae60">${vacaciones.restantes}</div>
+        </div>
+        <div style="border-left:1px solid var(--border2);"></div>
+        <div style="text-align:center">
+          <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">As. Propios</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#e67e22">${vacaciones.ap_total||0}</div>
+        </div>
       </div>
-      <div style="border-left:1px solid var(--border2);"></div>
-      <div style="text-align:center">
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Restantes</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#27ae60">${vacaciones.restantes}</div>
-      </div>
+      ${buildVacMensualHTML(vacaciones)}
     </div>`;
   }
   container.innerHTML=`
@@ -2361,6 +2381,34 @@ function renderFlota(tecId, containerId){
       ⚠️ Si este vehículo no es el tuyo, comunícalo a tu jefe de equipo.
     </div>
     ${vacacionesHtml}`;
+}
+
+// ══════════════════════════════════════════════
+//  VACACIONES — desglose mensual
+// ══════════════════════════════════════════════
+function buildVacMensualHTML(vacaciones){
+  const LABELS={ene:'Ene',feb:'Feb',mar:'Mar',abr:'Abr',may:'May',jun:'Jun',jul:'Jul',ago:'Ago',sep:'Sep',oct:'Oct',nov:'Nov',dic:'Dic'};
+  const meses=vacaciones.meses||{};
+  const conDatos=Object.entries(meses)
+    .filter(([,v])=>v.vac>0||v.ap>0)
+    .sort((a,b)=>a[0].localeCompare(b[0]));
+  if(!conDatos.length) return '';
+  const pills=conDatos.map(([k,v])=>{
+    const lbl=LABELS[k.slice(0,3)]||k.slice(0,3);
+    const anio=k.slice(3);
+    const vacPill=v.vac>0?`<span style="color:#4a90e2;font-weight:700">${v.vac}V</span>`:'';
+    const apPill =v.ap >0?`<span style="color:#e67e22;font-weight:700">${v.ap}AP</span>`:'';
+    return `<div style="background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:5px 9px;text-align:center;min-width:50px">
+      <div style="font-size:.62rem;color:var(--text2);margin-bottom:2px">${lbl} ${anio?'2'+anio.slice(-1):''}</div>
+      <div style="font-size:.82rem;display:flex;gap:5px;justify-content:center">${vacPill}${apPill}</div>
+    </div>`;
+  }).join('');
+  return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border2)">
+    <div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text2);margin-bottom:7px">
+      <span style="color:#4a90e2">■</span> Vacaciones &nbsp;<span style="color:#e67e22">■</span> Asuntos propios
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${pills}</div>
+  </div>`;
 }
 
 // ══════════════════════════════════════════════
@@ -2395,17 +2443,25 @@ function renderVacacionesJE(jeId, containerId){
   if(!vacaciones){ container.innerHTML=''; return; }
   container.innerHTML=`
     <div class="section-head" style="margin-top:20px">🏖️ Tus vacaciones</div>
-    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;justify-content:space-around;position:relative;overflow:hidden">
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#4a90e2,transparent)"></div>
-      <div style="text-align:center">
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Disfrutados</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#4a90e2">${vacaciones.disfrutados}</div>
+      <div style="display:flex;justify-content:space-around">
+        <div style="text-align:center">
+          <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Disfrutados</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#4a90e2">${vacaciones.disfrutados}</div>
+        </div>
+        <div style="border-left:1px solid var(--border2);"></div>
+        <div style="text-align:center">
+          <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Restantes</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#27ae60">${vacaciones.restantes}</div>
+        </div>
+        <div style="border-left:1px solid var(--border2);"></div>
+        <div style="text-align:center">
+          <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">As. Propios</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#e67e22">${vacaciones.ap_total||0}</div>
+        </div>
       </div>
-      <div style="border-left:1px solid var(--border2);"></div>
-      <div style="text-align:center">
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">Restantes</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#27ae60">${vacaciones.restantes}</div>
-      </div>
+      ${buildVacMensualHTML(vacaciones)}
     </div>`;
 }
 
