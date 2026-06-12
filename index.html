@@ -526,6 +526,7 @@ let AUTH_DATA = {
   '302154':       'Y9078755W',
   '239831':       '48650727T'
 };
+let AUTH_CUADRANTE_LOADED = false; // true cuando loadAuth() cargó el cuadrante completo
 let FLOTA_DATA = {};
 let DOCS_DATA = [];
 let VACACIONES_DATA = {};
@@ -741,10 +742,10 @@ async function loadAuth(){
           AUTH_DATA[matricula]=dni;
         }
       });
+      AUTH_CUADRANTE_LOADED = true;
       console.log('Auth CSV cargado:',Object.keys(AUTH_DATA).length,'matrículas');
     }
   }catch(e){console.log('Auth no disponible',e.message);}
-  // Los JEs y coordinadores ya están en AUTH_DATA desde la inicialización (no se sobreescriben)
 }
 
 async function loadDocs(){
@@ -2535,21 +2536,27 @@ async function doLogin(){
   document.getElementById('loginBtn').style.opacity='1';
 
   // ✅ VALIDACIÓN: todos los usuarios validan matrícula + DNI contra el cuadrante
-  if(Object.keys(AUTH_DATA).length > 0){
-    const dniEsperado = AUTH_DATA[mat];
-    if(!dniEsperado){
-      document.getElementById('loginError').textContent = '❌ Matrícula no registrada.';
+  const dniEsperado = AUTH_DATA[mat];
+  if(!dniEsperado){
+    if(!AUTH_CUADRANTE_LOADED){
+      // El cuadrante no llegó a tiempo — puede ser un técnico válido, pedir reintento
+      document.getElementById('loginError').textContent = '⏳ Datos de acceso aún cargando. Inténtalo de nuevo en unos segundos.';
       document.getElementById('loginError').style.display='block';
-      document.getElementById('matInput').style.borderColor='#c0392b';
+      document.getElementById('spinner').style.display='none';
+      document.getElementById('loginBtn').style.opacity='1';
       return;
     }
-    if(dniEsperado.toUpperCase() !== dni.toUpperCase()){
-      document.getElementById('loginError').textContent = '❌ Contraseña (DNI) incorrecta.';
-      document.getElementById('loginError').style.display='block';
-      document.getElementById('matInput').style.borderColor='#c0392b';
-      document.getElementById('dniInput').style.borderColor='#c0392b';
-      return;
-    }
+    document.getElementById('loginError').textContent = '❌ Matrícula no registrada.';
+    document.getElementById('loginError').style.display='block';
+    document.getElementById('matInput').style.borderColor='#c0392b';
+    return;
+  }
+  if(dniEsperado.toUpperCase() !== dni.toUpperCase()){
+    document.getElementById('loginError').textContent = '❌ Contraseña (DNI) incorrecta.';
+    document.getElementById('loginError').style.display='block';
+    document.getElementById('matInput').style.borderColor='#c0392b';
+    document.getElementById('dniInput').style.borderColor='#c0392b';
+    return;
   }
 
   const found=findUser(mat);
