@@ -2304,12 +2304,13 @@ async function loadRM(){
         const motivo_post=String(row['motivo_post']||'').trim();
 
         if(mat && nMant){
-          if(!rmByTec[mat]) rmByTec[mat]={visitas:[],reps:0,postMap:{},rmMap:{}};
+          if(!rmByTec[mat]) rmByTec[mat]={visitas:[],reps:0,postMap:{},rmMap:{},rmOnlyMap:{}};
           const isRep = repetido==='SI' || repetido==='SÍ' || repetido==='1' || repetido==='TRUE';
           rmByTec[mat].visitas.push({nMant,motivo,motivo_post,repetido:isRep});
           if(isRep) rmByTec[mat].reps++;
           if(motivo_post) rmByTec[mat].postMap[motivo_post]=(rmByTec[mat].postMap[motivo_post]||0)+1;
           if(motivo) rmByTec[mat].rmMap[motivo]=(rmByTec[mat].rmMap[motivo]||0)+1;
+          if(isRep && motivo) rmByTec[mat].rmOnlyMap[motivo]=(rmByTec[mat].rmOnlyMap[motivo]||0)+1;
         }
       });
 
@@ -2319,7 +2320,7 @@ async function loadRM(){
         const reps = data.reps;
         const pctRM = total>0 ? ((total-reps)/total*100) : 0;
         const topPost = Object.entries(data.postMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
-        const motivosRM = Object.entries(data.rmMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        const motivosRM = Object.entries(data.rmOnlyMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
         const topMotivos = Object.entries(data.rmMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
         RM_DATA[mat]={
