@@ -2319,9 +2319,9 @@ async function loadRM(){
         const total = data.visitas.length;
         const reps = data.reps;
         const pctRM = total>0 ? ((total-reps)/total*100) : 0;
-        const topPost = Object.entries(data.postMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
-        const motivosRM = Object.entries(data.rmOnlyMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
-        const topMotivos = Object.entries(data.rmMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        const topPost = Object.entries(data.postMap).sort((a,b)=>b[1]-a[1]);
+        const motivosRM = Object.entries(data.rmOnlyMap).sort((a,b)=>b[1]-a[1]);
+        const topMotivos = Object.entries(data.rmMap).sort((a,b)=>b[1]-a[1]);
 
         RM_DATA[mat]={
           visitas: data.visitas,
