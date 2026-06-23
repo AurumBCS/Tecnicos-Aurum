@@ -769,7 +769,10 @@ async function loadJerarquia(){
           if(!JERARQUIA[je].includes(mat)) JERARQUIA[je].push(mat);
         }
       });
-      console.log('Jerarquía cargada desde cuadrante:', Object.keys(JERARQUIA).filter(k=>!keepIds.has(k)).length, 'JEs');
+      // Actualizar la lista de JEs visible para el JR
+      const allJEIds = Object.keys(JERARQUIA).filter(k=>!keepIds.has(k));
+      JERARQUIA['JR9426'] = allJEIds;
+      console.log('Jerarquía cargada desde cuadrante:', allJEIds.length, 'JEs');
     }
   }catch(e){console.log('Jerarquía no disponible, usando datos del código',e.message);}
 }
@@ -1445,7 +1448,8 @@ function renderJRPanel(){
     const jeSummaries = grupo.jeIds.map(id=>{
       const tecs=getTecnicosOfJE(id);
       const av=calcAvg(tecs);
-      return {id, nombre:JE_NAMES[id]||id, tecs, av};
+      const tecNombre=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
+      return {id, nombre:JE_NAMES[id]||(tecNombre&&tecNombre.nombre)||id, tecs, av};
     }).sort((a,b)=>(b.av.mlv||0)-(a.av.mlv||0));
 
     jeListHTML += jeSummaries.map(je=>{
@@ -1473,8 +1477,58 @@ function renderJRPanel(){
       </div>`;
     }).join('');
 
-    jeListHTML += '<div style="height:12px"></div>'; // separador entre grupos
+    jeListHTML += '<div style="height:12px"></div>';
   });
+
+  // JEs del cuadrante que no están en ningún grupo definido
+  const gruposJEIds = new Set(GRUPOS.flatMap(g=>g.jeIds));
+  const sinGrupo = jeIds.filter(id=>!gruposJEIds.has(id));
+  if(sinGrupo.length > 0){
+    const sinGrupoTecs = sinGrupo.flatMap(id=>getTecnicosOfJE(id));
+    const sinGrupoAv = calcAvg(sinGrupoTecs);
+    const sgCol = sinGrupoAv.mlv>=7?'var(--green2)':sinGrupoAv.mlv>=6.5?'var(--orange)':'#e05a4a';
+    jeListHTML += `<div style="background:var(--dim);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:8px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold3),transparent)"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:.88rem;font-weight:800;color:var(--gold3)">Otros equipos</div>
+        <div style="font-size:.72rem;color:var(--muted)">${sinGrupoTecs.length} técnicos</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+        <div class="je-mini"><div class="je-mini-n" style="color:${sgCol}">${(sinGrupoAv.mlv||0).toFixed(2)}</div><div class="je-mini-l">ML-V</div></div>
+        <div class="je-mini"><div class="je-mini-n" style="color:${(sinGrupoAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(sinGrupoAv.pRM||0).toFixed(1)}%</div><div class="je-mini-l">%RM</div></div>
+        <div class="je-mini"><div class="je-mini-n" style="color:${(sinGrupoAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(sinGrupoAv.pCum||0).toFixed(1)}%</div><div class="je-mini-l">%Cum</div></div>
+        <div class="je-mini"><div class="je-mini-n" style="color:${(sinGrupoAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(sinGrupoAv.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
+      </div>
+    </div>`;
+    jeListHTML += sinGrupo.map(id=>{
+      const tecs=getTecnicosOfJE(id);
+      const av=calcAvg(tecs);
+      const g=getGrade(av.mlv||0);
+      const col=gradeColor(g);
+      const tecNombre=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
+      const nombre=JE_NAMES[id]||(tecNombre&&tecNombre.nombre)||id;
+      const rmOk=(av.pRM||0)>=89.5,cumOk=(av.pCum||0)>=90,convOk=(av.conv||0)>=15;
+      return`<div class="je-card g-${g} fade-up" onclick="showJEDetail('${id}')" style="margin-bottom:8px">
+        <div class="je-card-top">
+          <div>
+            <div class="je-card-name">${nombre}</div>
+            <div class="je-card-id">${id} · ${tecs.length} técnicos</div>
+          </div>
+          <div style="text-align:right">
+            <div class="je-card-mlv" style="color:${col}">${(av.mlv||0).toFixed(2)}</div>
+            <div style="font-size:.62rem;color:var(--muted)">ML-V promedio</div>
+          </div>
+        </div>
+        <div class="je-mini-grid">
+          <div class="je-mini"><div class="je-mini-n" style="color:${gradeColor(getGrade(av.mab||0))}">${(av.mab||0).toFixed(2)}</div><div class="je-mini-l">MA+B</div></div>
+          <div class="je-mini"><div class="je-mini-n" style="color:${rmOk?'var(--green2)':'#e05a4a'}">${(av.pRM||0).toFixed(1)}%</div><div class="je-mini-l">%RM</div></div>
+          <div class="je-mini"><div class="je-mini-n" style="color:${cumOk?'var(--green2)':'#e05a4a'}">${(av.pCum||0).toFixed(1)}%</div><div class="je-mini-l">%Cum</div></div>
+          <div class="je-mini"><div class="je-mini-n" style="color:${convOk?'var(--green2)':'#e05a4a'}">${(av.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
+        </div>
+        <div class="je-arrow">Ver equipo completo →</div>
+      </div>`;
+    }).join('');
+  }
 
   document.getElementById('jeList').innerHTML=jeListHTML;
 }
