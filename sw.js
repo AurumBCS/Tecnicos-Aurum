@@ -1,5 +1,5 @@
 // ── Service Worker · Aurum BC Security ──
-const VERSION = 'v20260614b';
+const VERSION = 'v20260614c';
 const CACHE   = 'aurum-' + VERSION;
 
 // Al instalar: guarda el HTML en caché
