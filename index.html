@@ -529,6 +529,7 @@ let AUTH_DATA = {
 };
 let AUTH_CUADRANTE_LOADED = false;
 let ZONA_DATA = {};
+let CUENTA_DATA = {}; // mat -> {je: bool, empresa: bool}
 let FLOTA_DATA = {};
 let DOCS_DATA = [];
 let VACACIONES_DATA = {};
@@ -763,14 +764,18 @@ async function loadJerarquia(){
       Object.keys(JERARQUIA).forEach(k=>{ if(!keepIds.has(k)) delete JERARQUIA[k]; });
       // Reconstruir desde el cuadrante
       ZONA_DATA = {};
+      CUENTA_DATA = {};
       rows.forEach(row=>{
-        const je   = String(row['JE']||'').trim().toUpperCase();
-        const mat  = String(row['Matricula']||'').trim().toUpperCase();
-        const zona = String(row['Zona']||'').trim();
+        const je       = String(row['JE']||'').trim().toUpperCase();
+        const mat      = String(row['Matricula']||'').trim().toUpperCase();
+        const zona     = String(row['Zona']||'').trim();
+        const cuentaJE = String(row['CuentaJE']||'').trim().toLowerCase().includes('si');
+        const cuentaEmp= String(row['CuentaEmpresa']||'').trim().toLowerCase().includes('si');
         if(je && mat){
           if(!JERARQUIA[je]) JERARQUIA[je]=[];
           if(!JERARQUIA[je].includes(mat)) JERARQUIA[je].push(mat);
           if(zona) ZONA_DATA[mat] = zona;
+          CUENTA_DATA[mat] = {je: cuentaJE, empresa: cuentaEmp};
         }
       });
       // Actualizar la lista de JEs visible para el JR
@@ -1213,22 +1218,23 @@ function renderEquipoPanel(jeId){
     if(document.getElementById('equipoDocsContainer')) renderDocsEquipoCollapsible(jeId,'equipoDocsContainer');
   }
 
-  // Lista de técnicos ordenados por ML-V desc — mejor con estrella
-  const sorted=[...tecs].sort((a,b)=>b.mlv-a.mlv);
-  // Calcular mejor técnico por score ponderado (ML-V + MA+B + KPIs)
+  // Lista de técnicos — separar cuentan / no cuentan para el JE
+  const tieneCuentaData = Object.keys(CUENTA_DATA).length > 0;
+  const cuentan   = tieneCuentaData ? tecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je !== false && (CUENTA_DATA[t.id.toUpperCase()]?.je === true || CUENTA_DATA[t.id]?.je !== false)) : tecs;
+  const noCuentan = tieneCuentaData ? tecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je === false || CUENTA_DATA[t.id]?.je === false) : [];
+
   function tecScore(t){
     let s=t.mlv*2+t.mab;
     if(t.pRM>=89.5)s+=1;if(t.pCum>=90)s+=1;if(t.conv>=15)s+=1;if(t.ppa>=10)s+=1;
     return s;
   }
-  const bestId=sorted.reduce((best,t)=>tecScore(t)>tecScore(best)?t:best,sorted[0])?.id;
+  const sortedCuentan=[...cuentan].sort((a,b)=>b.mlv-a.mlv);
+  const sortedNoCuentan=[...noCuentan].sort((a,b)=>b.mlv-a.mlv);
+  const bestId=sortedCuentan.length?sortedCuentan.reduce((best,t)=>tecScore(t)>tecScore(best)?t:best,sortedCuentan[0])?.id:null;
 
-  const tecRows = sorted.map((t,i)=>{
-    const g=getGrade(t.mlv);
-    const col=gradeColor(g);
-    const nombre=t.nombre.trim();
-    const isBest=t.id===bestId;
-    return`<div class="tec-row g-${g} fade-up" onclick="showTecDetail('${t.id}')">
+  const buildTecRow=(t,i,dimmed)=>{
+    const g=getGrade(t.mlv),col=gradeColor(g),nombre=t.nombre.trim(),isBest=t.id===bestId&&!dimmed;
+    return`<div class="tec-row g-${g} fade-up" onclick="showTecDetail('${t.id}')" style="${dimmed?'opacity:.45;':''}">
       <div class="tec-rank" style="${isBest?'color:var(--gold2);font-size:.85rem':''}">
         ${isBest?'⭐':''}${!isBest?i+1:''}
       </div>
@@ -1244,17 +1250,29 @@ function renderEquipoPanel(jeId){
         <div class="tec-arrow">›</div>
       </div>
     </div>`;
-  }).join('');
+  };
+
+  const cuentanRows   = sortedCuentan.map((t,i)=>buildTecRow(t,i,false)).join('');
+  const noCuentanRows = sortedNoCuentan.map((t,i)=>buildTecRow(t,i,true)).join('');
+  const separador = noCuentan.length ? `
+    <div style="margin:6px 0 4px;padding:6px 12px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:.62rem;font-weight:700;letter-spacing:.1em;color:#6b5a2a;text-transform:uppercase">No cuentan para el equipo · ${noCuentan.length}</span>
+      <div style="flex:1;height:1px;background:#2a2010"></div>
+    </div>` : '';
+
+  const encabezado = tieneCuentaData && cuentan.length < tecs.length
+    ? `👥 Técnicos · <span style="color:var(--green2)">${cuentan.length} cuentan</span> / <span style="color:var(--muted)">${noCuentan.length} no cuentan</span>`
+    : `👥 Técnicos del equipo · ${tecs.length}`;
 
   document.getElementById('tecList').innerHTML=`
     <div style="margin-top:20px">
       <div class="section-head" onclick="document.getElementById('tecList-${jeId}').style.display=document.getElementById('tecList-${jeId}').style.display==='none'?'block':'none';document.getElementById('tecArrow-${jeId}').style.transform=document.getElementById('tecArrow-${jeId}').style.transform==='rotate(180deg)'?'rotate(0deg)':'rotate(180deg)'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-        👥 Técnicos del equipo · ${sorted.length}
+        ${encabezado}
         <span id="tecArrow-${jeId}" style="display:inline-block;transition:transform .2s">→</span>
       </div>
       <div id="tecList-${jeId}" style="background:var(--dim);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-top:8px;display:none;padding:0 !important">
         <div class="tec-list">
-          ${tecRows}
+          ${cuentanRows}${separador}${noCuentanRows}
         </div>
       </div>
     </div>`;
@@ -1432,12 +1450,35 @@ function renderJRPanel(){
 
   // Lista agrupada por zonas
   let jeListHTML = '';
+  const tieneCuentaEmp = Object.keys(CUENTA_DATA).length > 0;
   GRUPOS.forEach(grupo => {
     const grupoTecs = tieneZonas ? getTecsPorZona(grupo.zonas) : grupo.jeIds.flatMap(id=>getTecnicosOfJE(id));
-    const grupoAv = calcAvg(grupoTecs);
+    const cuentanEmp  = tieneCuentaEmp ? grupoTecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===true) : grupoTecs;
+    const noCuentanEmp= tieneCuentaEmp ? grupoTecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===false) : [];
+    const grupoAv = calcAvg(cuentanEmp);
     const gCol = grupoAv.mlv>=7?'var(--green2)':grupoAv.mlv>=6.5?'var(--orange)':'#e05a4a';
+    const avNo = calcAvg(noCuentanEmp);
 
-    // Header del grupo con métricas totales
+    const splitHTML = tieneCuentaEmp ? `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="background:var(--bg);border-radius:8px;padding:7px 8px">
+          <div style="font-size:.6rem;font-weight:700;letter-spacing:.08em;color:var(--green2);text-transform:uppercase;margin-bottom:4px">Cuentan empresa · ${cuentanEmp.length}</div>
+          <div style="display:flex;gap:10px">
+            <div><div style="font-size:.75rem;font-weight:700;color:${gCol}">${(grupoAv.mlv||0).toFixed(2)}</div><div style="font-size:.58rem;color:var(--muted)">ML-V</div></div>
+            <div><div style="font-size:.75rem;font-weight:700;color:${(grupoAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(grupoAv.pRM||0).toFixed(1)}%</div><div style="font-size:.58rem;color:var(--muted)">%RM</div></div>
+            <div><div style="font-size:.75rem;font-weight:700;color:${(grupoAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(grupoAv.conv||0).toFixed(1)}%</div><div style="font-size:.58rem;color:var(--muted)">Conv</div></div>
+          </div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:7px 8px;opacity:.65">
+          <div style="font-size:.6rem;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:4px">No cuentan · ${noCuentanEmp.length}</div>
+          <div style="display:flex;gap:10px">
+            <div><div style="font-size:.75rem;font-weight:700;color:var(--muted)">${(avNo.mlv||0).toFixed(2)}</div><div style="font-size:.58rem;color:var(--muted)">ML-V</div></div>
+            <div><div style="font-size:.75rem;font-weight:700;color:var(--muted)">${(avNo.pRM||0).toFixed(1)}%</div><div style="font-size:.58rem;color:var(--muted)">%RM</div></div>
+            <div><div style="font-size:.75rem;font-weight:700;color:var(--muted)">${(avNo.conv||0).toFixed(1)}%</div><div style="font-size:.58rem;color:var(--muted)">Conv</div></div>
+          </div>
+        </div>
+      </div>` : '';
+
     jeListHTML += `<div style="background:var(--dim);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:8px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${grupo.color},transparent)"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -1450,6 +1491,7 @@ function renderJRPanel(){
         <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(grupoAv.pCum||0).toFixed(1)}%</div><div class="je-mini-l">%Cum</div></div>
         <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(grupoAv.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
       </div>
+      ${splitHTML}
     </div>`;
 
     // JEs individuales del grupo
