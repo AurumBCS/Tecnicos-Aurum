@@ -59,7 +59,7 @@ Al hacer login la app lanza en paralelo:
 | `CUENTA_DATA` | Object | mat → `{je: bool\|null, empresa: bool\|null}`. Columnas X e Y del cuadrante. |
 | `AUTH_DATA` | Object | mat → DNI. Pre-inicializado con JEs/coordinadores; ampliado al cargar cuadrante. |
 | `AUTH_CUADRANTE_LOADED` | bool | `true` cuando `loadAuth()` termina. Evita falso "matrícula no registrada" por timeout. |
-| `MEDALIA_COORD_DATA` | Object | territorio → `{promedio, cantidad}`. |
+| `MEDALIA_COORD_DATA` | Object | mat → `{promedio, cantidad}`. Por técnico, calculado desde sheet publicado. |
 
 ---
 
@@ -67,7 +67,7 @@ Al hacer login la app lanza en paralelo:
 
 **URL del deployment actual:**
 ```
-https://script.google.com/macros/s/AKfycbyHT1w_4MS_HxmQOFtJkiETOtodWsveMEmT2ZOg_NSNjohsUURW0QvO7G-xX2jz8s0T/exec
+https://script.google.com/macros/s/AKfycbwGzgQeBM9sTXQax8l8faPxguPR8sYpUu0OU-GScMSXJrRvSOWcACAnVV1GSdH_3bqE/exec
 ```
 
 El script lee de estos Google Sheets:
@@ -79,13 +79,15 @@ El script lee de estos Google Sheets:
 | `SHEET_CSV_ID` | `1UWfgzyAlu6sK6VLKP0Qoqhs31UfRju1J-zqaR8yuUng` | KPIs resumen técnicos (+ hoja AccesosApp para tracking) |
 | `SHEET_DOCS_ID` | `1clqnU3UH0ld86UoL4uvwp_ciAcMwRxeAjqDkbH4QZLc` | Documentos pendientes |
 | `SHEET_FLOTA_ID` | `1c990k4SDrPULhP0VQ8xbZunBg7Qo9nhHl2tTDYPxh2s` | Inventario vehículos (hoja INVENTARIO) |
-| `SHEET_MEDALIA_ID` | `1_EVdRTQPwpMjg9PiJzsbq2_-OgDqBwmZof-cCO1iwoA` | Encuestas de satisfacción (col E = mat, col Q = score CFL) |
+| `SHEET_MEDALIA_ID` | `1_EVdRTQPwpMjg9PiJzsbq2_-OgDqBwmZof-cCO1iwoA` | Encuestas de satisfacción (col A = tipo, col E = mat, col P = score CFL Interacción) |
 | `REMITENTE` | `gustavoa.perez@verisure.es` | Correo origen de los Excel |
 
-El cuadrante se lee desde una URL pública publicada como CSV:
-```
-https://docs.google.com/spreadsheets/d/e/2PACX-1vSvU7Aah_5VokujbrbolwqCAZLRxrDQqrAZiNpgvNZMXeD-KCPLmJqRjIlPGmswlg/pub?output=csv
-```
+Los sheets publicados como CSV que usa el script:
+
+| Uso | URL publicada |
+|-----|---------------|
+| Cuadrante (auth + jerarquía) | `https://docs.google.com/spreadsheets/d/e/2PACX-1vSvU7Aah_5VokujbrbolwqCAZLRxrDQqrAZiNpgvNZMXeD-KCPLmJqRjIlPGmswlg/pub?output=csv` |
+| Medalia CFL | `https://docs.google.com/spreadsheets/d/e/2PACX-1vTIbmLaEbAJoZj7d_lJqtIV-gbx2kTiumryL-Q7fpvkxvCs3PBaMiDCHTYpWHU-SQ1loy9eAT0G1X9n/pub?output=csv` |
 
 ### Columnas del cuadrante usadas
 
@@ -113,7 +115,7 @@ Valores posibles en columnas X e Y: `"Si cuenta"` → `true`, `"No cuenta"` → 
 | `servirVacaciones()` | Días VAC/AP totales + desglose mensual (claves `feb26_vac`, `feb26_ap`, …) |
 | `servirRM()` | Mantenimientos repetidos |
 | `servirCumplimiento()` | Visitas de cumplimiento |
-| `servirMedialiaCoord()` | Promedios de satisfacción por zona (`territorio, promedio, cantidad`) |
+| `servirMedialiaCoordinadores()` | CFL Interacción por técnico (`mat, promedio, cantidad`). Lee desde sheet publicado con detección de columnas por nombre de cabecera. |
 | `registrarAcceso(mat)` | Escribe fila en hoja AccesosApp con timestamp + matrícula |
 | `servirUsage()` | Agrega AccesosApp → CSV con count + último acceso por matrícula |
 | `procesarCorreosAurum()` | Trigger horario: detecta adjuntos por asunto y actualiza sheets |
@@ -223,7 +225,7 @@ Los coordinadores (`jr`) tienen una pestaña **Uso de la app** que muestra cuán
 | Archivo | Descripción |
 |---------|-------------|
 | `manifest.json` | Nombre "Aurum", color dorado `#c9a84c`, display standalone |
-| `sw.js` | Service Worker Network First, versión `v20260626c` |
+| `sw.js` | Service Worker Network First, versión `v20260626e` |
 | `icon-192.png` | Icono 192×192 (logo empresa, PNG real) |
 | `icon-512.png` | Icono 512×512 (logo empresa, PNG real) |
 | `favicon.ico` | Favicon 32×32 |
@@ -246,7 +248,7 @@ Cada nuevo deployment del Apps Script debe ir acompañado de un bump de versión
 | `?type=vacaciones` | ✅ OK | Días totales + desglose mensual VAC/AP |
 | `?type=rm` | ✅ OK | ~1000 registros, %RM con 2 decimales |
 | `?type=cumplimiento` | ✅ OK | ~1999 registros, %Cum con 2 decimales |
-| `?type=medalia-coord` | ✅ OK | Zonas 4-5 y 6-7: promedio por territorio |
+| `?type=medalia-coord` | ✅ OK | 101 técnicos con CFL Interacción · split cuentan/no cuentan por zona |
 | `?type=track` | ✅ OK | Registra acceso (fire-and-forget, no-cors) |
 | `?type=usage` | ✅ OK | CSV accesos por matrícula para coordinadores |
 
@@ -336,8 +338,14 @@ Datos del CSV principal en formato europeo (`1.234,56`). Usar siempre `parseNum(
 ### KPI_CONFIG
 Array que controla qué KPIs aparecen en la cuadrícula principal. `OTHER_KEYS` controla el bloque secundario "Resto de indicadores". Umbrales de color en `getGrade()` y `getStatus()`.
 
-### Pendiente — Medalia CFL por técnico con split cuentan/no cuentan
-La hoja de Medalia tiene: columna A = tipo (filtrar `"CFL Interaccion"`), columna E = matrícula, columna Q = puntuación. La idea es modificar `servirMedialiaCoord()` para devolver `mat, promedio, cantidad` por técnico, y en el cliente agrupar por zona (`ZONA_DATA`) y separar por `CUENTA_DATA`. Intentado pero revertido por problema no identificado. Retomar con cuidado.
+### Medalia CFL — cómo funciona
+
+`servirMedialiaCoordinadores()` lee un sheet publicado con datos de encuestas. Detecta columnas por nombre de cabecera (no por índice fijo):
+- Columna con "tipo" → filtra filas `CFL Interacción`
+- Columna con "matricula"/"técnico" → matrícula del técnico
+- Columna con "satisfac" → puntuación (0–10, se omiten vacíos)
+
+Devuelve `mat, promedio, cantidad` por técnico. El cliente agrupa por zona usando `ZONA_DATA` y separa cuentan/no cuentan usando `CUENTA_DATA.empresa`.
 
 ---
 
