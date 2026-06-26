@@ -1461,16 +1461,8 @@ function renderJRPanel(){
     const gCol = grupoAv.mlv>=7?'var(--green2)':grupoAv.mlv>=6.5?'var(--orange)':'#e05a4a';
     const avNo = calcAvg(noCuentanEmp);
 
-    const splitHTML = tieneCuentaEmp ? `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-        <div style="background:var(--bg);border-radius:8px;padding:7px 8px">
-          <div style="font-size:.6rem;font-weight:700;letter-spacing:.08em;color:var(--green2);text-transform:uppercase;margin-bottom:4px">Cuentan empresa · ${cuentanEmp.length}</div>
-          <div style="display:flex;gap:10px">
-            <div><div style="font-size:.75rem;font-weight:700;color:${gCol}">${(grupoAv.mlv||0).toFixed(2)}</div><div style="font-size:.58rem;color:var(--muted)">ML-V</div></div>
-            <div><div style="font-size:.75rem;font-weight:700;color:${(grupoAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(grupoAv.pRM||0).toFixed(1)}%</div><div style="font-size:.58rem;color:var(--muted)">%RM</div></div>
-            <div><div style="font-size:.75rem;font-weight:700;color:${(grupoAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(grupoAv.conv||0).toFixed(1)}%</div><div style="font-size:.58rem;color:var(--muted)">Conv</div></div>
-          </div>
-        </div>
+    const splitHTML = (tieneCuentaEmp && noCuentanEmp.length) ? `
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
         <div style="background:var(--bg);border-radius:8px;padding:7px 8px;opacity:.65">
           <div style="font-size:.6rem;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:4px">No cuentan · ${noCuentanEmp.length}</div>
           <div style="display:flex;gap:10px">
