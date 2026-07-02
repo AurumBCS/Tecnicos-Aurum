@@ -1105,7 +1105,7 @@ function renderEquipoPanel(jeId){
     {key:'pRM',  label:'%RM',          icon:'🛠️',unit:'%',min:89.5, dash:'rm'},
     {key:'pCum', label:'%Cumplimiento',icon:'✅', unit:'%',min:90.0, dash:'cum'},
     {key:'conv', label:'Conversión',   icon:'💰', unit:'%',min:15.0, dash:'conv'},
-    {key:'ppa',  label:'PPA',          icon:'⭐', unit:'%',min:10.0, dash:null},
+    {key:'ppa',  label:'PPA',          icon:'⭐', unit:'%',min:10.0, dash:'ppa'},
   ];
   let kpiHtml = JE_KPI_KEYS.map(k=>{
     const val=av[k.key]||0,s=getStatus(k,val),bp=getBarPct(k,val);
@@ -1747,6 +1747,26 @@ function showRMDash(tecId){
   _openRMDash(tecId);
 }
 
+let RM_ROW_LOOKUP = {};
+function toggleMantenimientosMotivo(rowId){
+  const info = RM_ROW_LOOKUP[rowId];
+  if(!info) return;
+  const listEl = document.getElementById(rowId + '-list');
+  if(!listEl) return;
+  if(listEl.style.display !== 'none'){ listEl.style.display='none'; return; }
+
+  const rm = RM_DATA[info.tecId] || RM_DATA[info.tecId.toUpperCase()];
+  const visitas = (rm && rm.visitas || []).filter(v=>
+    info.tipo==='rm' ? (v.repetido && v.motivo===info.motivo) : v.motivo_post===info.motivo);
+
+  listEl.innerHTML = visitas.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${visitas.map(v=>
+        `<span style="background:var(--dim);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;font-size:.66rem;color:var(--gold2);font-weight:600">#${v.nMant}</span>`
+      ).join('')}</div>`
+    : '<div style="color:var(--muted);font-size:.68rem">Sin mantenimientos encontrados</div>';
+  listEl.style.display='block';
+}
+
 function _openRMDash(tecId){
   const id = String(tecId).trim();
   const rm = RM_DATA[id] || RM_DATA[id.toUpperCase()];
@@ -1765,18 +1785,27 @@ function _openRMDash(tecId){
   const col = pctOk ? 'var(--green2)' : '#e05a4a';
   const totalOk = rm.total - rm.reps;
 
-  function barras(arr, maxVal, color){
+  function barras(arr, maxVal, color, tecId, tipo){
     if(!arr || !arr.length) return '<div style="color:var(--muted);font-size:.75rem">Sin datos</div>';
-    return arr.map(([m,n])=>{
+    return arr.map(([m,n],idx)=>{
       const pct = Math.round((n/maxVal)*100);
-      return `<div style="margin-bottom:10px">
+      let clickAttr = '', hint = '', listHtml = '';
+      if(tipo){
+        const rowId = `mant-${tipo}-${tecId}-${idx}`;
+        RM_ROW_LOOKUP[rowId] = {tecId, tipo, motivo:m};
+        clickAttr = ` onclick="toggleMantenimientosMotivo('${rowId}')" style="cursor:pointer"`;
+        hint = ' <span style="color:var(--muted);font-size:.6rem;font-weight:400">▾ ver mantenimientos</span>';
+        listHtml = `<div id="${rowId}-list" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)"></div>`;
+      }
+      return `<div style="margin-bottom:10px"${clickAttr}>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-          <div style="font-size:.72rem;color:var(--text);font-weight:600">${m}</div>
+          <div style="font-size:.72rem;color:var(--text);font-weight:600">${m}${hint}</div>
           <div style="font-size:.72rem;font-weight:700;color:${color}">${n}</div>
         </div>
         <div style="background:var(--dim);border-radius:4px;height:6px;overflow:hidden">
           <div style="width:${pct}%;height:100%;border-radius:4px;background:${color};transition:width .5s"></div>
         </div>
+        ${listHtml}
       </div>`;
     }).join('');
   }
@@ -1827,14 +1856,14 @@ function _openRMDash(tecId){
     <div class="detail-section">Motivo de las visitas repetidas (RM)</div>
     <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
       ${rm.motivosRM && rm.motivosRM.length
-        ? barras(rm.motivosRM, maxRMmot, '#e05a4a')
+        ? barras(rm.motivosRM, maxRMmot, '#e05a4a', id, 'rm')
         : '<div style="color:var(--green2);font-size:.75rem">✓ Sin repeticiones registradas</div>'}
     </div>
 
     <div class="detail-section">Causa raíz del post-mantenimiento</div>
     <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
       ${rm.topPost && rm.topPost.length
-        ? barras(rm.topPost, maxPost, 'var(--orange)')
+        ? barras(rm.topPost, maxPost, 'var(--orange)', id, 'post')
         : '<div style="color:var(--muted);font-size:.75rem">Sin datos de causa raíz</div>'}
     </div>`;
 
@@ -1976,6 +2005,14 @@ function showEquipoDash(type, jeId){
         {label:'Unidades',fn:t=>t.uven},
         {label:'Conversión',fn:t=>t.conv.toFixed(1)+'%',color:t=>t.conv>=15?'var(--green2)':'#e05a4a'},
         {label:'20% €',fn:t=>'€'+t.ventas.toFixed(0),color:()=>'var(--gold2)'},
+      ]
+    },
+    ppa:{
+      title:'⭐ PPA del equipo',
+      sub:'Objetivo ≥ 10%',
+      key:'ppa', min:10, unit:'%',
+      cols:[
+        {label:'PPA',fn:t=>t.ppa.toFixed(1)+'%',color:t=>t.ppa>=10?'var(--green2)':'#e05a4a'},
       ]
     }
   };
