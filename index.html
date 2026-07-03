@@ -2058,8 +2058,15 @@ function showEquipoDash(type, jeId){
     }).join('');
 
     const tieneRM = !!(RM_DATA[t.id.toUpperCase()]);
-    const nameClick = (type==='rm' && tieneRM) ? ` onclick="showRMDashFromEquipoDash('${t.id}')"` : '';
-    const nameCursor = (type==='rm' && tieneRM) ? 'cursor:pointer;' : '';
+    const tieneCum = !!(CUM_DATA[t.id.toUpperCase()]);
+    let nameClick = '', nameCursor = '';
+    if(type==='rm' && tieneRM){
+      nameClick = ` onclick="showRMDashFromEquipoDash('${t.id}')"`;
+      nameCursor = 'cursor:pointer;';
+    } else if(type==='cum' && tieneCum){
+      nameClick = ` onclick="showCumDashFromEquipoDash('${t.id}')"`;
+      nameCursor = 'cursor:pointer;';
+    }
 
     return`<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:8px 6px;min-width:0">
@@ -2870,6 +2877,7 @@ document.getElementById('backCumBtn').addEventListener('click',()=>{
 // ── CUM DASHBOARD ──
 let _cumBackPanel = 'mainPanel';
 function showCumDashFromTec(tecId){ _cumBackPanel='tecDetailPanel'; _openCumDash(tecId); }
+function showCumDashFromEquipoDash(tecId){ _cumBackPanel='equipoDashPanel'; _openCumDash(tecId); }
 function showCumDash(tecId){
   _cumBackPanel='mainPanel';
   const id=String(tecId||'').trim().toUpperCase();
