@@ -44,8 +44,8 @@ Al hacer login la app lanza en paralelo:
 | `docs` | Documentos pendientes por técnico | 5 min |
 | `flota` | Matrícula del coche asignado | 5 min |
 | `vacaciones` | Días disfrutados / restantes / AP + desglose mensual (VAC+AP por mes) | 5 min |
-| `rm` | Mantenimientos repetidos (~1000 filas, ~500KB) | Sin caché — supera límite 100KB |
-| `cumplimiento` | Visitas cumplidas/no cumplidas (~2000 filas) | Sin caché — supera límite 100KB |
+| `rm` | Mantenimientos repetidos (`nMant`, `nMantPost` para causa raíz — ver abajo) | Sin caché — supera límite 100KB |
+| `cumplimiento` | Visitas cumplidas/no cumplidas (incluye `nmant` por fila) | Sin caché — supera límite 100KB |
 | `medalia-coord` | Promedio satisfacción por zona (solo JR) | 5 min |
 | `track` | Registra el acceso del usuario (fire-and-forget, sin respuesta) | — |
 | `usage` | Devuelve CSV de accesos por matrícula para dashboard coordinadores | — |
@@ -56,10 +56,13 @@ Al hacer login la app lanza en paralelo:
 |----------|------|-----------|
 | `JERARQUIA` | Object | jeId → array de matrículas. Reconstruido desde cuadrante al login; fallback hardcodeado. |
 | `ZONA_DATA` | Object | mat → zona (string, ej. `'04'`). Columna C del cuadrante. |
-| `CUENTA_DATA` | Object | mat → `{je: bool\|null, empresa: bool\|null}`. Columnas X e Y del cuadrante. |
+| `CUENTA_DATA` | Object | mat → `{je: bool\|null, empresa: bool\|null}`. Desde `CuentaJE`/`CuentaEmpresa` del cuadrante. |
 | `AUTH_DATA` | Object | mat → DNI. Pre-inicializado con JEs/coordinadores; ampliado al cargar cuadrante. |
 | `AUTH_CUADRANTE_LOADED` | bool | `true` cuando `loadAuth()` termina. Evita falso "matrícula no registrada" por timeout. |
 | `MEDALIA_COORD_DATA` | Object | mat → `{promedio, cantidad}`. Por técnico, calculado desde sheet publicado. |
+| `RM_DATA` | Object | mat → `{visitas[], total, reps, pctRM, topPost, motivosRM, topMotivos}`. Cada visita trae `{nMant, motivo, repetido, motivo_post, nMantPost}`. |
+| `CUM_DATA` | Object | mat → `{total, ok, noOk, pct, topRazones, visitas[]}`. Cada visita trae `{nMant, razon, ok}`. |
+| `RM_ROW_LOOKUP` | Object | rowId → `{tecId, tipo, motivo}`. Usado por `toggleMantenimientosMotivo()` para saber qué desplegar al hacer click. |
 
 ---
 
@@ -67,83 +70,109 @@ Al hacer login la app lanza en paralelo:
 
 **URL del deployment actual:**
 ```
-https://script.google.com/macros/s/AKfycbwGzgQeBM9sTXQax8l8faPxguPR8sYpUu0OU-GScMSXJrRvSOWcACAnVV1GSdH_3bqE/exec
+https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec
 ```
+
+> ⚠️ Cada vez que se genera un **nuevo deployment** (no una nueva versión del mismo), la URL cambia y hay que actualizar las 11 constantes `*_URL` en `index.html` + bump de versión en `sw.js`. Ver sección "Redeploy" más abajo.
 
 El script lee de estos Google Sheets:
 
 | Constante en script | Sheet ID | Contenido |
 |---------------------|----------|-----------|
-| `SHEET_RM_ID` | `1mdwknpTrcTmDGMnTB-NZQEh0eI5VClo0fsBmk1BLzNM` | Excel mantenimientos (Hoja 1, ~5100 filas) |
-| `SHEET_CUMPLIMIENTO_ID` | `1UL3XSri6UVsWRfoU94pV1l9falmDmztMKupeE8U2WIw` | Visitas de cumplimiento |
-| `SHEET_CSV_ID` | `1UWfgzyAlu6sK6VLKP0Qoqhs31UfRju1J-zqaR8yuUng` | KPIs resumen técnicos (+ hoja AccesosApp para tracking) |
+| `SHEET_RM_ID` | `1mdwknpTrcTmDGMnTB-NZQEh0eI5VClo0fsBmk1BLzNM` | Excel mantenimientos repetidos (Hoja 1) |
+| `SHEET_CUMPLIMIENTO_ID` | `1UL3XSri6UVsWRfoU94pV1l9falmDmztMKupeE8U2WIw` | Visitas de cumplimiento (hoja `Cumplimiento_Aurum`) |
+| `SHEET_CSV_ID` | `1UWfgzyAlu6sK6VLKP0Qoqhs31UfRju1J-zqaR8yuUng` | KPIs resumen técnicos ("Resumen App Claude" + hoja AccesosApp) |
 | `SHEET_DOCS_ID` | `1clqnU3UH0ld86UoL4uvwp_ciAcMwRxeAjqDkbH4QZLc` | Documentos pendientes |
+| `SHEET_CUADRANTE_ID` | `1HqOI_kN10tAnBmeTrPqAklEa4f-1-DWQ` | Cuadrante (usado por `obtenerNombresTecnicos()`) |
 | `SHEET_FLOTA_ID` | `1c990k4SDrPULhP0VQ8xbZunBg7Qo9nhHl2tTDYPxh2s` | Inventario vehículos (hoja INVENTARIO) |
-| `SHEET_MEDALIA_ID` | `1_EVdRTQPwpMjg9PiJzsbq2_-OgDqBwmZof-cCO1iwoA` | Encuestas de satisfacción (col A = tipo, col E = mat, col P = score CFL Interacción) |
-| `REMITENTE` | `gustavoa.perez@verisure.es` | Correo origen de los Excel |
+| `SHEET_MEDALIA_ID` | `1_EVdRTQPwpMjg9PiJzsbq2_-OgDqBwmZof-cCO1iwoA` | Encuestas de satisfacción |
+| `REMITENTE` | `gustavoa.perez@verisure.es` | Correo origen de **todos** los Excel adjuntos (RM, Cumplimiento, Medalia, Resumen, Mtos_Finalizados) |
 
-Los sheets publicados como CSV que usa el script:
+Los sheets publicados como CSV que usa el script directamente (no pasan por `actualizarSheet`):
 
 | Uso | URL publicada |
 |-----|---------------|
 | Cuadrante (auth + jerarquía) | `https://docs.google.com/spreadsheets/d/e/2PACX-1vSvU7Aah_5VokujbrbolwqCAZLRxrDQqrAZiNpgvNZMXeD-KCPLmJqRjIlPGmswlg/pub?output=csv` |
 | Medalia CFL | `https://docs.google.com/spreadsheets/d/e/2PACX-1vTIbmLaEbAJoZj7d_lJqtIV-gbx2kTiumryL-Q7fpvkxvCs3PBaMiDCHTYpWHU-SQ1loy9eAT0G1X9n/pub?output=csv` |
+| Vacaciones | `https://docs.google.com/spreadsheets/d/e/2PACX-1vR9A0fhBk2ViKKewyKP8rJz364_MsEwi8CD_DEIjokUAeZiJzieR1k3KuZm6Kx9B68YrNTtalq8peFn/pub?output=csv` |
 
-### Columnas del cuadrante usadas
+### Columnas del cuadrante publicado usadas por `servirJerarquia()` / `servirAuth()`
 
-| Columna | Índice | Uso |
-|---------|--------|-----|
-| A | 0 | — |
-| C | 2 | Zona del técnico → `ZONA_DATA` |
-| D | 3 | Matrícula del JE → `JERARQUIA` |
-| E | 4 | Matrícula del técnico → `JERARQUIA` + `AUTH_DATA` |
-| I | 8 | DNI del técnico → `AUTH_DATA` |
-| X | 23 | `CuentaJE` — "Si cuenta" / "No cuenta" (para el equipo del JE) |
-| Y | 24 | `CuentaEmpresa` — "Si cuenta" / "No cuenta" (para KPIs globales) |
+⚠️ **Estos índices son frágiles** — ya se rompieron una vez (julio 2026) cuando alguien quitó 2 columnas ("F Baja", "Motivo") del cuadrante y los índices fijos quedaron desalineados. Si vuelve a pasar algo similar (JE viendo "0 cuentan / 0 no cuentan"), es la primera sospecha: contar columnas reales del sheet publicado contra estos índices.
 
-Valores posibles en columnas X e Y: `"Si cuenta"` → `true`, `"No cuenta"` → `false`, vacío → `null` (técnico no iniciado, excluido de ambos grupos).
+| Columna real (hoy) | Índice | Uso |
+|---------------------|--------|-----|
+| Territorial | 2 | Zona del técnico → `ZONA_DATA` |
+| JDE | 3 | Matrícula del JE → `JERARQUIA` |
+| Matricula | 4 | Matrícula del técnico → `JERARQUIA` + `AUTH_DATA` |
+| DNI | 8 | DNI del técnico → `AUTH_DATA` |
+| Cuenta JDE | **21** | `CuentaJE` — "Si Cuenta" / "No Cuenta" (para el equipo del JE) |
+| Cuenta E | **22** | `CuentaEmpresa` — "Si Cuenta" / "No Cuenta" (para KPIs globales) |
+
+Valores posibles: `"Si cuenta"` → `true`, `"No cuenta"` → `false`, vacío → `null` (técnico no iniciado, excluido de ambos grupos).
 
 ### Funciones del Apps Script
 
 | Función | Descripción |
 |---------|-------------|
 | `servirCSV()` | KPIs técnicos desde hoja principal |
-| `servirAuth()` | Matrículas + DNI del cuadrante. Usa `Utilities.parseCsv()` (maneja comas en nombres de ciudad). Sin filtro de fecha de baja. |
-| `servirJerarquia()` | CSV con JE, Matricula, Zona, CuentaJE, CuentaEmpresa. Excluye director (CM9651). |
+| `servirAuth()` | Matrículas + DNI del cuadrante |
+| `servirJerarquia()` | CSV con JE, Matricula, Zona, CuentaJE, CuentaEmpresa |
 | `servirDocs()` | Documentos pendientes |
 | `servirFlota()` | Vehículos asignados |
-| `servirVacaciones()` | Días VAC/AP totales + desglose mensual (claves `feb26_vac`, `feb26_ap`, …) |
-| `servirRM()` | Mantenimientos repetidos |
-| `servirCumplimiento()` | Visitas de cumplimiento |
-| `servirMedialiaCoordinadores()` | CFL Interacción por técnico (`mat, promedio, cantidad`). Lee desde sheet publicado con detección de columnas por nombre de cabecera. |
-| `registrarAcceso(mat)` | Escribe fila en hoja AccesosApp con timestamp + matrícula |
-| `servirUsage()` | Agrega AccesosApp → CSV con count + último acceso por matrícula |
-| `procesarCorreosAurum()` | Trigger horario: detecta adjuntos por asunto y actualiza sheets |
+| `servirVacaciones()` | Días VAC/AP totales + desglose mensual |
+| `servirRM()` | Mantenimientos repetidos. Devuelve `nMant,motivo,tecnico,territorial,repetido,motivo_post,averia,nMantPost` — **`nMant` (col E) es de la visita repetida, `nMantPost` (col M) es del post-mantenimiento; son números distintos, no reutilizar uno para el otro.** |
+| `servirCumplimiento()` | Visitas de cumplimiento. Devuelve `mat,territorial,averia,cumplido,razon,nmant`. Aplica `fixMojibake_()` a texto con posibles acentos rotos (`Ã¡` → `á`). |
+| `servirMedialiaCoordinadores()` | CFL Interacción por técnico |
+| `registrarAcceso(mat)` / `servirUsage()` | Tracking de accesos |
+| `procesarCorreosAurum()` | Trigger horario — RM/Cumplimiento/Medalia/Resumen (ver abajo) |
+| `procesarMtosFinalizados()` | Trigger horario **independiente** — solo Mtos_Finalizados (ver abajo) |
 | `limpiarCache()` | Invalida todas las claves de CacheService |
+| `archivarSiHuboCambioDeMes_()` / `archivarMtosSiHuboCambioDeMes_()` | Archivado mensual automático (ver sección dedicada) |
 
-### Procesador de correos
-El trigger `procesarCorreosAurum` corre cada hora. Detecta adjuntos por asunto del correo:
-- `repeated maintenance` o archivo `tabla*` → Sheet RM
-- `cumplimiento` → Sheet Cumplimiento
-- `notas globales` / `medalia` / `detalle encuestas` → Sheet Medalia
-- `.csv` / `resumen` → Sheet CSV principal
+### Procesador de correos principal (`procesarCorreosAurum`)
 
-Tras cada actualización llama a `limpiarCache()` automáticamente.
+Trigger horario. Busca correos sin leer de `REMITENTE` con adjunto, y los clasifica por asunto/nombre de archivo:
+- `repeated maintenance` o archivo `tabla*` → `SHEET_RM_ID`
+- `cumplimiento` → `SHEET_CUMPLIMIENTO_ID`
+- `notas globales` / `medalia` / `detalle encuestas` → `SHEET_MEDALIA_ID`
+- `.csv` / `resumen` → `SHEET_CSV_ID`
 
-### Columnas reales del Sheet RM (Hoja 1)
-`Año | Mes | Finalización | Instalación | Mantenimiento(4) | Av/NoAv(5) | Motivo(6) | Técnico(7) | Territorial(8) | ... | ¿Repetido?(11) | ... | Motivo Post(14) | ...`
+Cada adjunto (Excel o CSV) se convierte a CSV vía exportación temporal de Drive y **sobrescribe por completo** la hoja destino (`sheet.clearContents()` + `setValues()`). Después llama a `limpiarCache()`.
 
-El script detecta columnas por nombre (no por índice fijo) con fallback a los índices indicados entre paréntesis.
+### Procesador de Mtos_Finalizados (`procesarMtosFinalizados`) — automatización separada
 
-### Columnas reales del Sheet Cumplimiento
-`mat(0) | territorial(1) | averia(2) | cumplido(3) | razon(4)`
+A diferencia de RM/Cumplimiento/Medalia/Resumen (que van a un Google Sheet), **Mtos_Finalizados_Aurum llega como Excel crudo y se guarda tal cual en Drive** (no se convierte a Sheet, todavía no hay un endpoint `?type=` que lo sirva — es la base para migrar el cálculo de KPIs fuera de "Resumen App Claude", ver sección "Plan de migración").
+
+- Busca correos de `MTOS_REMITENTE` con adjunto que empiece con `Mtos_Finalizados_Aurum`, sin la etiqueta `Procesado-MtosFinalizados`
+- Guarda el adjunto en la carpeta de Drive **"Mtos Finalizados Aurum"** como `Mtos_Finalizados_Aurum.xlsx`, **borrando la versión anterior** (siempre queda solo la más reciente)
+- Etiqueta el correo como procesado
+- Trigger horario instalado vía `instalarTriggerMtosFinalizados()` (ejecutar una sola vez manualmente tras pegar el código)
+
+Funciones auxiliares: `getOrCreateCarpeta_(nombre)`, `getOrCreateLabel_(nombre)`.
+
+### Archivado mensual automático (histórico)
+
+Ninguna de las hojas anteriores guardaba histórico — cada correo nuevo sobrescribía el mes anterior sin dejar rastro. Para no perder datos al cambiar de mes, `actualizarSheet()` y `guardarEnDrive_()` ahora archivan **antes** de sobrescribir:
+
+- `archivarSiHuboCambioDeMes_(ss, tipo)` — para RM/Cumplimiento/Medalia/Resumen (Google Sheets). Detecta cambio de mes (usando la fecha real de la columna A para "CSV"/Resumen vía `detectarMesReal_()`, o el reloj del sistema como respaldo para los demás) y, si cambió, copia el sheet completo a la carpeta **"Historico {Tipo} Aurum"** con nombre **"{Tipo} {Mes} Aurum"** (ej. `Cumplimiento Junio 2026 Aurum`).
+- `archivarMtosSiHuboCambioDeMes_(carpeta, nombreArchivo)` — mismo concepto para el Excel crudo de Mtos_Finalizados, copiándolo a **"Historico Mtos Finalizados Aurum"** como `Mtos_Finalizados {Mes} Aurum.xlsx`.
+- El checkpoint de "qué mes ya se archivó" se guarda en `PropertiesService.getScriptProperties()` (`ultimoMesArchivado_{tipo}`), así que solo archiva **una vez por mes real**, sin importar cuántos correos lleguen ese mes.
+- La **primera vez** que corre no archiva nada (no sabe si el contenido actual es de un mes ya cerrado o no) — solo registra el mes actual como checkpoint. El archivado real empieza a partir del **segundo** cambio de mes detectado.
+
+**Para el histórico retroactivo (febrero–junio 2026):** el usuario coloca manualmente los Excel de esos meses en las mismas carpetas `Historico {Tipo} Aurum`, con el mismo formato de nombre `{Tipo} {Mes} Aurum` (ej. `Resumen Febrero Aurum`, `RM Marzo Aurum`), para que quede compatible con lo que el sistema genera automáticamente hacia adelante.
+
+**Pendiente (no implementado aún):** endpoint para leer un mes histórico específico + selector de mes en la vista de coordinador (`GD5381`) + agregación trimestral/semestral por técnico.
 
 ### Redeploy del Apps Script
 Cada cambio en el script requiere nueva versión:
 1. Deploy → Manage deployments → ✏️ → New version → Deploy
-2. Copiar la nueva URL
-3. Actualizar las constantes `*_URL` en `index.html`
-4. Ejecutar `limpiarCache()` en el editor del script
+2. Si Google genera una **URL nueva** (deployment nuevo, no versión), copiarla y actualizar las 11 constantes `*_URL` en `index.html`
+3. Bump de versión en `sw.js` (fuerza actualización de caché del Service Worker en los clientes)
+4. Commit + push a `main` → GitHub Pages publica automáticamente (~1-2 min)
+5. Ejecutar `limpiarCache()` en el editor del script si el cambio no involucra `doGet`
+
+**Nota sobre fallos de GitHub Pages:** el workflow "pages build and deployment" a veces falla de forma transitoria con el error genérico de GitHub `"Deployment failed, try again later."` (el build en sí siempre tuvo éxito, solo falla el paso de deploy). No es un problema de nuestro código — basta con hacer un nuevo commit/push (ej. bump de versión de `sw.js`) para reintentar. Si falla 2-3 veces seguidas en poco tiempo, esperar ~10 min antes de reintentar (parece estar relacionado con la frecuencia de despliegues).
 
 ---
 
@@ -154,69 +183,49 @@ Cada cambio en el script requiere nueva versión:
 - **Todos los usuarios** (técnicos, JEs y coordinadores) deben introducir matrícula + DNI.
 - `AUTH_DATA` está pre-inicializado con las credenciales de JEs y coordinadores para que un timeout en la carga del cuadrante no bloquee a esos usuarios.
 - Flag `AUTH_CUADRANTE_LOADED`: si el cuadrante aún no ha cargado cuando alguien intenta entrar, muestra "⏳ Datos de acceso aún cargando" en vez de "matrícula no registrada".
-- `loadAuth()` acepta el nombre de columna `Matric` (sin tilde), `Matrícula` o `Matricula` para mayor compatibilidad.
-- `servirAuth()` usa `Utilities.parseCsv()` (parser RFC 4180 nativo de GAS) para manejar comas dentro de celdas (p.ej. nombres de ciudad como "Santa Cruz de Tenerife, S/C").
-- Sin filtro de fecha de baja — pueden entrar todos los que tengan matrícula + DNI en el cuadrante.
 
 ### Jerarquía dinámica desde cuadrante
 
-`loadJerarquia()` reconstruye `JERARQUIA`, `ZONA_DATA` y `CUENTA_DATA` al login leyendo el cuadrante:
-- Columna D → JE (jefe de equipo)
-- Columna E → Matrícula del técnico
-- Columna C → Zona del técnico
-- Columna X → CuentaJE ("Si cuenta" / "No cuenta")
-- Columna Y → CuentaEmpresa ("Si cuenta" / "No cuenta")
-
-Si el endpoint no responde, se usa el `JERARQUIA` hardcodeado como fallback.
+`loadJerarquia()` reconstruye `JERARQUIA`, `ZONA_DATA` y `CUENTA_DATA` al login. Si el endpoint no responde, se usa el `JERARQUIA` hardcodeado como fallback.
 
 ### Panel del JE — lista de técnicos con separación cuentan/no cuentan
 
-La lista de técnicos en el panel del JE se divide en dos grupos según columna X del cuadrante:
-- **Cuentan para el equipo** — mostrados con opacidad normal, ordenados por ML-V
-- **No cuentan** — separados con un divisor y opacidad reducida (0.45)
-- Técnicos sin valor en columna X (no han empezado) → no aparecen en ningún grupo
-
-Cabecera: `👥 Técnicos · X cuentan / Y no cuentan`
+Cabecera: `👥 Técnicos · X cuentan / Y no cuentan`. Técnicos sin valor en la columna correspondiente (no han empezado) no aparecen en ningún grupo.
 
 ### Panel del coordinador — bloques de zona con split empresa
 
-Cada bloque de zona (Zonas 4 y 5 / Zonas 6 y 7) agrega KPIs **solo de los técnicos con `CuentaEmpresa = true`** (columna Y). Debajo aparece un cuadro "No cuentan · N" con sus propios promedios (opacidad 0.65), solo si hay técnicos en ese grupo.
+Cada bloque de zona agrega KPIs solo de técnicos con `CuentaEmpresa = true`. La asignación por zona usa `ZONA_DATA`, no la pertenencia al JE.
 
-Los técnicos sin valor en columna Y (no iniciados) quedan fuera de ambos grupos.
+### Dashboards de equipo con ranking clickeable (JE)
 
-La asignación por zona usa `ZONA_DATA` (columna C del cuadrante), no la pertenencia al JE. Esto permite que un JE con técnicos en zonas distintas (ej. 274629 con técnicos en zonas 04 y 06) contribuya correctamente a cada bloque.
+En la vista de equipo del JE, los 4 KPIs (`%RM`, `%Cumplimiento`, `Conversión`, `PPA`) abren un dashboard con ranking de todos los técnicos del equipo, ordenado de mayor a menor, vía `showEquipoDash(type, jeId)`.
 
-### Dashboard RM (técnico)
+**Desde el ranking de RM y Cumplimiento**, el nombre de cada técnico es clickeable y abre su dashboard individual (`showRMDashFromEquipoDash` / `showCumDashFromEquipoDash`) — **solo si el técnico tiene datos** en `RM_DATA`/`CUM_DATA` respectivamente (algunos técnicos aparecen en el ranking general pero no en el Excel detallado de RM/Cumplimiento de ese mes; en ese caso el nombre no es clickeable, para evitar un callejón sin salida).
 
-El panel de mantenimientos repetidos muestra:
-- **Sección superior** — todos los motivos de todas las visitas del técnico (sin límite de top 5)
-- **Sección inferior** — motivos específicos de las visitas marcadas como RM repetido (`isRep = true`), usando `rmOnlyMap` separado de `rmMap`
+### Dashboard individual de RM — motivos y causa raíz con detalle de mantenimientos
 
-### Banner de actualización
+El dashboard individual (`_openRMDash`) tiene 3 secciones:
+- **Top motivos de todas las visitas** — no clickeable, solo informativo
+- **Motivo de las visitas repetidas (RM)** — clickeable, despliega los números de mantenimiento (`nMant`, columna E del sheet)
+- **Causa raíz del post-mantenimiento** — clickeable, despliega los números de mantenimiento (`nMantPost`, columna M del sheet — **distinta** de la anterior)
 
-El banner de la app muestra la fecha real de los datos del Sheet (columna A del CSV):
-```
-Actualizado al 1 de junio de 2026
-```
+Al hacer click en el nombre de un motivo/razón se despliegan chips con los números de mantenimiento, **deduplicados** y con texto seleccionable/copiable. El click está restringido solo al texto del nombre (no a toda la fila), para poder seleccionar el número sin que la lista se colapse accidentalmente.
+
+### Dashboard individual de Cumplimiento — razones con detalle de mantenimientos
+
+Mismo patrón: "Razones de incumplimiento" es clickeable y despliega los `nmant` asociados a cada razón, deduplicados.
 
 ### Vacaciones con desglose mensual
 
-La vista de vacaciones muestra tres indicadores:
-- **Disfrutados** — días ya tomados
-- **Restantes** — días pendientes
-- **As. Propios** — días de asuntos propios
-
-Y un desglose mensual con píldoras de colores:
-- Azul → días de vacaciones ese mes
-- Naranja → días de asuntos propios ese mes
+Tres indicadores: Disfrutados, Restantes, As. Propios + desglose mensual con píldoras de colores (azul = vacaciones, naranja = asuntos propios).
 
 ### Confirmaciones WhatsApp (JEs)
 
-Los jefes de equipo tienen una pestaña **📲 Confirmaciones** que abre una herramienta local de confirmaciones por WhatsApp en `http://localhost:3000`. Si el servidor local no está corriendo, muestra un aviso con instrucciones para arrancarlo (`INICIAR.bat` / `INICIAR.sh`).
+Pestaña **📲 Confirmaciones** que abre una herramienta local en `http://localhost:3000`.
 
 ### Dashboard "Uso de la app" (coordinadores)
 
-Los coordinadores (`jr`) tienen una pestaña **Uso de la app** que muestra cuántas veces se ha conectado cada matrícula y cuándo fue el último acceso. Los datos se almacenan automáticamente en la hoja `AccesosApp` cada vez que alguien hace login con éxito.
+Pestaña **Uso de la app** con conteo de conexiones y último acceso por matrícula.
 
 ---
 
@@ -225,134 +234,46 @@ Los coordinadores (`jr`) tienen una pestaña **Uso de la app** que muestra cuán
 | Archivo | Descripción |
 |---------|-------------|
 | `manifest.json` | Nombre "Aurum", color dorado `#c9a84c`, display standalone |
-| `sw.js` | Service Worker Network First, versión `v20260626e` |
-| `icon-192.png` | Icono 192×192 (logo empresa, PNG real) |
-| `icon-512.png` | Icono 512×512 (logo empresa, PNG real) |
+| `sw.js` | Service Worker Network First, versión `v20260703a` |
+| `icon-192.png` / `icon-512.png` | Iconos PWA |
 | `favicon.ico` | Favicon 32×32 |
-
-Al instalar en pantalla de inicio aparece como **"Aurum"** con el logo de la empresa en Android e iOS.
 
 Cada nuevo deployment del Apps Script debe ir acompañado de un bump de versión en `sw.js` para que los usuarios reciban la versión actualizada de `index.html`.
 
 ---
 
-## Estado actual de endpoints verificados
+## Plan de migración: dejar de depender de "Resumen App Claude"
 
-| Endpoint | Estado | Muestra |
-|----------|--------|---------|
-| `?type=csv` | ✅ OK | KPIs de técnicos + fecha columna A |
-| `?type=auth` | ✅ OK | Matrículas válidas (sin filtro fecha baja, Utilities.parseCsv) |
-| `?type=jerarquia` | ✅ OK | JE→técnicos + zona + CuentaJE + CuentaEmpresa |
-| `?type=docs` | ✅ OK | Documentos pendientes |
-| `?type=flota` | ✅ OK | Matrícula coche |
-| `?type=vacaciones` | ✅ OK | Días totales + desglose mensual VAC/AP |
-| `?type=rm` | ✅ OK | ~1000 registros, %RM con 2 decimales |
-| `?type=cumplimiento` | ✅ OK | ~1999 registros, %Cum con 2 decimales |
-| `?type=medalia-coord` | ✅ OK | 101 técnicos con CFL Interacción · split cuentan/no cuentan por zona |
-| `?type=track` | ✅ OK | Registra acceso (fire-and-forget, no-cors) |
-| `?type=usage` | ✅ OK | CSV accesos por matrícula para coordinadores |
+**Dirección acordada:** eventualmente todos los KPIs se calcularán directo desde los Excel que llegan por correo (Mtos_Finalizados, Cumplimiento, RM) en vez de depender del sheet manual "Resumen App Claude". Mientras tanto, la app **sigue mostrando datos de Resumen App Claude** — este cambio no se ha hecho todavía.
 
----
+### Fórmula de KPIs validada contra Mtos_Finalizados_Aurum.xlsx
 
-## Bugs resueltos
+Columnas usadas: A=Nº instalación, B=Nº mantenimiento, C=fecha, D=matrícula, L=Tipo Actividad (ojo: encoding roto por acentos, ej. `Revisiï¿½n`), M=Tipología (A/B).
 
-### JE 286800 no podía entrar
-- La columna de matrícula en el cuadrante se llama `Matric` (sin tilde), no `Matrícula`.
-- Fix: `loadAuth()` acepta `row['Matric']||row['Matrícula']||row['Matricula']`.
+| KPI | Fórmula |
+|---|---|
+| **Palito** | Conteo bruto de filas del técnico (sin deduplicar) |
+| **Lab** | Nº de fechas distintas (lunes-viernes) donde el técnico tiene ≥1 fila (no es fijo por mes, varía por técnico según vacaciones/ausencias) |
+| **NEC** | `Lab × 7` |
+| **A+B** | Suma ponderada: tipología A=1, B=2.2, blanco/otro=1 — **deduplicando** cuando se repite instalación+fecha el mismo día (ampliación posterior no cuenta aparte) |
+| **Faltantes** | `max(0, NEC − A+B)` |
+| **MPal** | `Palito ÷ Lab` |
+| **ML-V** | Suma ponderada (dedup) solo de filas lunes-viernes ÷ `Lab` |
+| **MA+B** | `A+B ÷ Lab` (ambos, ML-V y MA+B, dividen por Lab — no por días naturales) |
 
-### Técnicos podían entrar sin DNI
-- El check de DNI solo aplicaba a un conjunto fijo `REQUIEREN_DNI`; los técnicos lo saltaban.
-- Fix: DNI requerido para todos los usuarios sin excepción.
+**Tabla de clasificación Tipo Actividad → A/B:** existe una tabla de referencia (ver conversación) para los casos donde la columna M viene mal o el texto de columna L tiene variantes (plurales "Ampliaciones" vs "Ampliación", prefijos "Avería - X" vs "X", etc.) — con alias ya resueltos para las variantes encontradas en los archivos reales.
 
-### Bypass de autenticación por timeout
-- Si `loadAuth()` tardaba más de 8s, `AUTH_DATA` era `{}` y la validación se omitía.
-- Fix: `AUTH_DATA` pre-inicializado con las credenciales de JEs y coordinadores antes del primer login.
-
-### Matrículas válidas marcadas como "no registradas"
-- Técnicos con fecha de baja en columna T del cuadrante quedaban excluidos de `servirAuth()`.
-- Fix: eliminado el filtro `!fechaBaja`; puede entrar cualquiera con matrícula + DNI en el cuadrante.
-
-### CSV de auth roto por comas en nombres de ciudad
-- `parseCSV()` del Apps Script no manejaba comas dentro de celdas (ej. "Santa Cruz de Tenerife, S/C").
-- Fix: reemplazado por `Utilities.parseCsv()` (parser RFC 4180 nativo de GAS).
-
-### Race condition al login — "matrícula no registrada" en carga lenta
-- `AUTH_DATA` pre-inicializado con JEs/coordinadores → validación siempre corría, pero técnicos del cuadrante aún no habían cargado.
-- Fix: flag `AUTH_CUADRANTE_LOADED`; si es `false` al login, muestra "⏳ Datos aún cargando".
-
-### JERARQUIA hardcodeado — JEs faltantes o con técnicos incorrectos
-- JERARQUIA estaba hardcodeado con 6 JEs y listas fijas de técnicos; no reflejaba cambios del cuadrante.
-- Fix: `loadJerarquia()` reconstruye JERARQUIA dinámicamente desde cuadrante (col D=JE, E=técnico). Fallback al hardcodeado si falla el endpoint.
-
-### JE 274629 con técnicos en zonas 04 y 06 — contabilizados solo en una zona
-- La asignación de zona se hacía por JE (pertenencia al equipo), no por zona real del técnico.
-- Fix: `ZONA_DATA` (col C del cuadrante) se usa para filtrar técnicos por zona real; `renderJRPanel()` usa `getTecsPorZona()`.
-
-### Dashboard RM — sección inferior repetía datos de la superior
-- Ambas secciones usaban `rmMap` (todos los motivos de todas las visitas).
-- Fix: añadido `rmOnlyMap` que solo acumula motivos de visitas con `isRep = true`.
-
-### Dashboard RM — motivos limitados a top 5
-- `slice(0,5)` cortaba la lista.
-- Fix: eliminado el slice; se muestran todos los motivos.
-
-### Clasificación cuentan/no cuentan — técnicos sin valor contaban como "no cuentan"
-- Valor vacío en columna X o Y → `''.includes('si')` → `false` → clasificado como "no cuenta".
-- Fix: valor vacío → `null`; solo "No cuenta" explícito → `false`. Técnicos con `null` (no iniciados) excluidos de ambos grupos.
-
-### Corrección de encoding UTF-8
-- Usar `Set-Content -Encoding UTF8` en PowerShell escribe UTF-8 con BOM, corrompiendo los caracteres españoles y emojis en el navegador.
-- Fix: ediciones en el archivo siempre vía herramienta Edit o `sed` (Bash), nunca `Set-Content` de PowerShell.
-
-### Datos no actualizaban desde Sheets
-- Apps Script cacheaba 1-6 horas → reducido a 5 min.
-- `limpiarCache()` llamado tras cada `actualizarSheet()`.
-- `&t=Date.now()` añadido a todas las URLs de fetch.
-
-### %RM mostraba valor incorrecto
-- `loadRM()` guardaba registros sin agregar y usaba índices numéricos en vez de nombres de columna.
-- Fix: agregación correcta + detección dinámica de columnas por nombre.
-
-### RM y Cumplimiento devolvían solo cabeceras
-- `cache.put()` lanza excepción cuando el valor supera 100KB; el `catch` externo devolvía solo la cabecera hardcodeada.
-- Fix: `cache.put()` en su propio try/catch interno; el `return` fuera del bloque try.
-
-### Flota/vacaciones/docs no aparecían al entrar
-- Race condition: datos cargaban antes de que `CURRENT_TEC` estuviera asignado.
-- Fix: `renderFlota()` llamado directamente en `renderMain()` con retry pattern.
-
----
-
-## Notas técnicas
-
-### parseCSV (cliente vs. script)
-- `parseCSV()` en `index.html` devuelve **objetos con claves por nombre de columna**. Usar siempre `row['nombreColumna']`, nunca `row[0]`.
-- En el Apps Script usar `Utilities.parseCsv()` (devuelve arrays de arrays) para datos con comas en celdas.
-
-### Formato numérico europeo
-Datos del CSV principal en formato europeo (`1.234,56`). Usar siempre `parseNum()`, `parsePct()`, `parseMoney()`. Nunca `parseFloat()` directamente sobre valores raw del CSV.
-
-### Límite caché Apps Script
-`CacheService.getScriptCache()` → **máximo 100KB por clave**. RM y Cumplimiento superan este límite. Si se intenta cachear y falla, el dato se devuelve igual (sin cachear).
-
-### KPI_CONFIG
-Array que controla qué KPIs aparecen en la cuadrícula principal. `OTHER_KEYS` controla el bloque secundario "Resto de indicadores". Umbrales de color en `getGrade()` y `getStatus()`.
-
-### Medalia CFL — cómo funciona
-
-`servirMedialiaCoordinadores()` lee un sheet publicado con datos de encuestas. Detecta columnas por nombre de cabecera (no por índice fijo):
-- Columna con "tipo" → filtra filas `CFL Interacción`
-- Columna con "matricula"/"técnico" → matrícula del técnico
-- Columna con "satisfac" → puntuación (0–10, se omiten vacíos)
-
-Devuelve `mat, promedio, cantidad` por técnico. El cliente agrupa por zona usando `ZONA_DATA` y separa cuentan/no cuentan usando `CUENTA_DATA.empresa`.
+### Pendiente para completar la migración
+- Endpoint(s) que lean directo de los Excel archivados (o del "Historico" cuando aplique) y calculen los KPIs con la fórmula de arriba
+- Reemplazar `loadSheets()` / `SHEETS_CSV_URL` en el cliente
+- Selector de mes histórico + estadísticas trimestrales/semestrales para coordinador (`GD5381`)
 
 ---
 
 ## Archivos del proyecto
 
 ```
-index.html      ← Toda la app (HTML + CSS + JS, ~2800 líneas)
+index.html      ← Toda la app (HTML + CSS + JS)
 manifest.json   ← PWA manifest
 sw.js           ← Service Worker (Network First, caché por versión)
 icon-192.png    ← Icono PWA 192×192
