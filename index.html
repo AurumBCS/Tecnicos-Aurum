@@ -1739,6 +1739,12 @@ function showRMDashFromTec(tecId){
   _openRMDash(tecId);
 }
 
+// showRMDashFromEquipoDash: abre el dashboard RM individual desde el ranking del equipo (JE)
+function showRMDashFromEquipoDash(tecId){
+  _rmBackPanel = 'equipoDashPanel';
+  _openRMDash(tecId);
+}
+
 // ══════════════════════════════════════════════
 //  DASHBOARD RM INDIVIDUAL (desde detalle KPI)
 // ══════════════════════════════════════════════
@@ -2051,9 +2057,13 @@ function showEquipoDash(type, jeId){
       return`<td style="padding:6px 4px;text-align:center;font-size:.7rem;font-family:var(--font);font-weight:700;color:${col}">${v}</td>`;
     }).join('');
 
+    const tieneRM = !!(RM_DATA[t.id.toUpperCase()]);
+    const nameClick = (type==='rm' && tieneRM) ? ` onclick="showRMDashFromEquipoDash('${t.id}')"` : '';
+    const nameCursor = (type==='rm' && tieneRM) ? 'cursor:pointer;' : '';
+
     return`<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:8px 6px;min-width:0">
-        <div style="font-size:.74rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${i===0?'⭐ ':''}${nombre}</div>
+        <div style="font-size:.74rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;${nameCursor}"${nameClick}>${i===0?'⭐ ':''}${nombre}</div>
         <div style="background:var(--dim);border-radius:3px;height:4px;margin-top:5px;overflow:hidden">
           <div style="width:${barPct}%;height:100%;border-radius:3px;background:${barCol};transition:width .5s"></div>
         </div>
