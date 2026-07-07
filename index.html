@@ -357,6 +357,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="sync-dot"></div>
       Sincronizado desde Google Sheets · <span id="lastUpdate">—</span>
     </div>
+    <select id="mesSelectorMain" onchange="cambiarMes(this.value)" style="width:100%;margin:8px 0 14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+      <option value="actual">Mes actual</option>
+    </select>
     <div class="section-head">Indicadores de calidad</div>
     <div class="hero-metrics" id="heroMetrics"></div>
     <div class="section-head">Resumen de objetivos</div>
@@ -376,6 +379,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         <div class="sync-dot"></div>
         <span id="equipoBanner">—</span>
       </div>
+      <select id="mesSelectorEquipo" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+        <option value="actual">Mes actual</option>
+      </select>
 
       <!-- Hero métricas promedio -->
       <div class="section-head">Promedios del equipo</div>
@@ -407,6 +413,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         <div class="sync-dot"></div>
         Vista global · Todos los jefes de equipo
       </div>
+      <select id="mesSelectorJR" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+        <option value="actual">Mes actual</option>
+      </select>
       <div class="section-head">Resumen global</div>
       <div class="equipo-kpis" id="jrResumen" style="margin-bottom:14px"></div>
       <div class="section-head">Jefes de equipo</div>
@@ -500,17 +509,18 @@ const JE_NAMES = {
   'JR9426': 'Coordinador Regional'
 };
 
-const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=csv";
-const AUTH_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=auth";
-const DOCS_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=docs";
-const FLOTA_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=flota";
-const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=vacaciones";
-const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=medalia-coord";
-const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=cumplimiento";
-const RM_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=rm";
-const TRACK_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=track";
-const USAGE_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=usage";
-const JERARQUIA_URL = "https://script.google.com/macros/s/AKfycbyPC8I3igKkEZqnnX_MDSKDh7NrvLcuWKaXPb3yG5oEv3Ho_yumQLA2OnmoLeaglsRQ/exec?type=jerarquia";
+const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=csv";
+const AUTH_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=auth";
+const DOCS_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=docs";
+const FLOTA_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=flota";
+const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=vacaciones";
+const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=medalia-coord";
+const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=cumplimiento";
+const RM_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=rm";
+const TRACK_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=track";
+const USAGE_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=usage";
+const JERARQUIA_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=jerarquia";
+const MESES_URL = "https://script.google.com/macros/s/AKfycbw44y1Lyt6oGW8BjHoFI6L6zKotPw9DrbkPpwPuM7-Tn-ur8K6GaYizASf9nRTpyG_Y/exec?type=meses";
 const VACACIONES_DOCS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9A0fhBk2ViKKewyKP8rJz364_MsEwi8CD_DEIjokUAeZiJzieR1k3KuZm6Kx9B68YrNTtalq8peFn/pub?output=csv";
 // Coordinadores y JEs precargados — AUTH_DATA nunca está vacío aunque falle el endpoint
 let AUTH_DATA = {
@@ -553,6 +563,9 @@ let CURRENT_TEC  = null;
 let CURRENT_USER_TYPE = null; // 'tecnico' | 'je' | 'jr'
 let CURRENT_JE_ID = null;
 let ACTIVE_TAB = 'misDatos';
+let MESES_DISPONIBLES = [];
+let MES_SELECCIONADO  = null; // null = mes actual (en vivo)
+let CURRENT_DATA_LIVE = null; // snapshot de los datos en vivo, para volver desde un mes historico
 
 // ══════════════════════════════════════════════
 //  UTILIDADES
@@ -832,6 +845,7 @@ async function loadSheets(){
       });
       if(tecs.length > 0){
         CURRENT_DATA = {tecnicos: tecs};
+        CURRENT_DATA_LIVE = CURRENT_DATA;
         // Tomar la fecha de actualización de la primera fila
         if(tecs[0].fecha) CSV_FECHA = tecs[0].fecha;
         _datosActualizados = true;
@@ -843,6 +857,83 @@ async function loadSheets(){
     }
   }
   console.log('No se pudo conectar — usando datos locales embebidos');
+}
+
+// ══════════════════════════════════════════════
+//  HISTÓRICO MENSUAL
+// ══════════════════════════════════════════════
+async function loadMeses(){
+  try{
+    const res = await fetch(MESES_URL + '&t=' + Date.now(), {cache:'no-store'});
+    if(!res.ok) return;
+    const text = await res.text();
+    MESES_DISPONIBLES = text.split(',').map(m=>m.trim()).filter(Boolean);
+    poblarSelectoresMes();
+    console.log('Meses disponibles:', MESES_DISPONIBLES.join(', ') || '(ninguno)');
+  }catch(e){ console.log('Meses no disponibles:', e.message); }
+}
+
+function opcionesMesesHTML(){
+  let html = '<option value="actual">Mes actual</option>';
+  MESES_DISPONIBLES.forEach(m => { html += `<option value="${m}">${m}</option>`; });
+  return html;
+}
+
+function poblarSelectoresMes(){
+  ['mesSelectorMain','mesSelectorEquipo','mesSelectorJR'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.innerHTML = opcionesMesesHTML();
+    el.value = MES_SELECCIONADO || 'actual';
+  });
+}
+
+async function cambiarMes(mes){
+  const nuevoMes = (mes === 'actual' || !mes) ? null : mes;
+  if(nuevoMes === MES_SELECCIONADO) return;
+
+  if(!nuevoMes){
+    MES_SELECCIONADO = null;
+    CURRENT_DATA = CURRENT_DATA_LIVE || CURRENT_DATA;
+  } else {
+    try{
+      const url = SHEETS_CSV_URL + '&mes=' + encodeURIComponent(nuevoMes) + '&t=' + Date.now();
+      const res = await fetch(url, {cache:'no-store'});
+      const csv = await res.text();
+      if(!csv || !csv.trim()){
+        alert('Sin datos disponibles para ' + nuevoMes);
+        poblarSelectoresMes();
+        return;
+      }
+      const rows = parseCSV(csv);
+      const tecs = rows.filter(r=>r['Técnico']).map(r=>{
+        const t=csvRow(r); t.ventas20=t.ventas; return t;
+      });
+      MES_SELECCIONADO = nuevoMes;
+      CURRENT_DATA = {tecnicos: tecs};
+    }catch(e){
+      alert('No se pudieron cargar los datos de ' + nuevoMes);
+      poblarSelectoresMes();
+      return;
+    }
+  }
+
+  poblarSelectoresMes();
+
+  // Re-renderizar segun el contexto actual
+  if(CURRENT_USER_TYPE==='tecnico'){
+    const tec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_TEC.id.toUpperCase());
+    if(tec) renderMain(tec); else alert('Sin datos de este técnico para ' + (MES_SELECCIONADO||'el mes actual'));
+  } else if(CURRENT_USER_TYPE==='je'){
+    if(ACTIVE_TAB==='equipo'){
+      renderEquipoPanel(CURRENT_JE_ID);
+    } else {
+      const tec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
+      if(tec) renderMain(tec);
+    }
+  } else if(CURRENT_USER_TYPE==='jr'){
+    renderJRPanel();
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -2740,6 +2831,8 @@ async function doLogin(){
     withTimeout(loadAuth()),
     withTimeout(loadJerarquia())
   ]);
+
+  loadMeses(); // fire-and-forget, no bloquea el login
 
   // Si el timeout ganó, reintenta en background y re-renderiza al llegar
   if(!_datosActualizados){
