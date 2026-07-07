@@ -358,7 +358,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       Sincronizado desde Google Sheets · <span id="lastUpdate">—</span>
     </div>
     <select id="mesSelectorMain" onchange="cambiarMes(this.value)" style="width:100%;margin:8px 0 14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
-      <option value="actual">Mes actual</option>
+      <option value="">Cargando meses…</option>
     </select>
     <div class="section-head">Indicadores de calidad</div>
     <div class="hero-metrics" id="heroMetrics"></div>
@@ -380,7 +380,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         <span id="equipoBanner">—</span>
       </div>
       <select id="mesSelectorEquipo" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
-        <option value="actual">Mes actual</option>
+        <option value="">Cargando meses…</option>
       </select>
 
       <!-- Hero métricas promedio -->
@@ -414,7 +414,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         Vista global · Todos los jefes de equipo
       </div>
       <select id="mesSelectorJR" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
-        <option value="actual">Mes actual</option>
+        <option value="">Cargando meses…</option>
       </select>
       <div class="section-head">Resumen global</div>
       <div class="equipo-kpis" id="jrResumen" style="margin-bottom:14px"></div>
@@ -821,24 +821,22 @@ async function loadDocs(){
 async function loadSheets(){
   if(!SHEETS_CSV_URL) return;
 
-  // Agregar timestamp para forzar refetch (evita caching del servidor)
-  const ts = '&t=' + Date.now();
-  const urlWithTimestamp = SHEETS_CSV_URL + (SHEETS_CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+  // Asegurar que tenemos la lista de meses disponibles para poder caer al ultimo con datos reales
+  if(!MESES_DISPONIBLES.length) await loadMeses();
 
-  // Con Apps Script propio no necesitamos proxy — llamada directa
-  const proxies = [
-    url => url, // directo (Apps Script ya resuelve el CORS)
-    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  ];
+  // MESES_DISPONIBLES viene ordenado del mas reciente al mas antiguo (ej. Julio, Junio, Mayo...).
+  // Probamos cada uno hasta encontrar el primero que tenga tecnicos con datos reales —
+  // el mes en curso puede llegar vacio hasta que carguen los datos de ese mes.
+  const mesesAProbar = MESES_DISPONIBLES.length ? MESES_DISPONIBLES : [null];
 
-  for(const proxyFn of proxies){
+  for(const mes of mesesAProbar){
     try{
-      const fetchUrl = proxyFn(urlWithTimestamp);
-      const res = await fetch(fetchUrl, {cache: 'no-store'});
+      const url = mes
+        ? SHEETS_CSV_URL + '&mes=' + encodeURIComponent(mes) + '&t=' + Date.now()
+        : SHEETS_CSV_URL + '&t=' + Date.now();
+      const res = await fetch(url, {cache: 'no-store'});
       if(!res.ok) continue;
       const text = await res.text();
-      if(!text.includes('Técnico') && !text.includes('Palito') && !text.includes('ecnico')) continue;
       const rows = parseCSV(text);
       const tecs = rows.filter(r=>r['Técnico']).map(r=>{
         const t=csvRow(r); t.ventas20=t.ventas; return t;
@@ -846,14 +844,16 @@ async function loadSheets(){
       if(tecs.length > 0){
         CURRENT_DATA = {tecnicos: tecs};
         CURRENT_DATA_LIVE = CURRENT_DATA;
+        MES_SELECCIONADO = mes;
         // Tomar la fecha de actualización de la primera fila
         if(tecs[0].fecha) CSV_FECHA = tecs[0].fecha;
         _datosActualizados = true;
-        console.log(`Sheets OK: ${tecs.length} técnicos · fecha sheet: ${CSV_FECHA}`);
+        console.log(`Sheets OK: ${tecs.length} técnicos · mes: ${mes||'actual'} · fecha sheet: ${CSV_FECHA}`);
+        poblarSelectoresMes();
         return;
       }
     } catch(e){
-      console.log(`Intento fallido, probando siguiente...`, e.message);
+      console.log(`Intento fallido para mes ${mes||'actual'}, probando siguiente...`, e.message);
     }
   }
   console.log('No se pudo conectar — usando datos locales embebidos');
@@ -874,9 +874,7 @@ async function loadMeses(){
 }
 
 function opcionesMesesHTML(){
-  let html = '<option value="actual">Mes actual</option>';
-  MESES_DISPONIBLES.forEach(m => { html += `<option value="${m}">${m}</option>`; });
-  return html;
+  return MESES_DISPONIBLES.map(m => `<option value="${m}">${m}</option>`).join('');
 }
 
 function poblarSelectoresMes(){
@@ -884,38 +882,32 @@ function poblarSelectoresMes(){
     const el = document.getElementById(id);
     if(!el) return;
     el.innerHTML = opcionesMesesHTML();
-    el.value = MES_SELECCIONADO || 'actual';
+    if(MES_SELECCIONADO) el.value = MES_SELECCIONADO;
   });
 }
 
 async function cambiarMes(mes){
-  const nuevoMes = (mes === 'actual' || !mes) ? null : mes;
-  if(nuevoMes === MES_SELECCIONADO) return;
+  if(!mes || mes === MES_SELECCIONADO) return;
 
-  if(!nuevoMes){
-    MES_SELECCIONADO = null;
-    CURRENT_DATA = CURRENT_DATA_LIVE || CURRENT_DATA;
-  } else {
-    try{
-      const url = SHEETS_CSV_URL + '&mes=' + encodeURIComponent(nuevoMes) + '&t=' + Date.now();
-      const res = await fetch(url, {cache:'no-store'});
-      const csv = await res.text();
-      if(!csv || !csv.trim()){
-        alert('Sin datos disponibles para ' + nuevoMes);
-        poblarSelectoresMes();
-        return;
-      }
-      const rows = parseCSV(csv);
-      const tecs = rows.filter(r=>r['Técnico']).map(r=>{
-        const t=csvRow(r); t.ventas20=t.ventas; return t;
-      });
-      MES_SELECCIONADO = nuevoMes;
-      CURRENT_DATA = {tecnicos: tecs};
-    }catch(e){
-      alert('No se pudieron cargar los datos de ' + nuevoMes);
+  try{
+    const url = SHEETS_CSV_URL + '&mes=' + encodeURIComponent(mes) + '&t=' + Date.now();
+    const res = await fetch(url, {cache:'no-store'});
+    const csv = await res.text();
+    const rows = parseCSV(csv);
+    const tecs = rows.filter(r=>r['Técnico']).map(r=>{
+      const t=csvRow(r); t.ventas20=t.ventas; return t;
+    });
+    if(!tecs.length){
+      alert('Sin datos disponibles para ' + mes);
       poblarSelectoresMes();
       return;
     }
+    MES_SELECCIONADO = mes;
+    CURRENT_DATA = {tecnicos: tecs};
+  }catch(e){
+    alert('No se pudieron cargar los datos de ' + mes);
+    poblarSelectoresMes();
+    return;
   }
 
   poblarSelectoresMes();
@@ -2831,8 +2823,6 @@ async function doLogin(){
     withTimeout(loadAuth()),
     withTimeout(loadJerarquia())
   ]);
-
-  loadMeses(); // fire-and-forget, no bloquea el login
 
   // Si el timeout ganó, reintenta en background y re-renderiza al llegar
   if(!_datosActualizados){
