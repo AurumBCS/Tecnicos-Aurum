@@ -2131,10 +2131,14 @@ function showEquipoDash(type, jeId){
   };
 
   const cfg=CFG[type];
-  const tecsForCalc = type==='rm'
+  const tecsForCalc = (type==='rm' || type==='cum')
     ? tecs.map(t=>{
-        const rmInfo=RM_DATA[t.id.toUpperCase()];
-        return rmInfo ? {...t, palito:rmInfo.total, rm:rmInfo.reps, pRM:rmInfo.pctRM} : t;
+        if(type==='rm'){
+          const rmInfo=RM_DATA[t.id.toUpperCase()];
+          return rmInfo ? {...t, palito:rmInfo.total, rm:rmInfo.reps, pRM:rmInfo.pctRM} : t;
+        }
+        const cumInfo=CUM_DATA[t.id.toUpperCase()];
+        return cumInfo ? {...t, nec:cumInfo.total, palito:cumInfo.ok, incum:cumInfo.noOk, pCum:cumInfo.pct} : t;
       })
     : tecs;
   const sorted=[...tecsForCalc].sort((a,b)=>b[cfg.key]-a[cfg.key]);
