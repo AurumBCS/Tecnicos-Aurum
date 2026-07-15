@@ -2131,9 +2131,15 @@ function showEquipoDash(type, jeId){
   };
 
   const cfg=CFG[type];
-  const sorted=[...tecs].sort((a,b)=>b[cfg.key]-a[cfg.key]);
+  const tecsForCalc = type==='rm'
+    ? tecs.map(t=>{
+        const rmInfo=RM_DATA[t.id.toUpperCase()];
+        return rmInfo ? {...t, palito:rmInfo.total, rm:rmInfo.reps, pRM:rmInfo.pctRM} : t;
+      })
+    : tecs;
+  const sorted=[...tecsForCalc].sort((a,b)=>b[cfg.key]-a[cfg.key]);
   const okCount=sorted.filter(t=>t[cfg.key]>=(cfg.min)).length;
-  const avg2=tecs.length?tecs.reduce((s,t)=>s+t[cfg.key],0)/tecs.length:0;
+  const avg2=tecsForCalc.length?tecsForCalc.reduce((s,t)=>s+t[cfg.key],0)/tecsForCalc.length:0;
   const avgS=getStatus({min:cfg.min},avg2);
   const avgCol=avgS==='ok'?'var(--green2)':avgS==='warn'?'var(--orange)':'#e05a4a';
 
