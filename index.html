@@ -606,6 +606,18 @@ function getBarPct(cfg,val){
 function statusLabel(s){
   return s==='ok'?'✓ Objetivo cumplido':s==='warn'?'⚠ Cerca':'✗ Por debajo';
 }
+function buildKpiAlertBadges(t){
+  const alerts=[];
+  if((t.pRM||0)<89.5)  alerts.push(`RM ${(t.pRM||0).toFixed(1)}%`);
+  if((t.pCum||0)<90)   alerts.push(`Cumpl. ${(t.pCum||0).toFixed(1)}%`);
+  if((t.conv||0)<15)   alerts.push(`Conv ${(t.conv||0).toFixed(1)}%`);
+  if((t.ppa||0)<10)    alerts.push(`PPA ${(t.ppa||0).toFixed(1)}%`);
+  if((t.falt||0)>0)    alerts.push(`Falt. ${t.falt}`);
+  if(!alerts.length) return '';
+  return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+    ${alerts.map(a=>`<span style="font-size:.55rem;font-weight:700;color:#e05a4a;background:rgba(224,90,74,.12);border:1px solid #3d1a1a;border-radius:20px;padding:1px 7px;white-space:nowrap">${a}</span>`).join('')}
+  </div>`;
+}
 function avg(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0; }
 
 // ── Obtener técnicos de un JE ──
@@ -1326,6 +1338,7 @@ function renderEquipoPanel(jeId){
       <div class="tec-info">
         <div class="tec-name">${nombre}${isBest?' <span style="font-size:.6rem;background:rgba(232,201,106,.15);color:var(--gold2);border:1px solid #3d3300;border-radius:4px;padding:1px 6px;vertical-align:middle;margin-left:4px">MEJOR</span>':''}</div>
         <div class="tec-sub">${t.id} · ${t.provincia} · ${t.lab} lab.</div>
+        ${buildKpiAlertBadges(t)}
       </div>
       <div class="tec-vals">
         <div>
@@ -1785,6 +1798,7 @@ function showJEDetail(jeId){
         <div class="tec-info">
           <div class="tec-name">${t.nombre.trim()}</div>
           <div class="tec-sub">${t.id} · ${t.provincia} · ${t.lab} lab.</div>
+          ${buildKpiAlertBadges(t)}
         </div>
         <div class="tec-vals">
           <div>
