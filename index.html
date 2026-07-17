@@ -607,15 +607,17 @@ function statusLabel(s){
   return s==='ok'?'✓ Objetivo cumplido':s==='warn'?'⚠ Cerca':'✗ Por debajo';
 }
 function buildKpiAlertBadges(t){
-  const alerts=[];
-  if((t.pRM||0)<89.5)  alerts.push(`RM ${(t.pRM||0).toFixed(1)}%`);
-  if((t.pCum||0)<90)   alerts.push(`Cumpl. ${(t.pCum||0).toFixed(1)}%`);
-  if((t.conv||0)<15)   alerts.push(`Conv ${(t.conv||0).toFixed(1)}%`);
-  if((t.ppa||0)<10)    alerts.push(`PPA ${(t.ppa||0).toFixed(1)}%`);
-  if((t.falt||0)>0)    alerts.push(`Falt. ${t.falt}`);
-  if(!alerts.length) return '';
+  const badges=[];
+  if((t.pRM||0)<89.5)  badges.push({label:`RM ${(t.pRM||0).toFixed(1)}%`, bad:true});
+  if((t.pCum||0)<90)   badges.push({label:`Cumpl. ${(t.pCum||0).toFixed(1)}%`, bad:true});
+  if((t.conv||0)<15)   badges.push({label:`Conv ${(t.conv||0).toFixed(1)}%`, bad:true});
+  if((t.ppa||0)<10)    badges.push({label:`PPA ${(t.ppa||0).toFixed(1)}%`, bad:true});
+  if((t.falt||0)>0)    badges.push({label:`Falt. ${t.falt}`, bad:true});
+  const exced = (t.ab||0)-(t.nec||0);
+  if(exced>0) badges.push({label:`Exced. +${exced.toFixed(1)} pts`, bad:false});
+  if(!badges.length) return '';
   return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
-    ${alerts.map(a=>`<span style="font-size:.55rem;font-weight:700;color:#e05a4a;background:rgba(224,90,74,.12);border:1px solid #3d1a1a;border-radius:20px;padding:1px 7px;white-space:nowrap">${a}</span>`).join('')}
+    ${badges.map(b=>`<span style="font-size:.55rem;font-weight:700;color:${b.bad?'#e05a4a':'var(--green2)'};background:${b.bad?'rgba(224,90,74,.12)':'rgba(61,170,110,.12)'};border:1px solid ${b.bad?'#3d1a1a':'#1a3d2a'};border-radius:20px;padding:1px 7px;white-space:nowrap">${b.label}</span>`).join('')}
   </div>`;
 }
 function avg(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0; }
