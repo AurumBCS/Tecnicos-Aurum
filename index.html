@@ -806,8 +806,10 @@ async function loadJerarquia(){
         const cuentaJE  = rawJE  ? rawJE.includes('si')  : null;
         const cuentaEmp = rawEmp ? rawEmp.includes('si') : null;
         if(je && mat){
-          if(!JERARQUIA[je]) JERARQUIA[je]=[];
-          if(!JERARQUIA[je].includes(mat)) JERARQUIA[je].push(mat);
+          if(mat !== je){
+            if(!JERARQUIA[je]) JERARQUIA[je]=[];
+            if(!JERARQUIA[je].includes(mat)) JERARQUIA[je].push(mat);
+          }
           if(zona) ZONA_DATA[mat] = zona;
           CUENTA_DATA[mat] = {je: cuentaJE, empresa: cuentaEmp};
         }
