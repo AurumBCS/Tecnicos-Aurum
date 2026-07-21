@@ -532,6 +532,7 @@ let AUTH_DATA = {
   'JN4767':       '77843052N',
   'GD5381':       '60233494J',
   'BLAS.ALVAREZ': '80065456H',
+  'BA8006':       '80065456H',
   'JR9426':       'JR9426',
   '273371':       '05323734Q',
   '286800':       'Z0952631E',
@@ -554,7 +555,7 @@ let _datosActualizados = false;
 
 // ── Matrículas que requieren validación de DNI (Coordinadores + JE) ──
 const REQUIEREN_DNI = new Set([
-  'GD5381', 'JN4767', 'JR9426', 'BLAS.ALVAREZ', // Coordinadores
+  'GD5381', 'JN4767', 'JR9426', 'BLAS.ALVAREZ', 'BA8006', // Coordinadores
   '273371', '286800', 'Q29994', '273379', 'Q28224', '302154', '239831' // JE
 ]);
 
@@ -792,7 +793,7 @@ async function loadJerarquia(){
     const rows = parseCSV(text);
     if(rows.length > 0){
       // Limpiar las entradas de JE (conservar solo las de JR/coordinadores)
-      const keepIds = new Set(['JR9426','CM9651','JN4767','GD5381','BLAS.ALVAREZ']);
+      const keepIds = new Set(['JR9426','CM9651','JN4767','GD5381','BLAS.ALVAREZ','BA8006']);
       Object.keys(JERARQUIA).forEach(k=>{ if(!keepIds.has(k)) delete JERARQUIA[k]; });
       // Reconstruir desde el cuadrante
       ZONA_DATA = {};
@@ -2815,7 +2816,7 @@ function renderVacacionesJE(jeId, containerId){
 function findUser(q){
   q=q.trim().toUpperCase();
   // JR nivel — acceso igual que JR9426
-  const JR_IDS=['JR9426','CM9651','JN4767','GD5381','BLAS.ALVAREZ'];
+  const JR_IDS=['JR9426','CM9651','JN4767','GD5381','BLAS.ALVAREZ','BA8006'];
   if(JR_IDS.includes(q)) return {type:'jr',id:q};
   if(JERARQUIA[q]) return {type:'je',id:q};
 
@@ -2927,7 +2928,8 @@ async function doLogin(){
       'CM9651':'Coordinador Regional',
       'JN4767':'Coordinador Regional',
       'GD5381':'Coordinador Regional',
-      'BLAS.ALVAREZ':'Blas Álvarez'
+      'BLAS.ALVAREZ':'Blas Álvarez',
+      'BA8006':'Blas Álvarez Meléndez'
     };
     document.getElementById('topbarName').textContent=JR_NOMBRES[found.id]||'Coordinador Regional';
     document.getElementById('topbarId').textContent=found.id+' · Regional';
