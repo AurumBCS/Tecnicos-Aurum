@@ -613,12 +613,13 @@ function statusLabel(s){
 }
 function buildKpiAlertBadges(t){
   const pRM=t.pRM||0, pCum=t.pCum||0, conv=t.conv||0, ppa=t.ppa||0;
-  const badges=[
-    {label:`RM ${pRM.toFixed(1)}%`, bad:pRM<89.5},
+  const badges=[];
+  if(!t.pRMSinDatos) badges.push({label:`RM ${pRM.toFixed(1)}%`, bad:pRM<89.5});
+  badges.push(
     {label:`Cumpl. ${pCum.toFixed(1)}%`, bad:pCum<90},
     {label:`Conv ${conv.toFixed(1)}%`, bad:conv<15},
     {label:`PPA ${ppa.toFixed(1)}%`, bad:ppa<10},
-  ];
+  );
   if((t.falt||0)>0) badges.push({label:`Falt. ${t.falt}`, bad:true});
   const exced = (t.ab||0)-(t.nec||0);
   badges.push({label:`Exced. ${exced>=0?'+':''}${exced.toFixed(1)} pts`, bad:exced<=0});
@@ -756,6 +757,7 @@ function csvRow(r){
     devE:   parseMoney(r['Dev.1']||r['Dev']||'0'),
     pRM:    parsePct(r['%RM']),
     rm:     parseFloat(String(r['RM']||'0').replace(',','.'))||0,
+    pRMSinDatos: parsePct(r['%RM'])===100 && !String(r['RM']||'').trim(),
     cfl:    0,
     ventas20: parseMoney(r['20%']),
     fecha:  r['Fecha'] || ''
@@ -1124,6 +1126,16 @@ function renderMain(tec, returnToEquipo=false){
         <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
       </div>`;
     }
+    if(k.key==='pRM' && tec.pRMSinDatos){
+      return`<div class="kpi-card fade-up" style="position:relative">
+        <span class="kpi-icon">${k.icon}</span>
+        <div class="kpi-name">${k.label}</div>
+        <div class="kpi-val" style="color:var(--muted)">—</div>
+        <div class="kpi-target">Obj: ≥ ${k.min}${k.unit}</div>
+        <div class="kpi-status" style="color:var(--muted)">Sin datos este período</div>
+        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:0%"></div></div>
+      </div>`;
+    }
     const val=tec[k.key],s=getStatus(k,val),bp=getBarPct(k,val);
     const tgt=k.max!==undefined?`Obj: = ${k.max}`:`Obj: ≥ ${k.min}${k.unit}`;
     const disp=typeof val==='number'&&!Number.isInteger(val)?val.toFixed(2):val;
@@ -1446,6 +1458,16 @@ function buildTecDetailHTML(tec){
           <div class="kpi-target">Comisión</div>
           <div class="kpi-status ok">Informativo</div>
           <div class="kpi-bar"><div class="kpi-bar-fill ok" style="width:100%"></div></div>
+        </div>`;
+      }
+      if(k.key==='pRM' && tec.pRMSinDatos){
+        return`<div class="kpi-card">
+          <span class="kpi-icon">${k.icon}</span>
+          <div class="kpi-name">${k.label}</div>
+          <div class="kpi-val" style="color:var(--muted)">—</div>
+          <div class="kpi-target">≥ ${k.min}${k.unit}</div>
+          <div class="kpi-status" style="color:var(--muted)">Sin datos este período</div>
+          <div class="kpi-bar"><div class="kpi-bar-fill" style="width:0%"></div></div>
         </div>`;
       }
       const val=tec[k.key],s=getStatus(k,val),bp=getBarPct(k,val);
