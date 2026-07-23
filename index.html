@@ -382,6 +382,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <select id="mesSelectorEquipo" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
         <option value="">Cargando meses…</option>
       </select>
+      <button onclick="showHistoricoEquipo(CURRENT_JE_ID,'equipoPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico del equipo</button>
 
       <!-- Hero métricas promedio -->
       <div class="section-head">Promedios del equipo</div>
@@ -416,11 +417,20 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <select id="mesSelectorJR" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
         <option value="">Cargando meses…</option>
       </select>
+      <button onclick="showHistoricoEquipo(null,'jrPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico de todos los técnicos</button>
       <div class="section-head">Resumen global</div>
       <div class="equipo-kpis" id="jrResumen" style="margin-bottom:14px"></div>
       <div class="section-head">Jefes de equipo</div>
       <div class="je-list" id="jeList"></div>
       <div id="medalliaCoordContainer"></div>
+    </div>
+  </div>
+
+  <!-- Panel histórico multi-mes (JE y coordinadores) -->
+  <div id="historicoPanel">
+    <div style="padding:14px 13px 48px;max-width:680px;margin:0 auto">
+      <button class="detail-back" id="backHistoricoBtn">← Volver</button>
+      <div id="historicoContent"></div>
     </div>
   </div>
 
@@ -758,6 +768,7 @@ function csvRow(r){
     pRM:    parsePct(r['%RM']),
     rm:     parseFloat(String(r['RM']||'0').replace(',','.'))||0,
     pRMSinDatos: parsePct(r['%RM'])===100 && !String(r['RM']||'').trim(),
+    nps:    parseNum(r['NPS']),
     cfl:    0,
     ventas20: parseMoney(r['20%']),
     fecha:  r['Fecha'] || ''
@@ -956,7 +967,7 @@ async function cambiarMes(mes){
 //  PANELS VISIBILITY
 // ══════════════════════════════════════════════
 function hideAllPanels(){
-  ['mainPanel','equipoPanel','jrPanel','usagePanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel']
+  ['mainPanel','equipoPanel','jrPanel','usagePanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel','historicoPanel']
     .forEach(id=>document.getElementById(id).style.display='none');
 }
 function showPanel(id){
@@ -1430,6 +1441,8 @@ function buildTecDetailHTML(tec){
       <div class="detail-hero-sub">${tec.provincia} · ${tec.lab} días laborables</div>
     </div>
 
+    <button onclick="showHistoricoTecnico('${tec.id}','tecDetailPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Ver histórico</button>
+
     <div style="display:flex;gap:12px;margin-bottom:14px;align-items:center">
       <div class="summary-ring" style="flex-shrink:0">
         <svg width="74" height="74" viewBox="0 0 74 74">
@@ -1794,6 +1807,8 @@ function showJEDetail(jeId){
       <div class="detail-hero-val" style="font-size:1.3rem;color:var(--gold2)">${jeNombre}</div>
       <div class="detail-hero-sub">${jeId} · ${tecs.length} técnicos en el equipo</div>
     </div>
+
+    <button onclick="showHistoricoEquipo('${jeId}','jrDetailPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico del equipo</button>
 
     <div class="detail-section">Promedios del equipo</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
@@ -2702,6 +2717,268 @@ async function loadRM(){
   }catch(e){console.log('✗ RM error:',e.message);}
 }
 
+// ══════════════════════════════════════════════
+//  HISTÓRICO MULTI-MES (JE y coordinadores)
+// ══════════════════════════════════════════════
+let _historicoBack = 'equipoPanel'; // string (nombre de panel) o función (re-renderiza una vista dentro de historicoPanel)
+let HISTORICO_DATA = null;
+let HISTORICO_LOADING = null;
+
+const HISTORICO_KPIS = [
+  {key:'mlv',  label:'ML-V', pass:v=>v>=7,    fmt:v=>v.toFixed(2)},
+  {key:'conv', label:'Conv', pass:v=>v>=15,   fmt:v=>v.toFixed(1)+'%'},
+  {key:'pCum', label:'%Cum', pass:v=>v>=90,   fmt:v=>v.toFixed(1)+'%'},
+  {key:'pRM',  label:'%RM',  pass:v=>v>=89.5, fmt:v=>v.toFixed(1)+'%', sinDatosKey:'pRMSinDatos'},
+  {key:'nps',  label:'NPS',  pass:v=>v>9.4,   fmt:v=>v.toFixed(1)},
+];
+
+async function loadHistorico(){
+  if(HISTORICO_DATA) return;
+  if(HISTORICO_LOADING) return HISTORICO_LOADING;
+  HISTORICO_LOADING = (async()=>{
+    if(!MESES_DISPONIBLES.length) await loadMeses();
+    const entries = await Promise.all(MESES_DISPONIBLES.map(async mes=>{
+      try{
+        const url = SHEETS_CSV_URL + '&mes=' + encodeURIComponent(mes) + '&t=' + Date.now();
+        const res = await fetch(url, {cache:'no-store'});
+        if(!res.ok) return [mes, {}];
+        const text = await res.text();
+        const rows = parseCSV(text);
+        const byTec = {};
+        rows.filter(r=>r['Técnico']).forEach(r=>{
+          const t = csvRow(r);
+          if(t.id) byTec[t.id.toUpperCase()] = t;
+        });
+        return [mes, byTec];
+      }catch(e){ return [mes, {}]; }
+    }));
+    const data = {};
+    entries.forEach(([mes, byTec])=>{ data[mes]=byTec; });
+    HISTORICO_DATA = data;
+  })();
+  await HISTORICO_LOADING;
+  HISTORICO_LOADING = null;
+}
+
+function toggleHistDetalle(id){
+  const el = document.getElementById(id);
+  if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+async function showHistoricoTecnico(tecId, back){
+  if(back!==undefined) _historicoBack = back;
+  showPanel('historicoPanel');
+  document.getElementById('historicoContent').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--muted)">Cargando histórico…</div>';
+  window.scrollTo(0,0);
+  await loadHistorico();
+
+  const id = String(tecId).trim().toUpperCase();
+  const meses = MESES_DISPONIBLES;
+  const filas = meses.map(mes=>({mes, t:(HISTORICO_DATA[mes]||{})[id]||null}));
+  const conDatos = filas.filter(f=>f.t);
+
+  let nombre = id;
+  const tecActual = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id);
+  if(tecActual) nombre = tecActual.nombre.trim();
+  else if(conDatos.length) nombre = conDatos[0].t.nombre.trim();
+
+  if(!conDatos.length){
+    document.getElementById('historicoContent').innerHTML = `
+      <div class="detail-hero">
+        <div class="detail-hero-title">📊 Histórico · ${nombre}</div>
+        <div class="detail-hero-sub">${id}</div>
+      </div>
+      <div style="text-align:center;padding:30px 0;color:var(--muted);font-size:.8rem">Sin registros en los meses disponibles</div>`;
+    return;
+  }
+
+  const resumen = HISTORICO_KPIS.map(k=>{
+    const okMeses=[], failMeses=[];
+    conDatos.forEach(f=>{
+      if(k.sinDatosKey && f.t[k.sinDatosKey]) return;
+      if(k.pass(f.t[k.key])) okMeses.push(f.mes); else failMeses.push(f.mes);
+    });
+    return {label:k.label, okMeses, failMeses};
+  });
+
+  const chipsHtml = resumen.map((k,i)=>{
+    const evalCount = k.okMeses.length+k.failMeses.length;
+    const rowId = `histChip-${i}`;
+    const color = k.failMeses.length>0 ? '#e05a4a' : 'var(--green2)';
+    return `
+    <div class="stat-box" onclick="toggleHistDetalle('${rowId}')" style="cursor:pointer">
+      <div class="n" style="color:${color};font-size:1.1rem">${k.okMeses.length}/${evalCount}</div>
+      <div class="l">${k.label}</div>
+      <div id="${rowId}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);text-align:left;font-size:.62rem;line-height:1.6">
+        ${k.okMeses.length?`<div style="color:var(--green2)">✓ ${k.okMeses.join(', ')}</div>`:''}
+        ${k.failMeses.length?`<div style="color:#e05a4a;margin-top:3px">✗ ${k.failMeses.join(', ')}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const compareRows = filas.map(f=>{
+    if(!f.t){
+      return `<tr style="opacity:.4"><td style="padding:8px 6px;font-weight:700">${f.mes}</td>${HISTORICO_KPIS.map(()=>'<td style="padding:8px 6px;text-align:center">—</td>').join('')}</tr>`;
+    }
+    const cells = HISTORICO_KPIS.map(k=>{
+      if(k.sinDatosKey && f.t[k.sinDatosKey]) return `<td style="padding:8px 6px;text-align:center;color:var(--muted)">—</td>`;
+      const val = f.t[k.key];
+      const ok = k.pass(val);
+      return `<td style="padding:8px 6px;text-align:center;color:${ok?'var(--green2)':'#e05a4a'};font-weight:700">${k.fmt(val)}</td>`;
+    }).join('');
+    return `<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px;font-weight:700;color:var(--gold2)">${f.mes}</td>${cells}</tr>`;
+  }).join('');
+
+  const headerCells = HISTORICO_KPIS.map(k=>`<th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">${k.label}</th>`).join('');
+
+  document.getElementById('historicoContent').innerHTML = `
+    <div class="detail-hero">
+      <div class="detail-hero-title">📊 Histórico · ${nombre}</div>
+      <div class="detail-hero-sub">${id} · ${conDatos.length} de ${meses.length} meses con datos</div>
+    </div>
+
+    <div class="detail-section">Resumen de cumplimiento · toca cada KPI para ver los meses</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:9px;margin-bottom:16px">
+      ${chipsHtml}
+    </div>
+
+    <div class="detail-section">Comparativa mensual · más reciente arriba</div>
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.68rem">
+        <thead style="background:var(--dim)"><tr>
+          <th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left">Mes</th>
+          ${headerCells}
+        </tr></thead>
+        <tbody>${compareRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function showHistoricoEquipo(jeId, back){
+  if(back!==undefined) _historicoBack = back;
+  window._histGrupoJeId = jeId;
+  window._histGrupoOuterBack = _historicoBack;
+  showPanel('historicoPanel');
+  document.getElementById('historicoContent').innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--muted)">Cargando histórico del equipo…</div>';
+  window.scrollTo(0,0);
+  await loadHistorico();
+
+  const mesesDesc = MESES_DISPONIBLES;
+  const mesesAsc = [...mesesDesc].reverse();
+
+  let miembros, titulo, sub;
+  if(jeId){
+    const ids = (JERARQUIA[jeId]||[]).map(x=>x.toUpperCase());
+    miembros = CURRENT_DATA.tecnicos.filter(t=>ids.includes(t.id.toUpperCase()));
+    titulo = JE_NAMES[jeId] || jeId;
+    sub = `${jeId} · Equipo`;
+  } else {
+    miembros = CURRENT_DATA.tecnicos;
+    titulo = 'Todos los técnicos';
+    sub = 'Vista global';
+  }
+
+  if(!miembros.length || !mesesAsc.length){
+    document.getElementById('historicoContent').innerHTML = `
+      <div class="detail-hero">
+        <div class="detail-hero-title">📊 Histórico del equipo</div>
+        <div class="detail-hero-val" style="font-size:1.1rem;color:var(--gold2)">${titulo}</div>
+        <div class="detail-hero-sub">${sub}</div>
+      </div>
+      <div style="text-align:center;padding:30px 0;color:var(--muted);font-size:.8rem">Sin técnicos o meses disponibles</div>`;
+    return;
+  }
+
+  window._histGrupo = {miembros, mesesAsc};
+
+  const opciones = mesesAsc.map(m=>`<option value="${m}">${m}</option>`).join('');
+  const filasMiembros = [...miembros].sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(m=>`
+    <div class="tec-row g-best" onclick="verTecnicoDesdeHistoricoEquipo('${m.id}')" style="cursor:pointer">
+      <div class="tec-info">
+        <div class="tec-name">${m.nombre.trim()}</div>
+        <div class="tec-sub">${m.id} · ${m.provincia}</div>
+      </div>
+      <div class="tec-arrow">›</div>
+    </div>`).join('');
+
+  document.getElementById('historicoContent').innerHTML = `
+    <div class="detail-hero">
+      <div class="detail-hero-title">📊 Histórico del equipo</div>
+      <div class="detail-hero-val" style="font-size:1.1rem;color:var(--gold2)">${titulo}</div>
+      <div class="detail-hero-sub">${sub} · ${miembros.length} técnicos</div>
+    </div>
+
+    <div class="detail-section">Periodo a evaluar</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+      <select id="histDesde" onchange="actualizarHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
+      <span style="color:var(--muted);font-size:.7rem">→</span>
+      <select id="histHasta" onchange="actualizarHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
+    </div>
+
+    <div class="detail-section" id="histStatsLabel">Cumplimiento del equipo</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:9px;margin-bottom:16px" id="histStatsGrid"></div>
+
+    <div class="detail-section">Técnicos del equipo · toca para ver su historial</div>
+    <div class="tec-list">${filasMiembros}</div>
+  `;
+
+  document.getElementById('histDesde').value = mesesAsc[0];
+  document.getElementById('histHasta').value = mesesAsc[mesesAsc.length-1];
+  actualizarHistoricoEquipo();
+}
+
+function verTecnicoDesdeHistoricoEquipo(tecId){
+  const jeId = window._histGrupoJeId;
+  const outerBack = window._histGrupoOuterBack;
+  showHistoricoTecnico(tecId, ()=>showHistoricoEquipo(jeId, outerBack));
+}
+
+function actualizarHistoricoEquipo(){
+  const g = window._histGrupo;
+  if(!g) return;
+  const desdeSel = document.getElementById('histDesde');
+  const hastaSel = document.getElementById('histHasta');
+  const idxDesde = g.mesesAsc.indexOf(desdeSel.value);
+  const idxHasta = g.mesesAsc.indexOf(hastaSel.value);
+  const lo = Math.min(idxDesde, idxHasta), hi = Math.max(idxDesde, idxHasta);
+  const mesesPeriodo = g.mesesAsc.slice(lo, hi+1);
+
+  let conDatosTotal = 0;
+  const resumen = HISTORICO_KPIS.map(k=>({key:k.key, label:k.label, pass:k.pass, sinDatosKey:k.sinDatosKey, okNombres:[], failNombres:[]}));
+  g.miembros.forEach(m=>{
+    const id = m.id.toUpperCase();
+    const filasMes = mesesPeriodo.map(mes=>(HISTORICO_DATA[mes]||{})[id]).filter(Boolean);
+    if(!filasMes.length) return;
+    conDatosTotal++;
+    resumen.forEach(k=>{
+      const evaluables = filasMes.filter(t=>!(k.sinDatosKey && t[k.sinDatosKey]));
+      if(!evaluables.length) return;
+      const cumpleTodos = evaluables.every(t=>k.pass(t[k.key]));
+      (cumpleTodos ? k.okNombres : k.failNombres).push(m.nombre.trim());
+    });
+  });
+
+  const grid = resumen.map((k,i)=>{
+    const evalCount = k.okNombres.length+k.failNombres.length;
+    const rowId = `histEquipoChip-${i}`;
+    const color = k.failNombres.length>0 ? '#e05a4a' : 'var(--green2)';
+    return `
+    <div class="stat-box" onclick="toggleHistDetalle('${rowId}')" style="cursor:pointer">
+      <div class="n" style="color:${color};font-size:1.1rem">${k.okNombres.length}/${evalCount}</div>
+      <div class="l">${k.label}</div>
+      <div id="${rowId}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);text-align:left;font-size:.6rem;line-height:1.6">
+        ${k.failNombres.length?`<div style="color:#e05a4a">✗ ${k.failNombres.join(', ')}</div>`:''}
+        ${k.okNombres.length?`<div style="color:var(--green2);margin-top:3px">✓ ${k.okNombres.join(', ')}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const periodoLabel = mesesPeriodo.length===1 ? mesesPeriodo[0] : `${mesesPeriodo[0]} → ${mesesPeriodo[mesesPeriodo.length-1]}`;
+  document.getElementById('histStatsLabel').textContent = `Cumplimiento del equipo · ${periodoLabel} (${conDatosTotal}/${g.miembros.length} con datos)`;
+  document.getElementById('histStatsGrid').innerHTML = grid;
+}
+
 function renderFlota(tecId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
@@ -3016,6 +3293,10 @@ document.getElementById('backRMBtn').addEventListener('click',()=>{
 });
 document.getElementById('backCumBtn').addEventListener('click',()=>{
   showPanel(_cumBackPanel); window.scrollTo(0,0);
+});
+document.getElementById('backHistoricoBtn').addEventListener('click',()=>{
+  if(typeof _historicoBack==='function'){ _historicoBack(); }
+  else { showPanel(_historicoBack); window.scrollTo(0,0); }
 });
 
 // ── CUM DASHBOARD ──
