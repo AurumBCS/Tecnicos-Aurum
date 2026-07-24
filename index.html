@@ -2949,8 +2949,15 @@ async function showHistoricoEquipo(jeId, back){
       ${provinciaOptions}
     </select>
 
-    <div class="detail-section">Filtrar por cuenta</div>
+    <div class="detail-section">Cuenta para la empresa</div>
     <select id="histCuentaFiltro" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
+      <option value="">Todos los técnicos</option>
+      <option value="si">Solo los que cuentan</option>
+      <option value="no">Solo los que no cuentan</option>
+    </select>
+
+    <div class="detail-section">Cuenta para el equipo (JE)</div>
+    <select id="histCuentaJEFiltro" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
       <option value="">Todos los técnicos</option>
       <option value="si">Solo los que cuentan</option>
       <option value="no">Solo los que no cuentan</option>
@@ -3025,6 +3032,10 @@ function actualizarVistaHistoricoEquipo(){
   const cuentaFiltro = document.getElementById('histCuentaFiltro').value;
   if(cuentaFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa!==false);
   else if(cuentaFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===false);
+
+  const cuentaJEFiltro = document.getElementById('histCuentaJEFiltro').value;
+  if(cuentaJEFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je!==false);
+  else if(cuentaJEFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je===false);
 
   document.getElementById('histGrupoSub').textContent = `${miembros.length} técnico${miembros.length===1?'':'s'} en el filtro actual`;
 
