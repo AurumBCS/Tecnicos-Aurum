@@ -765,7 +765,7 @@ function csvRow(r){
     ppa:    parsePct(r['PPA']),
     dev:    parseFloat(String(r['Dev']||'0').replace(',','.'))||0,
     devE:   parseMoney(r['Dev.1']||r['Dev']||'0'),
-    pRM:    parsePct(r['%RM']),
+    pRM:    Math.round(parsePct(r['%RM'])*10)/10,
     rm:     parseFloat(String(r['RM']||'0').replace(',','.'))||0,
     pRMSinDatos: parsePct(r['%RM'])===100 && !String(r['RM']||'').trim(),
     nps:    parseNum(r['NPS']),
