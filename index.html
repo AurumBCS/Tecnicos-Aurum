@@ -2765,6 +2765,23 @@ function toggleHistDetalle(id){
   if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
 }
 
+function kpiChipHtml(label, okList, failList, rowId){
+  const total = okList.length + failList.length;
+  const bad = failList.length>0;
+  const borderColor = bad ? '#3d1a1a' : '#1a3d2a';
+  const bgTint = bad ? 'rgba(224,90,74,.1)' : 'rgba(61,170,110,.1)';
+  const numColor = bad ? '#e05a4a' : 'var(--green2)';
+  return `
+    <div class="stat-box" onclick="toggleHistDetalle('${rowId}')" style="cursor:pointer;border-color:${borderColor};background:${bgTint}">
+      <div class="n" style="color:${numColor};font-size:1.1rem">${okList.length}/${total}</div>
+      <div class="l">${label}</div>
+      <div id="${rowId}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);text-align:left;font-size:.6rem;line-height:1.6">
+        ${failList.length?`<div style="color:#e05a4a">✗ ${failList.join(', ')}</div>`:''}
+        ${okList.length?`<div style="color:var(--green2);margin-top:3px">✓ ${okList.join(', ')}</div>`:''}
+      </div>
+    </div>`;
+}
+
 async function showHistoricoTecnico(tecId, back){
   if(back!==undefined) _historicoBack = back;
   showPanel('historicoPanel');
@@ -2801,20 +2818,7 @@ async function showHistoricoTecnico(tecId, back){
     return {label:k.label, okMeses, failMeses};
   });
 
-  const chipsHtml = resumen.map((k,i)=>{
-    const evalCount = k.okMeses.length+k.failMeses.length;
-    const rowId = `histChip-${i}`;
-    const color = k.failMeses.length>0 ? '#e05a4a' : 'var(--green2)';
-    return `
-    <div class="stat-box" onclick="toggleHistDetalle('${rowId}')" style="cursor:pointer">
-      <div class="n" style="color:${color};font-size:1.1rem">${k.okMeses.length}/${evalCount}</div>
-      <div class="l">${k.label}</div>
-      <div id="${rowId}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);text-align:left;font-size:.62rem;line-height:1.6">
-        ${k.okMeses.length?`<div style="color:var(--green2)">✓ ${k.okMeses.join(', ')}</div>`:''}
-        ${k.failMeses.length?`<div style="color:#e05a4a;margin-top:3px">✗ ${k.failMeses.join(', ')}</div>`:''}
-      </div>
-    </div>`;
-  }).join('');
+  const chipsHtml = resumen.map((k,i)=>kpiChipHtml(k.label, k.okMeses, k.failMeses, `histChip-${i}`)).join('');
 
   const compareRows = filas.map(f=>{
     if(!f.t){
@@ -2866,20 +2870,21 @@ async function showHistoricoEquipo(jeId, back){
 
   const mesesDesc = MESES_DISPONIBLES;
   const mesesAsc = [...mesesDesc].reverse();
+  const esTodos = !jeId;
 
-  let miembros, titulo, sub;
+  let miembrosBase, titulo, sub;
   if(jeId){
     const ids = (JERARQUIA[jeId]||[]).map(x=>x.toUpperCase());
-    miembros = CURRENT_DATA.tecnicos.filter(t=>ids.includes(t.id.toUpperCase()));
+    miembrosBase = CURRENT_DATA.tecnicos.filter(t=>ids.includes(t.id.toUpperCase()));
     titulo = JE_NAMES[jeId] || jeId;
     sub = `${jeId} · Equipo`;
   } else {
-    miembros = CURRENT_DATA.tecnicos;
+    miembrosBase = CURRENT_DATA.tecnicos;
     titulo = 'Todos los técnicos';
     sub = 'Vista global';
   }
 
-  if(!miembros.length || !mesesAsc.length){
+  if(!miembrosBase.length || !mesesAsc.length){
     document.getElementById('historicoContent').innerHTML = `
       <div class="detail-hero">
         <div class="detail-hero-title">📊 Histórico del equipo</div>
@@ -2890,42 +2895,41 @@ async function showHistoricoEquipo(jeId, back){
     return;
   }
 
-  window._histGrupo = {miembros, mesesAsc};
+  window._histGrupo = {miembrosBase, mesesAsc, esTodos};
 
   const opciones = mesesAsc.map(m=>`<option value="${m}">${m}</option>`).join('');
-  const filasMiembros = [...miembros].sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(m=>`
-    <div class="tec-row g-best" onclick="verTecnicoDesdeHistoricoEquipo('${m.id}')" style="cursor:pointer">
-      <div class="tec-info">
-        <div class="tec-name">${m.nombre.trim()}</div>
-        <div class="tec-sub">${m.id} · ${m.provincia}</div>
-      </div>
-      <div class="tec-arrow">›</div>
-    </div>`).join('');
 
   document.getElementById('historicoContent').innerHTML = `
     <div class="detail-hero">
       <div class="detail-hero-title">📊 Histórico del equipo</div>
       <div class="detail-hero-val" style="font-size:1.1rem;color:var(--gold2)">${titulo}</div>
-      <div class="detail-hero-sub">${sub} · ${miembros.length} técnicos</div>
+      <div class="detail-hero-sub" id="histGrupoSub">${sub} · ${miembrosBase.length} técnicos</div>
     </div>
 
     <div class="detail-section">Periodo a evaluar</div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-      <select id="histDesde" onchange="actualizarHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <select id="histDesde" onchange="actualizarVistaHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
       <span style="color:var(--muted);font-size:.7rem">→</span>
-      <select id="histHasta" onchange="actualizarHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
+      <select id="histHasta" onchange="actualizarVistaHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
     </div>
+
+    <div class="detail-section">Filtrar por cuenta</div>
+    <select id="histCuentaFiltro" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
+      <option value="">Todos los técnicos</option>
+      <option value="si">Solo los que cuentan</option>
+      <option value="no">Solo los que no cuentan</option>
+    </select>
 
     <div class="detail-section" id="histStatsLabel">Cumplimiento del equipo</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:9px;margin-bottom:16px" id="histStatsGrid"></div>
 
-    <div class="detail-section">Técnicos del equipo · toca para ver su historial</div>
-    <div class="tec-list">${filasMiembros}</div>
+    <div class="detail-section">Ver historial de un técnico${esTodos?' · agrupados por jefe de equipo':''}</div>
+    <select id="histTecnicoSelect" onchange="if(this.value) verTecnicoDesdeHistoricoEquipo(this.value)" style="width:100%;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-size:.75rem"></select>
   `;
 
   document.getElementById('histDesde').value = mesesAsc[0];
   document.getElementById('histHasta').value = mesesAsc[mesesAsc.length-1];
-  actualizarHistoricoEquipo();
+  actualizarVistaHistoricoEquipo();
 }
 
 function verTecnicoDesdeHistoricoEquipo(tecId){
@@ -2934,7 +2938,7 @@ function verTecnicoDesdeHistoricoEquipo(tecId){
   showHistoricoTecnico(tecId, ()=>showHistoricoEquipo(jeId, outerBack));
 }
 
-function actualizarHistoricoEquipo(){
+function actualizarVistaHistoricoEquipo(){
   const g = window._histGrupo;
   if(!g) return;
   const desdeSel = document.getElementById('histDesde');
@@ -2944,9 +2948,16 @@ function actualizarHistoricoEquipo(){
   const lo = Math.min(idxDesde, idxHasta), hi = Math.max(idxDesde, idxHasta);
   const mesesPeriodo = g.mesesAsc.slice(lo, hi+1);
 
+  const cuentaFiltro = document.getElementById('histCuentaFiltro').value;
+  let miembros = g.miembrosBase;
+  if(cuentaFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa!==false);
+  else if(cuentaFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===false);
+
+  document.getElementById('histGrupoSub').textContent = `${miembros.length} técnico${miembros.length===1?'':'s'} en el filtro actual`;
+
   let conDatosTotal = 0;
   const resumen = HISTORICO_KPIS.map(k=>({key:k.key, label:k.label, pass:k.pass, sinDatosKey:k.sinDatosKey, okNombres:[], failNombres:[]}));
-  g.miembros.forEach(m=>{
+  miembros.forEach(m=>{
     const id = m.id.toUpperCase();
     const filasMes = mesesPeriodo.map(mes=>(HISTORICO_DATA[mes]||{})[id]).filter(Boolean);
     if(!filasMes.length) return;
@@ -2959,24 +2970,38 @@ function actualizarHistoricoEquipo(){
     });
   });
 
-  const grid = resumen.map((k,i)=>{
-    const evalCount = k.okNombres.length+k.failNombres.length;
-    const rowId = `histEquipoChip-${i}`;
-    const color = k.failNombres.length>0 ? '#e05a4a' : 'var(--green2)';
-    return `
-    <div class="stat-box" onclick="toggleHistDetalle('${rowId}')" style="cursor:pointer">
-      <div class="n" style="color:${color};font-size:1.1rem">${k.okNombres.length}/${evalCount}</div>
-      <div class="l">${k.label}</div>
-      <div id="${rowId}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);text-align:left;font-size:.6rem;line-height:1.6">
-        ${k.failNombres.length?`<div style="color:#e05a4a">✗ ${k.failNombres.join(', ')}</div>`:''}
-        ${k.okNombres.length?`<div style="color:var(--green2);margin-top:3px">✓ ${k.okNombres.join(', ')}</div>`:''}
-      </div>
-    </div>`;
-  }).join('');
+  const grid = resumen.map((k,i)=>kpiChipHtml(k.label, k.okNombres, k.failNombres, `histEquipoChip-${i}`)).join('');
 
   const periodoLabel = mesesPeriodo.length===1 ? mesesPeriodo[0] : `${mesesPeriodo[0]} → ${mesesPeriodo[mesesPeriodo.length-1]}`;
-  document.getElementById('histStatsLabel').textContent = `Cumplimiento del equipo · ${periodoLabel} (${conDatosTotal}/${g.miembros.length} con datos)`;
+  document.getElementById('histStatsLabel').textContent = `Cumplimiento del equipo · ${periodoLabel} (${conDatosTotal}/${miembros.length} con datos)`;
   document.getElementById('histStatsGrid').innerHTML = grid;
+
+  // Selector de técnico — agrupado por jefe de equipo cuando es la vista "todos"
+  const sel = document.getElementById('histTecnicoSelect');
+  const sorted = [...miembros].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  if(g.esTodos){
+    const jeIds = (JERARQUIA['JR9426']||[]).slice().sort((a,b)=>(JE_NAMES[a]||a).localeCompare(JE_NAMES[b]||b));
+    const porJe = {};
+    sorted.forEach(m=>{
+      const je = jeIds.find(je=>(JERARQUIA[je]||[]).map(x=>x.toUpperCase()).includes(m.id.toUpperCase()));
+      const key = je || '__sin_equipo__';
+      if(!porJe[key]) porJe[key]=[];
+      porJe[key].push(m);
+    });
+    const grupos = jeIds.filter(je=>porJe[je]).map(je=>
+      `<optgroup label="${escapeHtmlAttr(JE_NAMES[je]||je)}">${porJe[je].map(m=>`<option value="${m.id}">${m.nombre.trim()}</option>`).join('')}</optgroup>`
+    ).join('');
+    const sinEquipo = porJe['__sin_equipo__']
+      ? `<optgroup label="Sin equipo asignado">${porJe['__sin_equipo__'].map(m=>`<option value="${m.id}">${m.nombre.trim()}</option>`).join('')}</optgroup>`
+      : '';
+    sel.innerHTML = `<option value="">— Elige un técnico (${miembros.length}) —</option>${grupos}${sinEquipo}`;
+  } else {
+    sel.innerHTML = `<option value="">— Elige un técnico (${miembros.length}) —</option>${sorted.map(m=>`<option value="${m.id}">${m.nombre.trim()}</option>`).join('')}`;
+  }
+}
+
+function escapeHtmlAttr(s){
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function renderFlota(tecId, containerId){
