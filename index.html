@@ -2899,6 +2899,19 @@ async function showHistoricoEquipo(jeId, back){
 
   const opciones = mesesAsc.map(m=>`<option value="${m}">${m}</option>`).join('');
 
+  const responsableOptions = esTodos
+    ? (JERARQUIA['JR9426']||[]).slice().sort((a,b)=>(JE_NAMES[a]||a).localeCompare(JE_NAMES[b]||b)).map(je=>{
+        const n = (JERARQUIA[je]||[]).length;
+        return `<option value="${je}">${escapeHtmlAttr(JE_NAMES[je]||je)} · ${n} técnico${n===1?'':'s'}</option>`;
+      }).join('')
+    : '';
+
+  const provincias = [...new Set(miembrosBase.map(t=>t.provincia).filter(Boolean))].sort();
+  const provinciaOptions = provincias.map(p=>{
+    const n = miembrosBase.filter(t=>t.provincia===p).length;
+    return `<option value="${escapeHtmlAttr(p)}">${p} · ${n} técnico${n===1?'':'s'}</option>`;
+  }).join('');
+
   document.getElementById('historicoContent').innerHTML = `
     <div class="detail-hero">
       <div class="detail-hero-title">📊 Histórico del equipo</div>
@@ -2906,12 +2919,35 @@ async function showHistoricoEquipo(jeId, back){
       <div class="detail-hero-sub" id="histGrupoSub">${sub} · ${miembrosBase.length} técnicos</div>
     </div>
 
+    ${esTodos?`
+    <div class="detail-section">Buscar técnico</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input id="histBuscarInput" type="text" placeholder="Nombre o matrícula" onkeydown="if(event.key==='Enter') buscarHistoricoTecnico()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem" />
+      <button onclick="buscarHistoricoTecnico()" style="padding:9px 16px;background:var(--gold2);color:#1a1608;border:none;border-radius:8px;font-weight:700;font-size:.72rem;cursor:pointer">Buscar</button>
+    </div>
+    <div id="histBuscarResultados" style="margin-bottom:6px"></div>
+    `:''}
+
     <div class="detail-section">Periodo a evaluar</div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
       <select id="histDesde" onchange="actualizarVistaHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
       <span style="color:var(--muted);font-size:.7rem">→</span>
       <select id="histHasta" onchange="actualizarVistaHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
     </div>
+
+    ${esTodos?`
+    <div class="detail-section">Responsable (jefe técnico)</div>
+    <select id="histResponsableFiltro" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
+      <option value="">Todos los responsables</option>
+      ${responsableOptions}
+    </select>
+    `:''}
+
+    <div class="detail-section">Provincia</div>
+    <select id="histProvinciaFiltro" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
+      <option value="">Todas las provincias</option>
+      ${provinciaOptions}
+    </select>
 
     <div class="detail-section">Filtrar por cuenta</div>
     <select id="histCuentaFiltro" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
@@ -2923,13 +2959,38 @@ async function showHistoricoEquipo(jeId, back){
     <div class="detail-section" id="histStatsLabel">Cumplimiento del equipo</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:9px;margin-bottom:16px" id="histStatsGrid"></div>
 
-    <div class="detail-section">Ver historial de un técnico${esTodos?' · agrupados por jefe de equipo':''}</div>
-    <select id="histTecnicoSelect" onchange="if(this.value) verTecnicoDesdeHistoricoEquipo(this.value)" style="width:100%;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-size:.75rem"></select>
+    <div class="detail-section">Técnicos · toca para ver su historial</div>
+    <div id="histRosterTable"></div>
   `;
 
   document.getElementById('histDesde').value = mesesAsc[0];
   document.getElementById('histHasta').value = mesesAsc[mesesAsc.length-1];
   actualizarVistaHistoricoEquipo();
+}
+
+function buscarHistoricoTecnico(){
+  const input = document.getElementById('histBuscarInput');
+  const cont = document.getElementById('histBuscarResultados');
+  if(!input || !cont) return;
+  const q = input.value.trim();
+  if(!q){ cont.innerHTML=''; return; }
+  const nq = q.toUpperCase();
+  const matches = CURRENT_DATA.tecnicos.filter(t=>
+    t.id.toUpperCase().includes(nq) || t.nombre.toUpperCase().includes(nq)
+  );
+  if(!matches.length){
+    cont.innerHTML = `<div style="padding:8px 0;color:var(--muted);font-size:.7rem">Sin resultados para "${escapeHtmlAttr(q)}"</div>`;
+    return;
+  }
+  if(matches.length===1){
+    verTecnicoDesdeHistoricoEquipo(matches[0].id);
+    return;
+  }
+  cont.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${matches.slice(0,20).map(m=>`<span onclick="verTecnicoDesdeHistoricoEquipo('${m.id}')" style="cursor:pointer;background:var(--s1);border:1px solid var(--border2);border-radius:20px;padding:6px 12px;font-size:.68rem;color:var(--text)">${m.nombre.trim()}</span>`).join('')}
+      ${matches.length>20?`<div style="font-size:.62rem;color:var(--muted);width:100%">Y ${matches.length-20} más — sé más específico.</div>`:''}
+    </div>`;
 }
 
 function verTecnicoDesdeHistoricoEquipo(tecId){
@@ -2948,8 +3009,20 @@ function actualizarVistaHistoricoEquipo(){
   const lo = Math.min(idxDesde, idxHasta), hi = Math.max(idxDesde, idxHasta);
   const mesesPeriodo = g.mesesAsc.slice(lo, hi+1);
 
-  const cuentaFiltro = document.getElementById('histCuentaFiltro').value;
   let miembros = g.miembrosBase;
+
+  const responsableSel = document.getElementById('histResponsableFiltro');
+  if(responsableSel && responsableSel.value){
+    const ids = (JERARQUIA[responsableSel.value]||[]).map(x=>x.toUpperCase());
+    miembros = miembros.filter(t=>ids.includes(t.id.toUpperCase()));
+  }
+
+  const provinciaSel = document.getElementById('histProvinciaFiltro');
+  if(provinciaSel && provinciaSel.value){
+    miembros = miembros.filter(t=>t.provincia===provinciaSel.value);
+  }
+
+  const cuentaFiltro = document.getElementById('histCuentaFiltro').value;
   if(cuentaFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa!==false);
   else if(cuentaFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===false);
 
@@ -2976,28 +3049,36 @@ function actualizarVistaHistoricoEquipo(){
   document.getElementById('histStatsLabel').textContent = `Cumplimiento del equipo · ${periodoLabel} (${conDatosTotal}/${miembros.length} con datos)`;
   document.getElementById('histStatsGrid').innerHTML = grid;
 
-  // Selector de técnico — agrupado por jefe de equipo cuando es la vista "todos"
-  const sel = document.getElementById('histTecnicoSelect');
+  // Roster como tabla — Código, Técnico, Jefe técnico, Cuenta
+  const jeIds = JERARQUIA['JR9426']||[];
   const sorted = [...miembros].sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  if(g.esTodos){
-    const jeIds = (JERARQUIA['JR9426']||[]).slice().sort((a,b)=>(JE_NAMES[a]||a).localeCompare(JE_NAMES[b]||b));
-    const porJe = {};
-    sorted.forEach(m=>{
-      const je = jeIds.find(je=>(JERARQUIA[je]||[]).map(x=>x.toUpperCase()).includes(m.id.toUpperCase()));
-      const key = je || '__sin_equipo__';
-      if(!porJe[key]) porJe[key]=[];
-      porJe[key].push(m);
-    });
-    const grupos = jeIds.filter(je=>porJe[je]).map(je=>
-      `<optgroup label="${escapeHtmlAttr(JE_NAMES[je]||je)}">${porJe[je].map(m=>`<option value="${m.id}">${m.nombre.trim()}</option>`).join('')}</optgroup>`
-    ).join('');
-    const sinEquipo = porJe['__sin_equipo__']
-      ? `<optgroup label="Sin equipo asignado">${porJe['__sin_equipo__'].map(m=>`<option value="${m.id}">${m.nombre.trim()}</option>`).join('')}</optgroup>`
-      : '';
-    sel.innerHTML = `<option value="">— Elige un técnico (${miembros.length}) —</option>${grupos}${sinEquipo}`;
-  } else {
-    sel.innerHTML = `<option value="">— Elige un técnico (${miembros.length}) —</option>${sorted.map(m=>`<option value="${m.id}">${m.nombre.trim()}</option>`).join('')}`;
-  }
+  const filas = sorted.map(m=>{
+    const je = jeIds.find(je=>(JERARQUIA[je]||[]).map(x=>x.toUpperCase()).includes(m.id.toUpperCase()));
+    const jeNombre = je ? (JE_NAMES[je]||je) : '—';
+    const cuenta = CUENTA_DATA[m.id.toUpperCase()]?.empresa;
+    const cuentaBadge = cuenta===true ? `<span style="color:var(--green2);font-weight:700">Sí</span>`
+      : cuenta===false ? `<span style="color:#e05a4a;font-weight:700">No</span>`
+      : `<span style="color:var(--muted)">—</span>`;
+    return `<tr onclick="verTecnicoDesdeHistoricoEquipo('${m.id}')" style="cursor:pointer;border-bottom:1px solid var(--border)">
+      <td style="padding:8px 6px;color:var(--muted)">${m.id}</td>
+      <td style="padding:8px 6px;font-weight:600;color:var(--text)">${m.nombre.trim()}</td>
+      <td style="padding:8px 6px;color:var(--muted);font-size:.64rem">${jeNombre}</td>
+      <td style="padding:8px 6px;text-align:center">${cuentaBadge}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('histRosterTable').innerHTML = miembros.length ? `
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.68rem">
+        <thead style="background:var(--dim)"><tr>
+          <th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left">Código</th>
+          <th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left">Técnico</th>
+          <th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left">Jefe técnico</th>
+          <th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Cuenta</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>` : `<div style="text-align:center;padding:20px 0;color:var(--muted);font-size:.75rem">Sin técnicos en este filtro</div>`;
 }
 
 function escapeHtmlAttr(s){
