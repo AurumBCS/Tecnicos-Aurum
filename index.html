@@ -326,6 +326,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       </div>
     </div>
     <div style="display:flex;gap:6px">
+      <button class="topbar-logout" id="fichajeBtn" style="color:var(--gold);border-color:var(--gold3);font-weight:700">🕐 Fichar entrada</button>
       <button class="topbar-logout" id="refreshBtn" style="color:var(--gold);border-color:var(--gold3)">🔄</button>
       <button class="topbar-logout" id="logoutBtn">Salir</button>
     </div>
@@ -420,9 +421,21 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <button onclick="showHistoricoEquipo(null,'jrPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico de todos los técnicos</button>
       <div class="section-head">Resumen global</div>
       <div class="equipo-kpis" id="jrResumen" style="margin-bottom:14px"></div>
+      <div id="jrFichajeContainer"></div>
       <div class="section-head">Jefes de equipo</div>
       <div class="je-list" id="jeList"></div>
       <div id="medalliaCoordContainer"></div>
+    </div>
+  </div>
+
+  <!-- Panel dedicado para administrativas de fichajes (262876, EQ5303) -->
+  <div id="fichajeAdminPanel">
+    <div style="padding:14px 13px 48px;max-width:680px;margin:0 auto">
+      <div class="data-banner" style="margin-bottom:14px">
+        <div class="sync-dot"></div>
+        Control de fichajes · Toda la empresa
+      </div>
+      <div id="fichajeAdminContainer"></div>
     </div>
   </div>
 
@@ -535,6 +548,9 @@ const TRACK_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYC
 const USAGE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=usage";
 const JERARQUIA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=jerarquia";
 const MESES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=meses";
+const FICHAJE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje";
+const FICHAJE_SHEET_DRIVE_URL = "https://docs.google.com/spreadsheets/d/1vPjN71Ss7PPm_5sstr2NVQdOAwvK-Fm3n5aYO3WsrpM/edit";
+const FICHAJE_TECNICOS_HABILITADO = false; // Cambiar a true cuando se active el fichaje para técnicos (tras la prueba piloto con JE/JR)
 const VACACIONES_DOCS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9A0fhBk2ViKKewyKP8rJz364_MsEwi8CD_DEIjokUAeZiJzieR1k3KuZm6Kx9B68YrNTtalq8peFn/pub?output=csv";
 // Coordinadores y JEs precargados — AUTH_DATA nunca está vacío aunque falle el endpoint
 let AUTH_DATA = {
@@ -581,6 +597,9 @@ let ACTIVE_TAB = 'misDatos';
 let MESES_DISPONIBLES = [];
 let MES_SELECCIONADO  = null; // null = mes actual (en vivo)
 let CURRENT_DATA_LIVE = null; // snapshot de los datos en vivo, para volver desde un mes historico
+let FICHAJE_ID = null;      // matrícula de la persona logueada (técnico, JE o JR), para fichar
+let FICHAJE_NOMBRE = null;
+let FICHAJE_HOY = {};       // {mat: {horaEntrada,horaComida,horaSalida,tipoCierre}} del día actual
 
 // ══════════════════════════════════════════════
 //  UTILIDADES
@@ -967,7 +986,7 @@ async function cambiarMes(mes){
 //  PANELS VISIBILITY
 // ══════════════════════════════════════════════
 function hideAllPanels(){
-  ['mainPanel','equipoPanel','jrPanel','usagePanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel','historicoPanel']
+  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','usagePanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel','historicoPanel']
     .forEach(id=>document.getElementById(id).style.display='none');
 }
 function showPanel(id){
@@ -1562,6 +1581,7 @@ function buildTecDetailHTML(tec){
 //  RENDER JR (vista director)
 // ══════════════════════════════════════════════
 function renderJRPanel(){
+  renderFichajeJR('jrFichajeContainer');
   const jeIds = JERARQUIA['JR9426']||[];
   const GRUPOS = [
     { nombre:'Zonas 4 y 5', jeIds:['Q29994','Q28224','273371'],                    zonas:['04','05','4','5','3304','3305'], color:'#c9a84c' },
@@ -2718,6 +2738,156 @@ async function loadRM(){
 }
 
 // ══════════════════════════════════════════════
+//  FICHAJE — registro horario legal
+// ══════════════════════════════════════════════
+function hoyISOFichaje(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+async function loadFichajeHoy(){
+  try{
+    const url=FICHAJE_URL+'&fecha='+hoyISOFichaje()+'&t='+Date.now();
+    const res=await fetch(url,{cache:'no-store'});
+    if(!res.ok) return;
+    const csv=await res.text();
+    const rows=parseCSV(csv);
+    const porMat={};
+    rows.forEach(row=>{
+      const mat=String(row['mat']||'').trim().toUpperCase();
+      if(!mat) return;
+      porMat[mat]={
+        nombre: row['nombre']||'',
+        horaEntrada: row['horaEntrada']||'',
+        horaComida: row['horaComida']||'',
+        horaSalida: row['horaSalida']||'',
+        tipoCierre: row['tipoCierre']||''
+      };
+    });
+    FICHAJE_HOY=porMat;
+  }catch(e){console.log('Fichaje error:',e.message);}
+}
+
+function estadoFichajeBtn(mat){
+  const f=FICHAJE_HOY[String(mat||'').toUpperCase()];
+  if(!f || !f.horaEntrada) return {estado:'sinFichar'};
+  if(!f.horaSalida) return {estado:'abierto', entrada:f.horaEntrada};
+  return {estado:'cerrado', entrada:f.horaEntrada, salida:f.horaSalida, tipoCierre:f.tipoCierre};
+}
+
+function pintarBotonFichaje(){
+  const btn=document.getElementById('fichajeBtn');
+  if(!btn || !FICHAJE_ID) return;
+  if(CURRENT_USER_TYPE==='tecnico' && !FICHAJE_TECNICOS_HABILITADO){
+    btn.style.display='none';
+    return;
+  }
+  btn.style.display='';
+  const st=estadoFichajeBtn(FICHAJE_ID);
+  btn.disabled=false;
+  if(st.estado==='sinFichar'){
+    btn.textContent='🕐 Fichar entrada';
+    btn.style.color='var(--gold)'; btn.style.borderColor='var(--gold3)';
+  } else if(st.estado==='abierto'){
+    btn.textContent='🔴 Finalizar jornada';
+    btn.style.color='#e05a4a'; btn.style.borderColor='#3d1a1a';
+  } else {
+    const manual = st.tipoCierre==='manual';
+    btn.textContent='✅ '+st.entrada+'–'+st.salida;
+    btn.style.color = manual ? 'var(--green2)' : 'var(--muted)';
+    btn.style.borderColor = manual ? '#1a3d2a' : 'var(--border2)';
+    btn.disabled=true;
+  }
+}
+
+async function enviarFichaje(accion){
+  if(!FICHAJE_ID) return;
+  try{
+    await fetch(FICHAJE_URL,{
+      method:'POST',
+      mode:'no-cors',
+      body: JSON.stringify({mat:FICHAJE_ID, nombre:FICHAJE_NOMBRE||'', accion})
+    });
+  }catch(e){console.log('Fichaje POST error:',e.message);}
+  await loadFichajeHoy();
+  pintarBotonFichaje();
+  if(CURRENT_USER_TYPE==='jr') renderFichajeJR('jrFichajeContainer');
+  if(CURRENT_USER_TYPE==='fichaje-admin') renderFichajeJR('fichajeAdminContainer');
+}
+
+function onFichajeBtnClick(){
+  const st=estadoFichajeBtn(FICHAJE_ID);
+  if(st.estado==='sinFichar') enviarFichaje('entrada');
+  else if(st.estado==='abierto') enviarFichaje('salida');
+}
+
+function filaFichajeTec(tec){
+  const nombre=tec.nombre.trim().split(' ').slice(0,2).join(' ');
+  const st=estadoFichajeBtn(tec.id);
+  let color,label;
+  if(st.estado==='sinFichar'){ color='#e05a4a'; label='Sin fichar'; }
+  else if(st.estado==='abierto'){ color='var(--orange)'; label='Entrada '+st.entrada; }
+  else if(st.tipoCierre==='manual'){ color='var(--green2)'; label=st.entrada+'–'+st.salida+' ✓'; }
+  else { color='var(--muted)'; label=st.entrada+'–'+st.salida+' (auto)'; }
+  return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
+    <div>
+      <div style="font-size:.78rem;font-weight:700;color:var(--text)">${nombre}</div>
+      <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${tec.id}</div>
+    </div>
+    <div style="background:${color}22;border:1px solid ${color}55;border-radius:20px;padding:3px 12px;font-size:.68rem;font-weight:700;color:${color}">${label}</div>
+  </div>`;
+}
+
+function descargarFichajeCSV(){
+  const fecha=hoyISOFichaje();
+  const rows=[['fecha','mat','nombre','horaEntrada','horaComida','horaSalida','tipoCierre']];
+  Object.keys(FICHAJE_HOY).forEach(mat=>{
+    const f=FICHAJE_HOY[mat];
+    rows.push([fecha,mat,f.nombre||'',f.horaEntrada||'',f.horaComida||'',f.horaSalida||'',f.tipoCierre||'']);
+  });
+  const csv=rows.map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='fichajes_'+fecha+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Vista de fichajes de toda la empresa, en desplegable — usada por JR y por FICHAJE_ADMIN_IDS
+function renderFichajeJR(containerId){
+  const container=document.getElementById(containerId);
+  if(!container) return;
+  const jeIds=JERARQUIA['JR9426']||[];
+  const grupos=jeIds.map(jeId=>{
+    const tecs=getTecnicosOfJE(jeId);
+    if(!tecs.length) return '';
+    const jeName=JE_NAMES[jeId]||jeId;
+    return `<div style="font-size:.65rem;font-weight:700;color:var(--gold2);text-transform:uppercase;letter-spacing:.08em;padding:8px 14px;background:var(--dim)">${jeName}</div>${tecs.map(filaFichajeTec).join('')}`;
+  }).join('');
+
+  const driveLink = FICHAJE_SHEET_DRIVE_URL
+    ? `<a href="${FICHAJE_SHEET_DRIVE_URL}" target="_blank" style="flex:1;text-align:center;padding:9px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-size:.68rem;font-weight:700;text-decoration:none">📊 Abrir hoja en Drive</a>`
+    : '';
+
+  container.innerHTML=`
+    <div style="margin-top:20px">
+      <div class="section-head" onclick="document.getElementById('fichajeDropdown').style.display=document.getElementById('fichajeDropdown').style.display==='none'?'block':'none';document.getElementById('fichajeArrow').style.transform=document.getElementById('fichajeArrow').style.transform==='rotate(180deg)'?'rotate(0deg)':'rotate(180deg)'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        🕐 Fichajes de hoy
+        <span id="fichajeArrow" style="display:inline-block;transition:transform .2s">→</span>
+      </div>
+      <div id="fichajeDropdown" style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;overflow:hidden;position:relative;margin-top:8px;display:none">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
+        <div style="display:flex;gap:8px;padding:10px 12px;background:var(--dim)">
+          <button onclick="descargarFichajeCSV()" style="flex:1;padding:9px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.68rem;font-weight:700;cursor:pointer">📥 Descargar CSV (hoy)</button>
+          ${driveLink}
+        </div>
+        ${grupos}
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════
 //  HISTÓRICO MULTI-MES (JE y coordinadores)
 // ══════════════════════════════════════════════
 let _historicoBack = 'equipoPanel'; // string (nombre de panel) o función (re-renderiza una vista dentro de historicoPanel)
@@ -3229,8 +3399,13 @@ function renderVacacionesJE(jeId, containerId){
 // ══════════════════════════════════════════════
 //  LOGIN
 // ══════════════════════════════════════════════
+// Administrativas encargadas de revisar fichajes — solo ven la vista de fichajes, no el panel JR completo
+const FICHAJE_ADMIN_IDS=['262876','EQ5303'];
+const FICHAJE_ADMIN_NOMBRES={'262876':'Mercedes Teresa Savarino Sainz','EQ5303':'Estibaliz Balmaseda Russian'};
+
 function findUser(q){
   q=q.trim().toUpperCase();
+  if(FICHAJE_ADMIN_IDS.includes(q)) return {type:'fichaje-admin',id:q};
   // JR nivel — acceso igual que JR9426
   const JR_IDS=['JR9426','CM9651','JN4767','GD5381','BLAS.ALVAREZ','BA8006'];
   if(JR_IDS.includes(q)) return {type:'jr',id:q};
@@ -3296,6 +3471,11 @@ async function doLogin(){
   Promise.all([loadVacaciones(), loadFlota(), loadCumplimiento(), loadRM()]).then(()=>{
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
+  loadFichajeHoy().then(()=>{
+    pintarBotonFichaje();
+    if(CURRENT_USER_TYPE==='jr') renderFichajeJR('jrFichajeContainer');
+    if(CURRENT_USER_TYPE==='fichaje-admin') renderFichajeJR('fichajeAdminContainer');
+  });
 
   document.getElementById('spinner').style.display='none';
   document.getElementById('loginBtn').style.opacity='1';
@@ -3337,7 +3517,19 @@ async function doLogin(){
   const _trackId = found.type==='tecnico' ? found.tec.id : found.id;
   fetch(TRACK_URL + '&mat=' + encodeURIComponent(_trackId), {mode:'no-cors'}).catch(()=>{});
 
-  if(found.type==='jr'){
+  if(found.type==='fichaje-admin'){
+    CURRENT_USER_TYPE='fichaje-admin';
+    const nombreAdmin=FICHAJE_ADMIN_NOMBRES[found.id]||'Control de Fichajes';
+    document.getElementById('topbarName').textContent=nombreAdmin;
+    document.getElementById('topbarId').textContent=found.id;
+    FICHAJE_ID=found.id; FICHAJE_NOMBRE=nombreAdmin;
+    document.getElementById('scorePill').innerHTML='<span style="color:var(--gold2);font-weight:700">Fichajes</span>';
+    document.getElementById('tabsBarJR').style.display='none';
+    document.getElementById('tabsBar').style.display='none';
+    renderFichajeJR('fichajeAdminContainer');
+    showPanel('fichajeAdminPanel');
+
+  } else if(found.type==='jr'){
     CURRENT_USER_TYPE='jr';
     const JR_NOMBRES={
       'JR9426':'Coordinador Regional',
@@ -3349,6 +3541,7 @@ async function doLogin(){
     };
     document.getElementById('topbarName').textContent=JR_NOMBRES[found.id]||'Coordinador Regional';
     document.getElementById('topbarId').textContent=found.id+' · Regional';
+    FICHAJE_ID=found.id; FICHAJE_NOMBRE=JR_NOMBRES[found.id]||'Coordinador Regional';
     document.getElementById('scorePill').innerHTML='<span style="color:var(--gold2);font-weight:700">Vista global</span>';
     document.getElementById('tabsBarJR').style.display='flex';
     document.getElementById('tabsBar').style.display='none';
@@ -3363,6 +3556,7 @@ async function doLogin(){
     const jeName=JE_NAMES[found.id]||found.id;
     document.getElementById('topbarName').textContent=jeName;
     document.getElementById('topbarId').textContent=found.id+' · JE';
+    FICHAJE_ID=found.id; FICHAJE_NOMBRE=jeName;
     document.getElementById('tabsBarJR').style.display='none';
     document.getElementById('tabsBar').style.display='flex';
     if(jeTec){
@@ -3384,8 +3578,10 @@ async function doLogin(){
     CURRENT_USER_TYPE='tecnico';
     document.getElementById('tabsBar').style.display='none';
     document.getElementById('tabsBarJR').style.display='none';
+    FICHAJE_ID=found.tec.id; FICHAJE_NOMBRE=found.tec.nombre;
     renderMain(found.tec);
   }
+  pintarBotonFichaje();
 }
 
 // ── Botón volver ──
@@ -3513,7 +3709,8 @@ async function doRefreshData(){
       loadVacaciones(),
       loadMedialiaCoord(),
       loadCumplimiento(),
-      loadRM()
+      loadRM(),
+      loadFichajeHoy()
     ]);
 
     if(CURRENT_TEC) renderMain(CURRENT_TEC);
@@ -3523,6 +3720,8 @@ async function doRefreshData(){
     }
     if(CURRENT_USER_TYPE === 'jr'){ renderJRPanel(); renderMedialiaCoord(); }
     else if(CURRENT_USER_TYPE === 'je' && ACTIVE_TAB === 'equipo') renderEquipoPanel(CURRENT_JE_ID);
+    else if(CURRENT_USER_TYPE === 'fichaje-admin') renderFichajeJR('fichajeAdminContainer');
+    pintarBotonFichaje();
 
     console.log('✅ Datos actualizados correctamente');
   } catch(e) {
@@ -3542,11 +3741,13 @@ function doLogout(){
   document.getElementById('tabsBar').style.display='none';
   document.getElementById('tabsBarJR').style.display='none';
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
+  FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={};
   hideAllPanels();
   document.getElementById('mainPanel').style.display='block';
 }
 document.getElementById('logoutBtn').addEventListener('click',doLogout);
 document.getElementById('refreshBtn').addEventListener('click',doRefreshData);
+document.getElementById('fichajeBtn').addEventListener('click',onFichajeBtnClick);
 
 // ── Events ──
 document.getElementById('loginBtn').addEventListener('click',doLogin);
