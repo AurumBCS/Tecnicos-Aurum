@@ -344,7 +344,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <div class="tabs-bar" id="tabsBar" style="display:none">
     <button class="tab-btn" id="tabMisDatos" onclick="switchTab(&#39;misDatos&#39;)">Mis datos</button>
     <button class="tab-btn" id="tabEquipo" onclick="switchTab(&#39;equipo&#39;)">Mi equipo</button>
-    <button class="tab-btn" id="tabConfirmaciones" onclick="abrirConfirmaciones()" style="color:var(--gold3);">📲 Confirmaciones</button>
+    <button class="tab-btn" id="tabConfirmaciones" onclick="abrirConfirmaciones()" style="color:var(--gold3);">📲 Confirmaciones (WhatsApp)</button>
+    <button class="tab-btn" id="tabConfirmacionesSMS" onclick="abrirConfirmacionesSMS('je')" style="color:var(--gold3);">💬 Confirmaciones (SMS)</button>
   </div>
   <!-- Tabs para JR -->
   <div class="tabs-bar" id="tabsBarJR" style="display:none">
@@ -357,6 +358,15 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div class="data-banner">
       <div class="sync-dot"></div>
       Sincronizado desde Google Sheets · <span id="lastUpdate">—</span>
+    </div>
+    <div id="bannerConfirmacionesSMS" onclick="abrirConfirmacionesSMS('tecnico')" style="display:none;cursor:pointer;
+         background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);border-radius:12px;
+         padding:12px 14px;margin:10px 0;align-items:center;gap:10px;">
+      <div style="font-size:1.4rem">💬</div>
+      <div>
+        <div style="color:var(--gold2);font-weight:700;font-size:.82rem">Confirmaciones de citas por SMS</div>
+        <div style="color:var(--muted);font-size:.7rem;margin-top:2px">Ábrelo desde tu móvil de trabajo para mandar los SMS de mañana</div>
+      </div>
     </div>
     <select id="mesSelectorMain" onchange="cambiarMes(this.value)" style="width:100%;margin:8px 0 14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
       <option value="">Cargando meses…</option>
@@ -549,6 +559,10 @@ const USAGE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYC
 const JERARQUIA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=jerarquia";
 const MESES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=meses";
 const FICHAJE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje";
+
+// Confirmaciones por SMS (servidor en la nube) — ACTUALIZAR con la URL real de Render
+// una vez desplegado, ej: "https://confirmaciones-sms-aurum.onrender.com"
+const SMS_CONFIRMACIONES_URL = "https://tecnicos-aurum.onrender.com";
 const FICHAJE_SHEET_DRIVE_URL = "https://docs.google.com/spreadsheets/d/1vPjN71Ss7PPm_5sstr2NVQdOAwvK-Fm3n5aYO3WsrpM/edit";
 const FICHAJE_TECNICOS_HABILITADO = false; // Cambiar a true cuando se active el fichaje para técnicos (tras la prueba piloto con JE/JR)
 const VACACIONES_DOCS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9A0fhBk2ViKKewyKP8rJz364_MsEwi8CD_DEIjokUAeZiJzieR1k3KuZm6Kx9B68YrNTtalq8peFn/pub?output=csv";
@@ -1027,6 +1041,14 @@ function abrirConfirmaciones(){
       document.body.appendChild(overlay);
       overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
     });
+}
+
+// Confirmaciones por SMS — página web en la nube, sin instalar nada.
+// tipo: 'tecnico' abre tecnico.html, 'je' abre je.html
+function abrirConfirmacionesSMS(tipo){
+  const pagina = tipo === 'je' ? 'je.html' : 'tecnico.html';
+  const url = SMS_CONFIRMACIONES_URL.replace(/\/$/, '') + '/' + pagina;
+  window.open(url, '_blank');
 }
 
 function switchTab(tab){
@@ -3578,6 +3600,7 @@ async function doLogin(){
     CURRENT_USER_TYPE='tecnico';
     document.getElementById('tabsBar').style.display='none';
     document.getElementById('tabsBarJR').style.display='none';
+    document.getElementById('bannerConfirmacionesSMS').style.display='flex';
     FICHAJE_ID=found.tec.id; FICHAJE_NOMBRE=found.tec.nombre;
     renderMain(found.tec);
   }
