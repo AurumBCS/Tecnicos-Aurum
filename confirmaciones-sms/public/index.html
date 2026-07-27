@@ -725,6 +725,24 @@
       </div>
     </div>
 
+    <!-- Carga completa (sin matrícula de JE) — requiere autorización -->
+    <div id="uploader-auth-box" style="margin-bottom:16px;">
+      <label style="display:block; font-size:.62rem; font-weight:700; color:var(--orange); text-transform:uppercase; letter-spacing:.12em; margin-bottom:8px;">
+        ⚠️ Carga completa (todos los técnicos) — tu matrícula autorizada
+      </label>
+      <input type="text" id="uploader-matricula"
+             placeholder="Matrícula autorizada para carga completa"
+             maxlength="10"
+             style="background:var(--dim); border:1.5px solid rgba(212,131,26,.4); color:var(--text);
+                    border-radius:8px; padding:10px 14px; font-size:.88rem; font-family:var(--font);
+                    outline:none; width:280px; letter-spacing:.04em; text-transform:uppercase;"
+             oninput="this.value=this.value.toUpperCase()">
+      <div style="font-size:.68rem; color:var(--muted); margin-top:6px;">
+        Dejaste la matrícula de arriba en blanco → esto sube el Excel completo, sin filtrar, para que
+        lo vean todos los técnicos y JE. Solo personas autorizadas pueden hacerlo.
+      </div>
+    </div>
+
     <div id="drop-zone"
          onclick="document.getElementById('file-input').click()"
          ondragover="handleDragOver(event)"
@@ -1056,7 +1074,12 @@
     const fd = new FormData();
     fd.append('excel', file);
     const matricula = document.getElementById('je-matricula').value.trim().toUpperCase();
-    if (matricula) fd.append('matricula', matricula);
+    if (matricula) {
+      fd.append('matricula', matricula);
+    } else {
+      const uploaderMat = document.getElementById('uploader-matricula').value.trim().toUpperCase();
+      fd.append('uploaderMatricula', uploaderMat);
+    }
 
     fetch('/upload', { method: 'POST', body: fd })
       .then(r => r.json())
@@ -1463,6 +1486,8 @@
     const badge = document.getElementById('je-name-badge');
     const err   = document.getElementById('je-error');
     input.value = val;
+    // Mostrar el campo de autorización de carga completa solo cuando esto queda vacío
+    document.getElementById('uploader-auth-box').style.display = val ? 'none' : '';
     if (!val) { badge.style.display = 'none'; err.style.display = 'none'; return; }
     if (JE_NAMES[val]) {
       badge.textContent = `✓ ${JE_NAMES[val]}`;

@@ -23,6 +23,11 @@ const JERARQUIA_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSvU7
 let JERARQUIA = {};
 let JE_NAMES  = { 'JR9426': 'Coordinador Regional' };
 
+// Matrículas autorizadas para hacer la carga CENTRAL del Excel (todos los técnicos, sin filtrar).
+// Una carga con matrícula de JE en blanco (modo central) solo se permite si "uploaderMatricula"
+// está en esta lista. Cargas normales filtradas por un JE/técnico concreto no la necesitan.
+const UPLOADERS_PERMITIDOS = ['262876', 'CM9651', 'GD5381', 'EQ5303'];
+
 function fetchCSV(url, redirects = 0) {
   return new Promise((resolve, reject) => {
     if (redirects > 5) return reject(new Error('Demasiadas redirecciones'));
@@ -349,6 +354,18 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 app.post('/upload', upload.single('excel'), (req, res) => {
   try {
     const matricula = String(req.body.matricula || '').trim().toUpperCase();
+
+    // Carga CENTRAL (matrícula en blanco = todos los técnicos, sin filtrar):
+    // solo la pueden hacer las matrículas autorizadas en UPLOADERS_PERMITIDOS.
+    if (!matricula) {
+      const uploaderMatricula = String(req.body.uploaderMatricula || '').trim().toUpperCase();
+      if (!UPLOADERS_PERMITIDOS.includes(uploaderMatricula)) {
+        return res.json({
+          ok: false,
+          error: 'Tu matrícula no está autorizada para hacer la carga completa del Excel.'
+        });
+      }
+    }
 
     // Determinar qué citas mostrar según la matrícula que ha iniciado sesión:
     //  - Si es un JEFE DE EQUIPO (está en JERARQUIA) → las de todos sus técnicos
