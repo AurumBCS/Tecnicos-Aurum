@@ -326,6 +326,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       </div>
     </div>
     <div style="display:flex;gap:6px">
+      <button class="topbar-logout" id="btnCargaExcel" onclick="abrirCargaExcel()" style="display:none;color:#0a0a0a;background:linear-gradient(135deg,#7a5c10,#c9a84c,#e8c96a);border:none;font-weight:700">📂 Cargar Excel</button>
       <button class="topbar-logout" id="fichajeBtn" style="color:var(--gold);border-color:var(--gold3);font-weight:700">🕐 Fichar entrada</button>
       <button class="topbar-logout" id="refreshBtn" style="color:var(--gold);border-color:var(--gold3)">🔄</button>
       <button class="topbar-logout" id="logoutBtn">Salir</button>
@@ -563,6 +564,16 @@ const FICHAJE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4Qu
 // Confirmaciones por SMS (servidor en la nube) — ACTUALIZAR con la URL real de Render
 // una vez desplegado, ej: "https://confirmaciones-sms-aurum.onrender.com"
 const SMS_CONFIRMACIONES_URL = "https://tecnicos-aurum.onrender.com";
+
+// Matrículas autorizadas para hacer la carga completa del Excel de confirmaciones SMS.
+// Debe coincidir con UPLOADERS_PERMITIDOS en confirmaciones-sms/server.js
+const EXCEL_UPLOADERS_PERMITIDOS = ['262876', 'CM9651', 'GD5381', 'EQ5303'];
+
+function abrirCargaExcel(){
+  const mat = (CURRENT_JE_ID || (CURRENT_TEC && CURRENT_TEC.id) || '').toUpperCase();
+  const url = SMS_CONFIRMACIONES_URL.replace(/\/$/, '') + '/?uploader=' + encodeURIComponent(mat);
+  window.open(url, '_blank');
+}
 const FICHAJE_SHEET_DRIVE_URL = "https://docs.google.com/spreadsheets/d/1vPjN71Ss7PPm_5sstr2NVQdOAwvK-Fm3n5aYO3WsrpM/edit";
 const FICHAJE_TECNICOS_HABILITADO = false; // Cambiar a true cuando se active el fichaje para técnicos (tras la prueba piloto con JE/JR)
 const VACACIONES_DOCS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9A0fhBk2ViKKewyKP8rJz364_MsEwi8CD_DEIjokUAeZiJzieR1k3KuZm6Kx9B68YrNTtalq8peFn/pub?output=csv";
@@ -3604,6 +3615,13 @@ async function doLogin(){
     FICHAJE_ID=found.tec.id; FICHAJE_NOMBRE=found.tec.nombre;
     renderMain(found.tec);
   }
+
+  // Mostrar el botón de carga de Excel solo a las matrículas autorizadas
+  const _matriculaLogin = (found.type==='tecnico' ? found.tec.id : found.id || '').toUpperCase();
+  if(EXCEL_UPLOADERS_PERMITIDOS.includes(_matriculaLogin)){
+    document.getElementById('btnCargaExcel').style.display='';
+  }
+
   pintarBotonFichaje();
 }
 
