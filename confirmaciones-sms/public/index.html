@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmaciones WhatsApp · Aurum BC Security</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent }
+    html,body { height:100%; }
+
+    :root {
+      --bg:     #0a0a0a;
+      --s1:     #111111;
+      --s2:     #181818;
+      --border: #2a2200;
+      --border2:#3d3300;
+      --gold:   #c9a84c;
+      --gold2:  #e8c96a;
+      --gold3:  #a07830;
+      --text:   #f0e6c8;
+      --muted:  #7a6840;
+      --dim:    #1c1800;
+      --red:    #c0392b;
+      --red2:   #e74c3c;
+      --green:  #2e7d52;
+      --green2: #3daa6e;
+      --blue:   #2980b9;
+      --blue2:  #3498db;
+      --orange: #d4831a;
+      --font:   'Outfit', sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Subtle gold radial glow on background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse 100% 50% at 50% 0%, rgba(201,168,76,.05) 0%, transparent 60%);
+    }
+
+    /* ── HEADER ─────────────────────────────────────── */
+    header {
+      background: var(--s1);
+      border-bottom: 1px solid var(--border2);
+      padding: 0 20px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 20px rgba(0,0,0,.5);
+      position: relative;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold3), transparent);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+    .logo img {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1.5px solid var(--gold3);
+      box-shadow: 0 0 12px rgba(201,168,76,.25);
+    }
+    .logo-text {
+      line-height: 1.25;
+    }
+    .logo-title {
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--gold2);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .logo-sub {
+      font-size: .62rem;
+      color: var(--muted);
+      letter-spacing: .04em;
+    }
+
+    #wa-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      cursor: pointer;
+      border: none;
+      font-family: var(--font);
+      transition: all .2s;
+      text-transform: uppercase;
+    }
+    #wa-badge.disconnected { background: rgba(192,57,43,.15); color: var(--red2); border: 1px solid rgba(192,57,43,.35); }
+    #wa-badge.qr           { background: rgba(212,131,26,.15); color: var(--orange); border: 1px solid rgba(212,131,26,.35); }
+    #wa-badge.authenticated{ background: rgba(41,128,185,.15); color: var(--blue2); border: 1px solid rgba(41,128,185,.35); }
+    #wa-badge.connected     { background: rgba(46,125,82,.2);  color: var(--green2); border: 1px solid rgba(46,125,82,.4); }
+    #wa-badge.disabled      { background: rgba(122,104,64,.15); color: var(--muted); border: 1px solid rgba(122,104,64,.3); cursor: default; }
+    .wa-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink:0; }
+
+    /* ── MAIN ────────────────────────────────────────── */
+    main {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── PANELS ─────────────────────────────────────── */
+    .panel {
+      background: var(--s1);
+      border: 1px solid var(--border2);
+      border-radius: 16px;
+      padding: 22px;
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    .panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--gold3), transparent);
+    }
+    .panel-title {
+      font-size: .62rem;
+      font-weight: 700;
+      color: var(--gold3);
+      text-transform: uppercase;
+      letter-spacing: .16em;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-title::before {
+      content: '';
+      width: 14px;
+      height: 1px;
+      background: linear-gradient(90deg, var(--gold), transparent);
+    }
+
+    /* ── QR MODAL ───────────────────────────────────── */
+    #qr-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.75);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #qr-overlay.show { display: flex; }
+
+    .qr-box {
+      background: var(--s1);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      padding: 36px 32px 28px;
+      text-align: center;
+      max-width: 340px;
+      width: 90%;
+      box-shadow: 0 40px 80px rgba(0,0,0,.8), 0 0 0 1px rgba(201,168,76,.1);
+      position: relative;
+      overflow: hidden;
+    }
+    .qr-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--gold), var(--gold2), var(--gold), transparent);
+    }
+    .qr-box h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--gold2);
+      letter-spacing: .04em;
+      margin-bottom: 8px;
+    }
+    .qr-box p {
+      color: var(--muted);
+      font-size: .78rem;
+      margin-bottom: 22px;
+      line-height: 1.6;
+    }
+    #qr-img {
+      width: 220px;
+      height: 220px;
+      border-radius: 10px;
+      background: #fff;
+      padding: 6px;
+      display: block;
+      margin: 0 auto;
+    }
+    #qr-spinner {
+      width: 220px;
+      height: 220px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: .8rem;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .spin-ring {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .qr-steps {
+      margin-top: 18px;
+      text-align: left;
+      font-size: .72rem;
+      color: var(--muted);
+      line-height: 1.9;
+      background: var(--dim);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .qr-steps span { color: var(--gold3); font-weight: 600; }
+    .qr-close {
+      margin-top: 18px;
+      background: transparent;
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      padding: 8px 22px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .76rem;
+      font-family: var(--font);
+      letter-spacing: .05em;
+      transition: all .2s;
+    }
+    .qr-close:hover { border-color: var(--gold3); color: var(--gold); }
+
+    /* ── UPLOAD ─────────────────────────────────────── */
+    #drop-zone {
+      border: 1.5px dashed var(--border2);
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+      background: var(--dim);
+    }
+    #drop-zone:hover, #drop-zone.dragover {
+      border-color: var(--gold);
+      background: rgba(201,168,76,.05);
+    }
+    #drop-zone .dz-icon { font-size: 30px; margin-bottom: 10px; }
+    #drop-zone .dz-main { font-size: .88rem; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+    #drop-zone .dz-sub  { font-size: .74rem; color: var(--muted); }
+    #file-input { display: none; }
+    #upload-result {
+      margin-top: 12px;
+      font-size: .78rem;
+      min-height: 18px;
+      letter-spacing: .02em;
+    }
+
+    /* ── STATS ──────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+    }
+    .stat-card {
+      background: var(--dim);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 14px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 20%; right: 20%;
+      height: 1px;
+    }
+    .stat-card.total   ::after { background: var(--gold3); }
+    .stat-num {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 5px;
+    }
+    .stat-label { font-size: .6rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+    .stat-card.total    .stat-num { color: var(--gold2); }
+    .stat-card.pending  .stat-num { color: var(--muted); }
+    .stat-card.sent     .stat-num { color: var(--blue2); }
+    .stat-card.confirmed .stat-num { color: var(--green2); }
+    .stat-card.rejected  .stat-num { color: var(--red2); }
+    .stat-card.other     .stat-num { color: var(--orange); }
+
+    /* ── CONTROLS ───────────────────────────────────── */
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .controls input, .controls select {
+      background: var(--dim);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 13px;
+      font-size: .78rem;
+      font-family: var(--font);
+      outline: none;
+      transition: border-color .2s;
+    }
+    .controls input { flex: 1; min-width: 200px; }
+    .controls input::placeholder { color: var(--muted); }
+    .controls input:focus, .controls select:focus { border-color: var(--gold3); }
+    .controls select option { background: var(--s2); }
+
+    /* ── MULTI-SELECT DROPDOWN (técnicos) ──────────────── */
+    .ms-dropdown { position: relative; }
+    .ms-btn {
+      background: var(--dim);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 13px;
+      font-size: .78rem;
+      font-family: var(--font);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      transition: border-color .2s;
+    }
+    .ms-btn:hover { border-color: var(--gold3); }
+    .ms-btn .ms-arrow { color: var(--muted); font-size: .7rem; }
+    .ms-panel {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 240px;
+      max-width: 320px;
+      background: var(--s2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.5);
+      z-index: 50;
+      overflow: hidden;
+    }
+    .ms-panel.show { display: block; }
+    .ms-panel-actions {
+      display: flex;
+      gap: 6px;
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ms-panel-actions button {
+      flex: 1;
+      background: transparent;
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 5px;
+      font-size: .68rem;
+      font-family: var(--font);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .ms-panel-actions button:hover { border-color: var(--gold3); color: var(--gold); }
+    .ms-panel-list { max-height: 260px; overflow-y: auto; padding: 6px; }
+    .ms-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .78rem;
+      color: var(--text);
+    }
+    .ms-item:hover { background: rgba(201,168,76,.08); }
+
+    /* ── BUTTONS ────────────────────────────────────── */
+    .btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: none;
+      font-size: .76rem;
+      font-weight: 700;
+      font-family: var(--font);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all .15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:disabled { opacity: .35; cursor: not-allowed; }
+    .btn-gold {
+      background: linear-gradient(135deg, #7a5c10, var(--gold), var(--gold2), var(--gold), #7a5c10);
+      background-size: 200% 100%;
+      background-position: 100% 0;
+      color: #0a0a0a;
+      box-shadow: 0 4px 16px rgba(201,168,76,.2);
+    }
+    .btn-gold:hover:not(:disabled) {
+      background-position: 0 0;
+      box-shadow: 0 6px 24px rgba(201,168,76,.35);
+    }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border2);
+      color: var(--muted);
+    }
+    .btn-outline:hover:not(:disabled) { border-color: var(--gold3); color: var(--gold); }
+    .btn-danger {
+      background: rgba(192,57,43,.12);
+      border: 1px solid rgba(192,57,43,.3);
+      color: var(--red2);
+    }
+    .btn-danger:hover:not(:disabled) { background: rgba(192,57,43,.22); }
+
+    /* ── PROGRESS ───────────────────────────────────── */
+    #send-progress { display: none; margin-bottom: 14px; }
+    #send-progress.show { display: block; }
+    .progress-track {
+      background: var(--dim);
+      border-radius: 4px;
+      height: 5px;
+      overflow: hidden;
+      margin-bottom: 6px;
+      border: 1px solid var(--border);
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--gold3), var(--gold2));
+      border-radius: 4px;
+      transition: width .3s;
+      width: 0%;
+    }
+    #progress-text { font-size: .72rem; color: var(--muted); letter-spacing: .03em; }
+
+    /* ── TABLE ──────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+    thead th {
+      background: var(--dim);
+      padding: 10px 13px;
+      text-align: left;
+      font-size: .6rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      border-bottom: 1px solid var(--border2);
+      white-space: nowrap;
+    }
+    thead th:first-child { border-radius: 6px 0 0 6px; }
+    thead th:last-child  { border-radius: 0 6px 6px 0; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:hover { background: rgba(201,168,76,.03); }
+    tbody tr.highlight-no { background: rgba(192,57,43,.06); }
+    tbody td { padding: 10px 13px; vertical-align: middle; }
+    td.cliente  { font-weight: 600; max-width: 180px; }
+    td.tecnico  { color: var(--muted); max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    td.tipo     { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+    td.respuesta{ color: var(--muted); font-style: italic; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .74rem; }
+
+    /* ── BADGES ─────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: .65rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+    .badge-pendiente      { background: rgba(122,104,64,.15); color: var(--muted); border: 1px solid rgba(122,104,64,.25); }
+    .badge-enviado        { background: rgba(41,128,185,.12);  color: var(--blue2); border: 1px solid rgba(41,128,185,.25); }
+    .badge-confirmado     { background: rgba(46,125,82,.15);   color: var(--green2); border: 1px solid rgba(46,125,82,.3); }
+    .badge-no_confirmado  { background: rgba(192,57,43,.15);   color: var(--red2); border: 1px solid rgba(192,57,43,.3); }
+    .badge-otra_respuesta { background: rgba(212,131,26,.15);  color: var(--orange); border: 1px solid rgba(212,131,26,.3); }
+    .badge-error          { background: rgba(192,57,43,.2);    color: var(--red2); border: 1px solid rgba(192,57,43,.35); }
+    .badge-sin_telefono   { background: rgba(26,24,0,.5);      color: #3a3520; border: 1px solid var(--border); }
+    .badge-sin_whatsapp   { background: rgba(122,104,64,.12);  color: var(--muted); border: 1px solid rgba(122,104,64,.3); }
+
+    /* Row action button */
+    .btn-row {
+      background: transparent;
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 4px 9px;
+      cursor: pointer;
+      font-size: .7rem;
+      font-family: var(--font);
+      transition: all .15s;
+    }
+    .btn-row:hover { border-color: var(--gold3); color: var(--gold); }
+
+    /* ── NO PANEL ───────────────────────────────────── */
+    #no-panel {
+      display: none;
+      background: rgba(192,57,43,.07);
+      border: 1px solid rgba(192,57,43,.28);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    #no-panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--red2), transparent);
+    }
+    #no-panel.show { display: block; }
+    #no-panel h4 { color: var(--red2); font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }
+    .no-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(192,57,43,.12);
+      gap: 14px;
+    }
+    .no-item:last-child { border-bottom: none; }
+    .no-item-name { font-weight: 700; font-size: .82rem; }
+    .no-item-detail { color: var(--muted); font-size: .7rem; margin-top: 3px; }
+    .no-item-phone { color: var(--red2); font-size: .74rem; font-family: monospace; white-space: nowrap; }
+
+    /* ── EMPTY STATE ────────────────────────────────── */
+    #empty-state {
+      padding: 52px;
+      text-align: center;
+      color: var(--muted);
+    }
+    #empty-state .big { font-size: 44px; margin-bottom: 12px; }
+    #empty-state p { font-size: .78rem; }
+
+    /* ── TOAST ──────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--s1);
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: .78rem;
+      max-width: 300px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all .3s;
+      z-index: 999;
+      pointer-events: none;
+      font-family: var(--font);
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.success { border-left: 3px solid var(--green2); }
+    #toast.error   { border-left: 3px solid var(--red2); }
+    #toast.warning { border-left: 3px solid var(--orange); }
+
+    /* ── CHECKBOX ───────────────────────────────────── */
+    input[type=checkbox] {
+      accent-color: var(--gold);
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+
+    /* ── SCROLLBAR ──────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gold3); }
+
+    @media (max-width: 600px) {
+      main { padding: 14px; }
+      .controls { flex-direction: column; }
+      .controls input { width: 100%; }
+      .btn-gold { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <img src="logo.png" alt="Aurum BC Security">
+    <div class="logo-text">
+      <div class="logo-title">Confirmaciones WhatsApp</div>
+      <div class="logo-sub">Aurum BC Security · Verisure</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <button id="wa-badge" class="disconnected" onclick="toggleQR()">
+      <span class="wa-dot"></span>
+      <span id="wa-text">Desconectado</span>
+    </button>
+    <button id="btn-logout" onclick="logoutWA()"
+      style="display:none; background:transparent; border:1px solid var(--border2);
+             color:var(--muted); border-radius:8px; padding:6px 10px; cursor:pointer;
+             font-size:.7rem; font-family:var(--font); letter-spacing:.04em;
+             transition:all .2s;"
+      onmouseover="this.style.borderColor='var(--red2)';this.style.color='var(--red2)'"
+      onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'"
+      title="Cerrar sesión de WhatsApp">
+      ⏏ Cerrar sesión
+    </button>
+  </div>
+</header>
+
+<!-- QR MODAL -->
+<div id="qr-overlay">
+  <div class="qr-box">
+    <h3>Conectar WhatsApp</h3>
+    <p>Escanea el código con tu WhatsApp para enviar las confirmaciones desde tu número.</p>
+    <div id="qr-spinner">
+      <div class="spin-ring"></div>
+      <span>Generando QR...</span>
+    </div>
+    <img id="qr-img" alt="QR Code" style="display:none">
+    <div class="qr-steps">
+      <span>1.</span> Abre WhatsApp en tu móvil<br>
+      <span>2.</span> Ve a <strong style="color:var(--text)">Dispositivos vinculados</strong><br>
+      <span>3.</span> Pulsa <strong style="color:var(--text)">Vincular un dispositivo</strong><br>
+      <span>4.</span> Escanea este código QR
+    </div>
+    <div id="qr-error" style="display:none; margin-top:14px; background:rgba(192,57,43,.1);
+         border:1px solid rgba(192,57,43,.3); border-radius:10px; padding:12px 14px;
+         font-size:.72rem; color:var(--red2); line-height:1.7; text-align:left;">
+    </div>
+    <button class="qr-close" onclick="closeQR()">Cerrar</button>
+    <div style="margin-top:10px;">
+      <button onclick="reiniciarWA()"
+        style="background:transparent; border:none; color:var(--muted); font-size:.7rem;
+               font-family:var(--font); cursor:pointer; text-decoration:underline; padding:4px 0;"
+        onmouseover="this.style.color='var(--orange)'"
+        onmouseout="this.style.color='var(--muted)'">
+        🔄 No aparece el QR — Reiniciar WhatsApp
+      </button>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <!-- UPLOAD -->
+  <div class="panel">
+    <div class="panel-title">📂 Cargar Excel del TOA</div>
+
+    <!-- Matrícula JE -->
+    <div style="margin-bottom:16px;">
+      <label style="display:block; font-size:.62rem; font-weight:700; color:var(--gold3); text-transform:uppercase; letter-spacing:.12em; margin-bottom:8px;">
+        Tu matrícula (Técnico o Jefe de Equipo)
+      </label>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <input type="text" id="je-matricula"
+               placeholder="Ej: 239831 · Q28224 · 273379"
+               maxlength="10"
+               style="background:var(--dim); border:1.5px solid var(--border2); color:var(--text);
+                      border-radius:8px; padding:10px 14px; font-size:.88rem; font-family:var(--font);
+                      outline:none; width:240px; letter-spacing:.04em; text-transform:uppercase;"
+               oninput="onMatriculaInput(this)"
+               onfocus="this.style.borderColor='var(--gold)'"
+               onblur="this.style.borderColor='var(--border2)'">
+        <div id="je-name-badge" style="display:none;
+             background:rgba(201,168,76,.12); border:1px solid rgba(201,168,76,.3);
+             border-radius:20px; padding:5px 14px; font-size:.76rem; font-weight:600; color:var(--gold2);">
+        </div>
+        <div id="je-error" style="display:none; color:var(--red2); font-size:.76rem;"></div>
+      </div>
+      <div style="font-size:.68rem; color:var(--muted); margin-top:6px;">
+        Si eres <strong style="color:var(--gold3)">técnico</strong>, verás solo tus citas. Si eres <strong style="color:var(--gold3)">jefe de equipo</strong>, las de todos tus técnicos. Sube siempre el mismo Excel global.
+      </div>
+    </div>
+
+    <div id="drop-zone"
+         onclick="document.getElementById('file-input').click()"
+         ondragover="handleDragOver(event)"
+         ondragleave="handleDragLeave(event)"
+         ondrop="handleDrop(event)">
+      <div class="dz-icon">📊</div>
+      <div class="dz-main">Haz clic o arrastra el Excel aquí</div>
+      <div class="dz-sub">Archivo exportado del TOA · Actividades-Mantenimientos</div>
+    </div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" onchange="uploadFile(this.files[0])">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px; min-height:22px;">
+      <div id="upload-result"></div>
+      <button id="btn-clear" class="btn btn-danger" onclick="clearAll()" style="display:none">
+        🗑️ &nbsp;Borrar todo
+      </button>
+    </div>
+  </div>
+
+  <!-- NO RESPONSES PANEL -->
+  <div id="no-panel">
+    <h4>❌ Clientes que NO confirman — Requieren llamada del JE</h4>
+    <div id="no-list"></div>
+  </div>
+
+  <!-- STATS -->
+  <div class="panel" id="stats-panel" style="display:none">
+    <div class="panel-title">Resumen de confirmaciones</div>
+    <div class="stats-grid">
+      <div class="stat-card total">
+        <div class="stat-num" id="s-total">0</div>
+        <div class="stat-label">Total</div>
+      </div>
+      <div class="stat-card pending">
+        <div class="stat-num" id="s-pending">0</div>
+        <div class="stat-label">Pendientes</div>
+      </div>
+      <div class="stat-card sent">
+        <div class="stat-num" id="s-sent">0</div>
+        <div class="stat-label">Enviados</div>
+      </div>
+      <div class="stat-card confirmed">
+        <div class="stat-num" id="s-confirmed">0</div>
+        <div class="stat-label">Confirmados</div>
+      </div>
+      <div class="stat-card rejected">
+        <div class="stat-num" id="s-rejected">0</div>
+        <div class="stat-label">No confirman</div>
+      </div>
+      <div class="stat-card other">
+        <div class="stat-num" id="s-other">0</div>
+        <div class="stat-label">Otra respuesta</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="panel" id="table-panel" style="display:none">
+    <div class="panel-title">Citas programadas</div>
+
+    <div class="controls">
+      <input type="text" id="search" placeholder="🔍  Buscar cliente, técnico o tipo..." oninput="renderTable()">
+      <div class="ms-dropdown" id="tecnico-ms">
+        <button type="button" class="ms-btn" id="tecnico-ms-btn" onclick="toggleTecnicoMS(event)">
+          <span id="tecnico-ms-label">Todos los técnicos</span> <span class="ms-arrow">▾</span>
+        </button>
+        <div class="ms-panel" id="tecnico-ms-panel">
+          <div class="ms-panel-actions">
+            <button type="button" onclick="msSeleccionarTodos()">Todos</button>
+            <button type="button" onclick="msLimpiar()">Ninguno</button>
+          </div>
+          <div class="ms-panel-list" id="tecnico-ms-list"></div>
+        </div>
+      </div>
+      <select id="filter-status" onchange="renderTable()">
+        <option value="">Todos los estados</option>
+        <option value="pendiente">Pendientes</option>
+        <option value="enviado">Enviados</option>
+        <option value="confirmado">Confirmados</option>
+        <option value="no_confirmado">No confirman</option>
+        <option value="otra_respuesta">Otra respuesta</option>
+        <option value="error">Error envío</option>
+        <option value="sin_whatsapp">Sin WhatsApp</option>
+      </select>
+    </div>
+
+    <!-- PROGRESS BAR -->
+    <div id="send-progress">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div id="progress-text">Enviando mensajes...</div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:8px; align-items:center;">
+      <button class="btn btn-gold" id="btn-send-tecnico" onclick="sendTecnico()" style="display:none">
+        📤 &nbsp;Enviar técnicos seleccionados (<span id="tec-count">0</span>)
+      </button>
+      <button class="btn btn-outline" id="btn-send-all" onclick="sendAll()">
+        📤 &nbsp;Enviar todos los pendientes
+      </button>
+      <button class="btn btn-danger" id="btn-send-errors" onclick="sendErrors()" style="display:none">
+        🔁 &nbsp;Reenviar errores (<span id="error-count">0</span>)
+      </button>
+      <button class="btn btn-outline" id="btn-send-selected" onclick="sendSelected()" style="display:none">
+        📤 &nbsp;Enviar seleccionados (<span id="sel-count">0</span>)
+      </button>
+      <button class="btn btn-outline" onclick="resetSelected()" id="btn-reset" style="display:none">
+        🔄 &nbsp;Resetear seleccionados
+      </button>
+    </div>
+    <div id="tecnico-hint" style="display:none; font-size:.72rem; color:var(--muted); margin-bottom:18px; line-height:1.6;">
+      💡 Recomendado: envía por tandas a lo largo del día. Marca uno o varios técnicos arriba
+      y pulsa <strong style="color:var(--gold3)">Enviar técnicos seleccionados</strong>. Así el WhatsApp no se sobrecarga.
+    </div>
+    <div style="margin-bottom:18px;"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"></th>
+            <th>#</th>
+            <th>Cliente</th>
+            <th>Técnico</th>
+            <th>Timeslot</th>
+            <th>Tipo</th>
+            <th>Teléfono</th>
+            <th>Estado</th>
+            <th>Respuesta</th>
+            <th>Hora</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="empty-state" style="display:none">
+        <div class="big">🔍</div>
+        <p>No hay citas que coincidan con el filtro</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+  let appointments = [];
+  let ws;
+  let selectedIds = new Set();
+  let selectedTecnicos = new Set(); // vacío = todos los técnicos (sin filtro)
+  let sendingProgress = { active: false, total: 0, batch: 0, totalBatches: 0, pausing: false, pauseSeconds: 0 };
+  let pauseInterval = null;
+  let qrTimeout    = null;
+
+  // ─── WebSocket ────────────────────────────────────────────────────────────
+  function connectWS() {
+    ws = new WebSocket(`ws://${location.host}`);
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'qr') {
+        // QR recibido — limpiar timeout y mostrar imagen
+        if (qrTimeout) { clearTimeout(qrTimeout); qrTimeout = null; }
+        document.getElementById('qr-error').style.display = 'none';
+        const img  = document.getElementById('qr-img');
+        const spin = document.getElementById('qr-spinner');
+        img.src = msg.qr;
+        img.style.display = 'block';
+        spin.style.display = 'none';
+        openQR();
+      }
+      if (msg.type === 'wa_status') {
+        updateWABadge(msg.status, msg.name);
+        if (msg.status === 'connected') closeQR();
+      }
+      if (msg.type === 'update') {
+        appointments = msg.appointments;
+        renderAll();
+      }
+      if (msg.type === 'je') {
+        if (msg.je) updateJEDisplay(msg.je);
+      }
+      if (msg.type === 'sending') {
+        sendingProgress.active      = msg.active;
+        sendingProgress.total       = msg.total;
+        sendingProgress.batch       = msg.batch || 0;
+        sendingProgress.totalBatches = msg.totalBatches || 0;
+        sendingProgress.pausing     = false;
+        if (pauseInterval) { clearInterval(pauseInterval); pauseInterval = null; }
+        if (!msg.active) { sendingProgress.batch = 0; sendingProgress.totalBatches = 0; }
+        updateProgress();
+      }
+      if (msg.type === 'batch_pause') {
+        sendingProgress.pausing      = true;
+        sendingProgress.pauseSeconds = msg.seconds;
+        sendingProgress.pauseBatch   = msg.batch;
+        sendingProgress.pauseTotalBatches = msg.totalBatches;
+        // Arrancar countdown local en el cliente
+        if (pauseInterval) clearInterval(pauseInterval);
+        pauseInterval = setInterval(() => {
+          if (sendingProgress.pauseSeconds > 0) {
+            sendingProgress.pauseSeconds--;
+            updateProgress();
+          } else {
+            clearInterval(pauseInterval);
+            pauseInterval = null;
+          }
+        }, 1000);
+        updateProgress();
+      }
+      if (msg.type === 'notice') {
+        showToast(msg.text, msg.level || 'warning');
+      }
+    };
+    ws.onclose = () => setTimeout(connectWS, 3000);
+  }
+
+  function updateWABadge(status, name) {
+    const badge  = document.getElementById('wa-badge');
+    const text   = document.getElementById('wa-text');
+    const logout = document.getElementById('btn-logout');
+    badge.className = status;
+    const labels = {
+      disconnected:  'Desconectado',
+      qr:            'Escanea el QR',
+      authenticated: 'Autenticando...',
+      connected:     name ? `Conectado · ${name}` : 'Conectado',
+      disabled:      'WhatsApp desactivado en este servidor'
+    };
+    text.textContent = labels[status] || status;
+    logout.style.display = status === 'connected' ? '' : 'none';
+  }
+
+  function logoutWA() {
+    if (!confirm('¿Cerrar la sesión de WhatsApp? Tendrás que escanear el QR de nuevo la próxima vez.')) return;
+    fetch('/logout', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) showToast('Sesión de WhatsApp cerrada', 'success');
+        else showToast('Error al cerrar sesión: ' + d.error, 'error');
+      });
+  }
+
+  function reiniciarWA() {
+    // Borra la sesión guardada y fuerza un QR nuevo
+    const img  = document.getElementById('qr-img');
+    const spin = document.getElementById('qr-spinner');
+    img.style.display  = 'none';
+    img.src = '';
+    spin.style.display = 'flex';
+    fetch('/reiniciar-wa', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) showToast('WhatsApp reiniciado — generando QR...', 'success');
+        else showToast('Error: ' + d.error, 'error');
+      })
+      .catch(() => showToast('Error de conexión con el servidor', 'error'));
+  }
+
+  // ─── QR Modal ─────────────────────────────────────────────────────────────
+  function toggleQR() {
+    const o = document.getElementById('qr-overlay');
+    o.classList.contains('show') ? closeQR() : openQR();
+  }
+  function openQR() {
+    document.getElementById('qr-overlay').classList.add('show');
+    const img = document.getElementById('qr-img');
+    if (!img.src || img.src === window.location.href) {
+      img.style.display  = 'none';
+      document.getElementById('qr-spinner').style.display = 'flex';
+      document.getElementById('qr-error').style.display   = 'none';
+      // Si el QR no llega en 50s → mostrar diagnóstico de error
+      if (!qrTimeout) {
+        qrTimeout = setTimeout(() => {
+          qrTimeout = null;
+          fetch('/diagnostico').then(r => r.json()).then(d => {
+            const err = document.getElementById('qr-error');
+            if (!d.chromeExists && !d.puppeteerExists) {
+              err.innerHTML =
+                '⚠️ <strong>Chrome no encontrado.</strong><br>' +
+                'El navegador interno no se descargó correctamente.<br><br>' +
+                '1. Cierra esta ventana negra<br>' +
+                '2. Vuelve a ejecutar <strong>INSTALAR.bat</strong><br>' +
+                '3. Cuando termine, abre <strong>INICIAR.bat</strong>';
+            } else {
+              err.innerHTML =
+                '⚠️ <strong>Tiempo de espera agotado.</strong><br>' +
+                'Chrome: ' + (d.chromePath || d.puppeteerPath || 'desconocido') + '<br><br>' +
+                'Prueba a pulsar <em>🔄 Reiniciar WhatsApp</em> abajo.<br>' +
+                'Si persiste, cierra y vuelve a abrir <strong>INICIAR.bat</strong>.';
+            }
+            err.style.display = '';
+            document.getElementById('qr-spinner').style.display = 'none';
+          }).catch(() => {
+            const err = document.getElementById('qr-error');
+            err.innerHTML = '⚠️ No se puede conectar con el servidor. Comprueba que la ventana negra está abierta.';
+            err.style.display = '';
+            document.getElementById('qr-spinner').style.display = 'none';
+          });
+        }, 50000);
+      }
+    }
+  }
+  function closeQR() {
+    document.getElementById('qr-overlay').classList.remove('show');
+    if (qrTimeout) { clearTimeout(qrTimeout); qrTimeout = null; }
+  }
+
+  // ─── Drag & Drop ──────────────────────────────────────────────────────────
+  function handleDragOver(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.add('dragover');
+  }
+  function handleDragLeave() {
+    document.getElementById('drop-zone').classList.remove('dragover');
+  }
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) uploadFile(file);
+  }
+
+  function uploadFile(file) {
+    if (!file) return;
+    const result = document.getElementById('upload-result');
+    result.style.color = 'var(--muted)';
+    result.textContent = '⏳  Procesando archivo...';
+
+    const fd = new FormData();
+    fd.append('excel', file);
+    const matricula = document.getElementById('je-matricula').value.trim().toUpperCase();
+    if (matricula) fd.append('matricula', matricula);
+
+    fetch('/upload', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          result.style.color = 'var(--green2)';
+          const msg = d.added > 0
+            ? `✅  ${d.added} citas nuevas añadidas · ${d.count} total`
+            : `✅  Sin citas nuevas · ${d.count} ya cargadas`;
+          result.textContent = msg;
+          showToast(d.added > 0 ? `${d.added} citas nuevas añadidas` : 'Sin citas nuevas que añadir', d.added > 0 ? 'success' : 'warning');
+        } else {
+          result.style.color = 'var(--red2)';
+          result.textContent = `❌  Error: ${d.error}`;
+          showToast('Error al leer el archivo', 'error');
+        }
+      })
+      .catch(() => {
+        result.style.color = 'var(--red2)';
+        result.textContent = '❌  Error de conexión con el servidor';
+      });
+  }
+
+  // ─── Send ──────────────────────────────────────────────────────────────────
+  function sendAll() {
+    fetch('/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: null })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) {
+        showToast(d.error || 'Error al enviar', 'error');
+        if (d.error && d.error.includes('WhatsApp')) openQR();
+        return;
+      }
+      if (d.queued === 0) { showToast('No hay citas pendientes', 'warning'); return; }
+      let txt = `Enviando ${d.queued} mensajes...`;
+      if (d.skipped > 0) {
+        txt = `Enviando ${d.queued}. ${d.skipped} quedan para mañana (tope diario ${d.dailyLimit}).`;
+      }
+      showToast(txt, d.skipped > 0 ? 'warning' : 'success');
+      sendingProgress = { active: true, total: d.queued };
+      updateProgress();
+    });
+  }
+
+  function sendErrors() {
+    fetch('/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ includeErrors: true })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { showToast(d.error || 'Error', 'error'); return; }
+      if (d.queued === 0) { showToast('No hay errores que reenviar', 'warning'); return; }
+      showToast(`Reenviando ${d.queued} mensajes con error...`, 'success');
+    });
+  }
+
+  // Citas pendientes del técnico actualmente filtrado
+  function pendientesDelTecnico() {
+    if (selectedTecnicos.size === 0) return [];
+    return appointments.filter(a => selectedTecnicos.has(a.tecnico) &&
+      (a.status === 'pendiente' || a.status === 'error'));
+  }
+
+  function sendTecnico() {
+    const pend = pendientesDelTecnico();
+    if (selectedTecnicos.size === 0) { showToast('Selecciona uno o varios técnicos primero', 'warning'); return; }
+    if (pend.length === 0) { showToast('No hay citas pendientes para los técnicos elegidos', 'warning'); return; }
+    fetch('/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: pend.map(a => a.id) })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) {
+        showToast(d.error || 'Error al enviar', 'error');
+        if (d.error && d.error.includes('WhatsApp')) openQR();
+        return;
+      }
+      if (d.queued === 0) { showToast('Nada que enviar', 'warning'); return; }
+      const quien = selectedTecnicos.size === 1 ? [...selectedTecnicos][0] : `${selectedTecnicos.size} técnicos`;
+      let txt = `Enviando ${d.queued} citas de ${quien}...`;
+      if (d.skipped > 0) txt += ` (${d.skipped} para mañana, tope ${d.dailyLimit})`;
+      showToast(txt, d.skipped > 0 ? 'warning' : 'success');
+      sendingProgress = { active: true, total: d.queued };
+      updateProgress();
+    });
+  }
+
+  // Mostrar/ocultar el botón "Enviar técnicos seleccionados" según la selección activa
+  function updateTecnicoButton() {
+    const btn  = document.getElementById('btn-send-tecnico');
+    const hint = document.getElementById('tecnico-hint');
+    const pend = pendientesDelTecnico();
+    if (selectedTecnicos.size > 0 && pend.length > 0) {
+      btn.style.display = '';
+      document.getElementById('tec-count').textContent = pend.length;
+    } else {
+      btn.style.display = 'none';
+    }
+    // La sugerencia se muestra siempre que haya varios técnicos
+    const numTecnicos = new Set(appointments.map(a => a.tecnico)).size;
+    hint.style.display = numTecnicos > 1 ? '' : 'none';
+  }
+
+  function sendSelected() {
+    if (selectedIds.size === 0) return;
+    fetch('/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [...selectedIds] })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { showToast(d.error || 'Error', 'error'); return; }
+      showToast(`Enviando ${d.queued} mensajes...`, 'success');
+      selectedIds.clear();
+      renderSelectionBar();
+    });
+  }
+
+  function sendOne(id) {
+    fetch('/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [id] })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) showToast(d.error || 'Error', 'error');
+      else showToast('Mensaje en cola de envío', 'success');
+    });
+  }
+
+  function clearAll() {
+    if (!confirm('¿Borrar todas las citas cargadas? Esta acción no se puede deshacer.')) return;
+    fetch('/clear', { method: 'POST' })
+      .then(r => r.json())
+      .then(() => {
+        document.getElementById('upload-result').textContent = '';
+        document.getElementById('file-input').value = '';
+        showToast('Datos borrados correctamente', 'success');
+      });
+  }
+
+  function resetSelected() {
+    if (selectedIds.size === 0) return;
+    fetch('/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [...selectedIds] })
+    }).then(() => { selectedIds.clear(); renderSelectionBar(); });
+  }
+
+  // ─── Progress ─────────────────────────────────────────────────────────────
+  function updateProgress() {
+    const bar = document.getElementById('send-progress');
+    if (!sendingProgress.active && !sendingProgress.pausing) { bar.classList.remove('show'); return; }
+    bar.classList.add('show');
+
+    const done = appointments.filter(a =>
+      ['enviado','confirmado','no_confirmado','otra_respuesta','error'].includes(a.status)
+    ).length;
+    const pct = sendingProgress.total > 0
+      ? Math.min(100, Math.round(done / sendingProgress.total * 100))
+      : 0;
+
+    document.getElementById('progress-fill').style.width = pct + '%';
+
+    if (sendingProgress.pausing) {
+      const s   = sendingProgress.pauseSeconds;
+      const min = Math.floor(s / 60);
+      const sec = String(s % 60).padStart(2, '0');
+      const lote = sendingProgress.pauseBatch;
+      const total = sendingProgress.pauseTotalBatches;
+      document.getElementById('progress-text').textContent =
+        `⏸ Pausa anti-bloqueo (lote ${lote}/${total} completado) · Continúa en ${min}:${sec} · ${done}/${sendingProgress.total} enviados`;
+    } else {
+      const loteInfo = sendingProgress.totalBatches > 1
+        ? ` · Lote ${sendingProgress.batch}/${sendingProgress.totalBatches}`
+        : '';
+      document.getElementById('progress-text').textContent =
+        `📤 Enviando${loteInfo} · ${done} / ${sendingProgress.total} mensajes`;
+    }
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+  function renderAll() {
+    updateStats();
+    populateTechFilter();
+    renderTable();
+    renderNoPanel();
+    updateProgress();
+    const hasData = appointments.length > 0;
+    document.getElementById('stats-panel').style.display = hasData ? '' : 'none';
+    document.getElementById('table-panel').style.display = hasData ? '' : 'none';
+    document.getElementById('btn-clear').style.display   = hasData ? '' : 'none';
+    const errorCount = appointments.filter(a => a.status === 'error').length;
+    const btnErrors = document.getElementById('btn-send-errors');
+    btnErrors.style.display = errorCount > 0 ? '' : 'none';
+    document.getElementById('error-count').textContent = errorCount;
+  }
+
+  function updateStats() {
+    const c = { total:0, pendiente:0, enviado:0, confirmado:0, no_confirmado:0, otra_respuesta:0 };
+    appointments.forEach(a => {
+      if (a.status !== 'sin_telefono' && a.status !== 'sin_whatsapp') c.total++;
+      if (c[a.status] !== undefined) c[a.status]++;
+    });
+    document.getElementById('s-total').textContent     = c.total;
+    document.getElementById('s-pending').textContent   = c.pendiente;
+    document.getElementById('s-sent').textContent      = c.enviado;
+    document.getElementById('s-confirmed').textContent = c.confirmado;
+    document.getElementById('s-rejected').textContent  = c.no_confirmado;
+    document.getElementById('s-other').textContent     = c.otra_respuesta;
+  }
+
+  function populateTechFilter() {
+    const tecnicos = [...new Set(appointments.map(a => a.tecnico))].sort();
+    // Quitar de la selección los técnicos que ya no están en los datos
+    [...selectedTecnicos].forEach(t => { if (!tecnicos.includes(t)) selectedTecnicos.delete(t); });
+
+    const list = document.getElementById('tecnico-ms-list');
+    list.innerHTML = tecnicos.map(t => {
+      const checked = selectedTecnicos.has(t) ? 'checked' : '';
+      const safe = esc(t).replace(/'/g, "\\'");
+      return `<label class="ms-item">
+        <input type="checkbox" ${checked} onchange="toggleTecnicoMSItem('${safe}', this.checked)">
+        <span>${esc(t)}</span>
+      </label>`;
+    }).join('');
+    updateTecnicoMSLabel();
+  }
+
+  // ─── Menú desplegable de técnicos (multi-selección) ───────────────────────
+  function toggleTecnicoMS(e) {
+    e.stopPropagation();
+    document.getElementById('tecnico-ms-panel').classList.toggle('show');
+  }
+  document.addEventListener('click', (e) => {
+    const ms = document.getElementById('tecnico-ms');
+    if (ms && !ms.contains(e.target)) document.getElementById('tecnico-ms-panel').classList.remove('show');
+  });
+
+  function toggleTecnicoMSItem(tecnico, checked) {
+    checked ? selectedTecnicos.add(tecnico) : selectedTecnicos.delete(tecnico);
+    updateTecnicoMSLabel();
+    renderTable();
+  }
+  function msSeleccionarTodos() {
+    const tecnicos = [...new Set(appointments.map(a => a.tecnico))];
+    tecnicos.forEach(t => selectedTecnicos.add(t));
+    populateTechFilter();
+    renderTable();
+  }
+  function msLimpiar() {
+    selectedTecnicos.clear();
+    populateTechFilter();
+    renderTable();
+  }
+  function updateTecnicoMSLabel() {
+    const label = document.getElementById('tecnico-ms-label');
+    const n = selectedTecnicos.size;
+    if (n === 0) label.textContent = 'Todos los técnicos';
+    else if (n === 1) label.textContent = [...selectedTecnicos][0];
+    else label.textContent = `${n} técnicos seleccionados`;
+  }
+
+  function getFiltered() {
+    const q      = document.getElementById('search').value.toLowerCase();
+    const status = document.getElementById('filter-status').value;
+    return appointments.filter(a => {
+      if (selectedTecnicos.size > 0 && !selectedTecnicos.has(a.tecnico)) return false;
+      if (status  && a.status  !== status)  return false;
+      if (q && !a.cliente.toLowerCase().includes(q) &&
+               !a.tecnico.toLowerCase().includes(q) &&
+               !a.tipo.toLowerCase().includes(q))   return false;
+      return true;
+    });
+  }
+
+  function renderTable() {
+    updateTecnicoButton();
+    const filtered = getFiltered();
+    const tbody = document.getElementById('tbody');
+    const empty = document.getElementById('empty-state');
+    if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = ''; return; }
+    empty.style.display = 'none';
+    tbody.innerHTML = filtered.map(a => {
+      const checked  = selectedIds.has(a.id) ? 'checked' : '';
+      const rowClass = a.status === 'no_confirmado' ? 'highlight-no' : '';
+      const canSend  = a.status === 'pendiente' || a.status === 'error';
+      return `<tr class="${rowClass}">
+        <td><input type="checkbox" ${checked} onchange="toggleSelect(${a.id}, this)"></td>
+        <td style="color:var(--muted);font-size:.7rem">${a.id + 1}</td>
+        <td class="cliente">${esc(a.cliente)}</td>
+        <td class="tecnico" title="${esc(a.tecnico)}">${esc(a.tecnico)}</td>
+        <td style="white-space:nowrap;color:var(--gold3);font-weight:600">${esc(a.timeslot)}</td>
+        <td class="tipo" title="${esc(a.tipo)}">${esc(a.tipo)}</td>
+        <td style="font-family:monospace;font-size:.74rem;color:var(--muted)">${esc(a.telefono)}</td>
+        <td>${badgeHTML(a.status)}</td>
+        <td class="respuesta" title="${esc(a.respuesta)}">${esc(a.respuesta) || '—'}</td>
+        <td style="color:var(--muted);font-size:.7rem;white-space:nowrap">${a.horaRespuesta || '—'}</td>
+        <td>${canSend ? `<button class="btn-row" onclick="sendOne(${a.id})">📤</button>` : ''}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderNoPanel() {
+    const noCitas = appointments.filter(a => a.status === 'no_confirmado');
+    const panel = document.getElementById('no-panel');
+    const list  = document.getElementById('no-list');
+    if (noCitas.length === 0) { panel.classList.remove('show'); return; }
+    panel.classList.add('show');
+    list.innerHTML = noCitas.map(a => `
+      <div class="no-item">
+        <div>
+          <div class="no-item-name">${esc(a.cliente)}</div>
+          <div class="no-item-detail">${esc(a.tipo)} &nbsp;·&nbsp; ${esc(a.timeslot)}h &nbsp;·&nbsp; Técnico: ${esc(a.tecnico)}</div>
+          ${a.respuesta ? `<div class="no-item-detail" style="margin-top:3px;color:var(--red2)">Respuesta: "${esc(a.respuesta)}"</div>` : ''}
+        </div>
+        <div style="text-align:right">
+          ${a.numMantenimiento ? `<div style="color:var(--gold3);font-size:.72rem;font-weight:700;font-family:monospace;margin-bottom:3px">Mant. ${esc(a.numMantenimiento)}</div>` : ''}
+          <div class="no-item-phone">📞 &nbsp;${esc(a.telefono)}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ─── Selection ─────────────────────────────────────────────────────────────
+  function toggleSelect(id, cb) {
+    cb.checked ? selectedIds.add(id) : selectedIds.delete(id);
+    renderSelectionBar();
+  }
+  function toggleSelectAll(cb) {
+    getFiltered().forEach(a => cb.checked ? selectedIds.add(a.id) : selectedIds.delete(a.id));
+    renderSelectionBar();
+    renderTable();
+  }
+  function renderSelectionBar() {
+    const n = selectedIds.size;
+    document.getElementById('btn-send-selected').style.display = n > 0 ? '' : 'none';
+    document.getElementById('btn-reset').style.display         = n > 0 ? '' : 'none';
+    document.getElementById('sel-count').textContent = n;
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+  function badgeHTML(status) {
+    const labels = {
+      pendiente:      '⏳ Pendiente',
+      enviado:        '📨 Enviado',
+      confirmado:     '✅ Confirmado',
+      no_confirmado:  '❌ No confirma',
+      otra_respuesta: '💬 Otra resp.',
+      error:          '⚠️ Error',
+      sin_telefono:   '📵 Sin tel.',
+      sin_whatsapp:   '🚫 Sin WhatsApp'
+    };
+    return `<span class="badge badge-${status}">${labels[status] || status}</span>`;
+  }
+
+  function esc(str) {
+    return String(str || '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  let toastTimer;
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.className = '', 3500);
+  }
+
+  // ─── Jerarquía (espejo del servidor) ──────────────────────────────────────
+  const JERARQUIA = {
+    'JR9426':  ['239831','286800','273379','273371','Q28224','Q29994'],
+    '239831':  ['296625','336070','356443','JC5863','358721','277029','357641','333158','338045'],
+    '286800':  ['Q14001','302786','Q30910','294255','317492','291125','359684','359682','336919','307113','358717','303760','317024','342074','RR6743','359189','341284'],
+    '273379':  ['279300','356427','294898','337588','338851','303768','286106','274629','357636','286596','343017','310655','356444','308264','336469','318921','339251','358719','356455','295342','356463'],
+    '273371':  ['333156','356432','356434','290754','356440','333528','301653','306055','293800','339887','363','356463','356980','356460','337583','312440','339886','312756'],
+    'Q28224':  ['315166','313824','299538','356431','247470','310306','Q30909','334203','297373','356445','357633','338071','314302','356458','340320'],
+    'Q29994':  ['356426','301193','301652','247472','353969','DY9618','310656','356441','356442','356448','356452','359193','334204','276085','312756']
+  };
+  const JE_NAMES = {
+    '239831': 'Pablo Marques Peñalver',
+    '286800': 'Ezequiel Pugliese',
+    '273379': 'Maikel Ramón Gutiérrez Niño',
+    '273371': 'Armando José Madrid Ruiz',
+    'Q28224': 'Manuel Enrique Sequeira Avila',
+    'Q29994': 'Hefranyer Humberto Chacón Tovar',
+    'JR9426': 'Coordinador Regional'
+  };
+
+  // ─── Matrícula input ───────────────────────────────────────────────────────
+  function onMatriculaInput(input) {
+    const val = input.value.trim().toUpperCase();
+    const badge = document.getElementById('je-name-badge');
+    const err   = document.getElementById('je-error');
+    input.value = val;
+    if (!val) { badge.style.display = 'none'; err.style.display = 'none'; return; }
+    if (JE_NAMES[val]) {
+      badge.textContent = `✓ ${JE_NAMES[val]}`;
+      badge.style.display = '';
+      err.style.display = 'none';
+    } else if (val.length >= 5) {
+      // Matrícula no está en la lista pero puede ser válida — la aceptamos
+      badge.textContent = `✓ ${val}`;
+      badge.style.display = '';
+      err.style.display = 'none';
+    } else {
+      badge.style.display = 'none';
+      err.textContent = 'Matrícula demasiado corta';
+      err.style.display = '';
+    }
+  }
+
+  // Leer parámetro ?je= de la URL para pre-rellenar desde el portal de Aurum
+  function readURLParam() {
+    const params = new URLSearchParams(window.location.search);
+    const je = params.get('je');
+    if (je) {
+      const input = document.getElementById('je-matricula');
+      input.value = je.toUpperCase();
+      onMatriculaInput(input);
+    }
+  }
+
+  // Mostrar JE activo recibido del servidor (al reconectar)
+  function updateJEDisplay(je) {
+    if (!je) return;
+    const input = document.getElementById('je-matricula');
+    if (!input.value) {
+      input.value = je.matricula;
+      onMatriculaInput(input);
+    }
+  }
+
+  // ─── Init ──────────────────────────────────────────────────────────────────
+  readURLParam();
+  connectWS();
+</script>
+</body>
+</html>

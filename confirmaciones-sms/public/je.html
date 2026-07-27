@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Confirmaciones del Equipo · Verisure</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent }
+    html,body { height:100%; }
+    :root {
+      --bg:     #0a0a0a;
+      --s1:     #111111;
+      --s2:     #181818;
+      --border: #2a2200;
+      --border2:#3d3300;
+      --gold:   #c9a84c;
+      --gold2:  #e8c96a;
+      --gold3:  #a07830;
+      --text:   #f0e6c8;
+      --muted:  #7a6840;
+      --dim:    #1c1800;
+      --red:    #c0392b;
+      --red2:   #e74c3c;
+      --green:  #2e7d52;
+      --green2: #3daa6e;
+      --blue2:  #3498db;
+      --font:   'Outfit', sans-serif;
+    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
+    header {
+      background: var(--s1); border-bottom: 1px solid var(--border2);
+      padding: 14px 16px; position: sticky; top: 0; z-index: 10;
+    }
+    header h1 { font-size: 1rem; color: var(--gold2); font-weight: 800; letter-spacing: .03em; }
+    header .sub { font-size: .68rem; color: var(--muted); margin-top: 2px; }
+
+    main { padding: 14px; max-width: 520px; margin: 0 auto; }
+
+    .panel { background: var(--s1); border: 1px solid var(--border2); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    label { display:block; font-size:.62rem; font-weight:700; color:var(--gold3); text-transform:uppercase; letter-spacing:.1em; margin-bottom:8px; }
+    input[type=text] {
+      width: 100%; background: var(--dim); border: 1.5px solid var(--border2); color: var(--text);
+      border-radius: 10px; padding: 12px 14px; font-size: 1rem; font-family: var(--font); outline: none;
+      text-transform: uppercase; letter-spacing: .03em;
+    }
+    input[type=text]:focus { border-color: var(--gold); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      border: none; border-radius: 10px; font-family: var(--font); font-weight: 700; cursor: pointer;
+    }
+    .btn-gold { background: linear-gradient(135deg, #7a5c10, var(--gold), var(--gold2)); color: #0a0a0a; width: 100%; padding: 13px; font-size: .9rem; margin-top: 12px; }
+    .btn-send { background: rgba(52,152,219,.15); color: var(--blue2); border: 1px solid rgba(52,152,219,.35); flex: 1; padding: 10px; font-size: .76rem; }
+    .btn-yes  { background: rgba(46,125,82,.15); color: var(--green2); border: 1px solid rgba(46,125,82,.35); flex: 1; padding: 10px; font-size: .76rem; }
+    .btn-no   { background: rgba(192,57,43,.15); color: var(--red2); border: 1px solid rgba(192,57,43,.35); flex: 1; padding: 10px; font-size: .76rem; }
+
+    .stats { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+    .stat { flex:1; min-width:70px; background:var(--dim); border:1px solid var(--border); border-radius:10px; padding:10px 6px; text-align:center; }
+    .stat b { display:block; font-size:1.25rem; color:var(--gold2); }
+    .stat span { font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+
+    /* Grupo por técnico (colapsable) */
+    .tec-group { background: var(--s1); border: 1px solid var(--border2); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+    .tec-header {
+      display:flex; justify-content:space-between; align-items:center; padding: 13px 14px;
+      cursor: pointer; user-select: none;
+    }
+    .tec-header .tec-name { font-weight: 700; font-size: .86rem; }
+    .tec-header .tec-info { display:flex; align-items:center; gap:8px; }
+    .tec-badge-count { background: var(--dim); color: var(--gold3); font-size: .68rem; font-weight: 700; padding: 3px 9px; border-radius: 12px; }
+    .tec-badge-pend  { background: rgba(212,131,26,.15); color: #d4831a; font-size: .68rem; font-weight: 700; padding: 3px 9px; border-radius: 12px; }
+    .tec-arrow { color: var(--muted); font-size: .7rem; transition: transform .2s; }
+    .tec-group.open .tec-arrow { transform: rotate(180deg); }
+    .tec-body { display: none; padding: 0 10px 10px; }
+    .tec-group.open .tec-body { display: block; }
+
+    .card { background: var(--dim); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+    .card.confirmado { border-color: rgba(46,125,82,.4); }
+    .card.no_confirmado { border-color: rgba(192,57,43,.45); background: rgba(192,57,43,.06); }
+    .card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px; }
+    .card-name { font-weight: 700; font-size: .88rem; }
+    .card-detail { font-size: .72rem; color: var(--muted); line-height: 1.5; margin-bottom: 9px; }
+    .card-detail b { color: var(--gold3); }
+    .badge {
+      display: inline-flex; align-items:center; gap:4px; padding: 3px 9px; border-radius: 20px;
+      font-size: .6rem; font-weight: 700; letter-spacing: .03em; white-space: nowrap; text-transform: uppercase;
+    }
+    .badge-pendiente     { background: rgba(122,104,64,.15); color: var(--muted); }
+    .badge-enviado       { background: rgba(52,152,219,.15); color: var(--blue2); }
+    .badge-confirmado    { background: rgba(46,125,82,.18);  color: var(--green2); }
+    .badge-no_confirmado { background: rgba(192,57,43,.18);  color: var(--red2); }
+    .badge-sin_telefono  { background: rgba(26,24,0,.5);     color: #3a3520; }
+    .card-actions { display:flex; gap:6px; }
+
+    #empty, #login-hint { text-align:center; padding: 40px 20px; color: var(--muted); font-size: .82rem; line-height:1.6; }
+    #empty .big, #login-hint .big { font-size: 40px; margin-bottom: 10px; }
+
+    #toast {
+      position: fixed; bottom: 20px; left: 16px; right: 16px;
+      background: var(--s1); border: 1px solid var(--border2); border-radius: 12px;
+      padding: 12px 16px; font-size: .8rem; text-align:center;
+      opacity: 0; transform: translateY(10px); transition: all .3s; z-index: 999; pointer-events:none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.success { border-left: 3px solid var(--green2); }
+    #toast.error   { border-left: 3px solid var(--red2); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📲 Confirmaciones del Equipo</h1>
+  <div class="sub">Verisure · Envío por SMS</div>
+</header>
+
+<main>
+
+  <div class="panel">
+    <label>Tu matrícula de Jefe de Equipo</label>
+    <input type="text" id="matricula" placeholder="Ej: 286800" maxlength="10" oninput="this.value=this.value.toUpperCase()">
+    <label style="margin-top:12px">Tu DNI (contraseña)</label>
+    <input type="text" id="dni" placeholder="Ej: 12345678A" maxlength="12" oninput="this.value=this.value.toUpperCase()">
+    <button class="btn btn-gold" onclick="cargarCitas()">Ver mi equipo</button>
+  </div>
+
+  <div id="login-hint">
+    <div class="big">👥</div>
+    Escribe tu matrícula y DNI, y pulsa<br>"Ver mi equipo" para empezar.<br><br>
+    <span style="font-size:.7rem">El Excel se sube una sola vez desde el panel principal — aquí solo se visualiza y se envía.</span>
+  </div>
+
+  <div id="content" style="display:none">
+    <div class="stats">
+      <div class="stat"><b id="st-total">0</b><span>Total</span></div>
+      <div class="stat"><b id="st-pend">0</b><span>Pend.</span></div>
+      <div class="stat"><b id="st-conf">0</b><span>Confirm.</span></div>
+      <div class="stat"><b id="st-no">0</b><span>No conf.</span></div>
+    </div>
+    <div id="grupos"></div>
+    <div id="empty" style="display:none">
+      <div class="big">✅</div>
+      No hay citas cargadas para tu equipo todavía.
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+  let citas = [];
+  let openTecnicos = new Set();
+  let refreshTimer = null;
+
+  const savedMat = localStorage.getItem('mi_matricula_je');
+  const savedDni = localStorage.getItem('mi_dni_je');
+  if (savedMat) document.getElementById('matricula').value = savedMat;
+  if (savedDni) document.getElementById('dni').value = savedDni;
+
+  function cargarCitas() {
+    const mat = document.getElementById('matricula').value.trim().toUpperCase();
+    const dni = document.getElementById('dni').value.trim().toUpperCase();
+    if (!mat || !dni) { showToast('Escribe tu matrícula y DNI', 'error'); return; }
+    localStorage.setItem('mi_matricula_je', mat);
+    localStorage.setItem('mi_dni_je', dni);
+
+    fetch('/mis-citas-equipo?matricula=' + encodeURIComponent(mat) + '&dni=' + encodeURIComponent(dni))
+      .then(r => r.json())
+      .then(d => {
+        if (!d.ok) { showToast(d.error || 'Error', 'error'); return; }
+        citas = d.citas;
+        document.getElementById('login-hint').style.display = 'none';
+        document.getElementById('content').style.display = '';
+        render();
+        if (!refreshTimer) refreshTimer = setInterval(() => cargarCitasSilencioso(mat, dni), 15000);
+      })
+      .catch(() => showToast('No se pudo conectar con el servidor', 'error'));
+  }
+
+  function cargarCitasSilencioso(mat, dni) {
+    fetch('/mis-citas-equipo?matricula=' + encodeURIComponent(mat) + '&dni=' + encodeURIComponent(dni))
+      .then(r => r.json())
+      .then(d => { if (d.ok) { citas = d.citas; render(); } })
+      .catch(() => {});
+  }
+
+  function render() {
+    const total = citas.filter(c => c.status !== 'sin_telefono').length;
+    const pend  = citas.filter(c => c.status === 'pendiente').length;
+    const conf  = citas.filter(c => c.status === 'confirmado').length;
+    const noconf= citas.filter(c => c.status === 'no_confirmado').length;
+    document.getElementById('st-total').textContent = total;
+    document.getElementById('st-pend').textContent  = pend;
+    document.getElementById('st-conf').textContent  = conf;
+    document.getElementById('st-no').textContent    = noconf;
+
+    const cont  = document.getElementById('grupos');
+    const empty = document.getElementById('empty');
+    if (citas.length === 0) { cont.innerHTML = ''; empty.style.display = ''; return; }
+    empty.style.display = 'none';
+
+    // Agrupar por técnico
+    const porTecnico = {};
+    citas.forEach(c => {
+      if (!porTecnico[c.tecnico]) porTecnico[c.tecnico] = [];
+      porTecnico[c.tecnico].push(c);
+    });
+
+    const tecnicosOrdenados = Object.keys(porTecnico).sort();
+
+    cont.innerHTML = tecnicosOrdenados.map(tec => {
+      const lista = porTecnico[tec];
+      const pendTec = lista.filter(c => c.status === 'pendiente').length;
+      const isOpen = openTecnicos.has(tec);
+      const safe = tec.replace(/'/g, "\\'");
+      const cardsHtml = lista.map(c => cardHTML(c)).join('');
+      return `<div class="tec-group ${isOpen ? 'open' : ''}">
+        <div class="tec-header" onclick="toggleTecnico('${safe}')">
+          <div class="tec-name">${esc(tec)}</div>
+          <div class="tec-info">
+            ${pendTec > 0 ? `<span class="tec-badge-pend">${pendTec} pend.</span>` : ''}
+            <span class="tec-badge-count">${lista.length}</span>
+            <span class="tec-arrow">▾</span>
+          </div>
+        </div>
+        <div class="tec-body">${cardsHtml}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function cardHTML(c) {
+    const labels = {
+      pendiente: '⏳ Pendiente', enviado: '📨 Enviado', confirmado: '✅ Confirmado',
+      no_confirmado: '❌ No confirma', sin_telefono: '📵 Sin teléfono'
+    };
+    const badge = `<span class="badge badge-${c.status}">${labels[c.status] || c.status}</span>`;
+    const puedeEnviar = c.status !== 'sin_telefono';
+    return `<div class="card ${c.status}">
+      <div class="card-top">
+        <div class="card-name">${esc(c.cliente)}</div>
+        ${badge}
+      </div>
+      <div class="card-detail">
+        <b>${esc(c.tipo)}</b> · ${esc(c.fecha)} · tramo ${esc(c.timeslot)}h<br>
+        📞 ${esc(c.telefono) || '—'}
+      </div>
+      ${puedeEnviar ? `<div class="card-actions">
+        <button class="btn btn-send" onclick="enviarSMS(${c.id})">📱 Enviar SMS</button>
+        <button class="btn btn-yes" onclick="marcar(${c.id},'confirmado')">✅ Sí</button>
+        <button class="btn btn-no" onclick="marcar(${c.id},'no_confirmado')">❌ No</button>
+      </div>` : ''}
+    </div>`;
+  }
+
+  function toggleTecnico(tec) {
+    if (openTecnicos.has(tec)) openTecnicos.delete(tec);
+    else openTecnicos.add(tec);
+    render();
+  }
+
+  function enviarSMS(id) {
+    const c = citas.find(x => x.id === id);
+    if (!c) return;
+    const nombre = c.cliente.split(' ')[0];
+    const msg = `Hola ${nombre}, Verisure: tiene cita de ${c.tipo} el ${c.fecha} tramo ${c.timeslot}h. Responda SI o NO. Gracias`;
+    const tel = String(c.telefono || '').replace(/\D/g, '');
+    if (tel.length < 9) { showToast('Este cliente no tiene teléfono válido', 'error'); return; }
+    window.location.href = `sms:+34${tel}?body=${encodeURIComponent(msg)}`;
+    marcar(id, 'enviado', true);
+  }
+
+  function marcar(id, status, silencioso) {
+    fetch('/marcar-respuesta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status })
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (!d.ok) { showToast(d.error || 'Error', 'error'); return; }
+        const c = citas.find(x => x.id === id);
+        if (c) c.status = status;
+        render();
+        if (!silencioso) {
+          const txt = status === 'confirmado' ? 'Marcado como confirmado' : 'Marcado como no confirma';
+          showToast(txt, 'success');
+        }
+      })
+      .catch(() => showToast('No se pudo guardar', 'error'));
+  }
+
+  function esc(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  let toastTimer;
+  function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type || ''}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.className = '', 3000);
+  }
+
+  if (savedMat && savedDni) cargarCitas();
+</script>
+</body>
+</html>
