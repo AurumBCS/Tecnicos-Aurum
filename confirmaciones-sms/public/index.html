@@ -721,25 +721,7 @@
         <div id="je-error" style="display:none; color:var(--red2); font-size:.76rem;"></div>
       </div>
       <div style="font-size:.68rem; color:var(--muted); margin-top:6px;">
-        Si eres <strong style="color:var(--gold3)">técnico</strong>, verás solo tus citas. Si eres <strong style="color:var(--gold3)">jefe de equipo</strong>, las de todos tus técnicos. Sube siempre el mismo Excel global.
-      </div>
-    </div>
-
-    <!-- Carga completa (sin matrícula de JE) — requiere autorización -->
-    <div id="uploader-auth-box" style="margin-bottom:16px;">
-      <label style="display:block; font-size:.62rem; font-weight:700; color:var(--orange); text-transform:uppercase; letter-spacing:.12em; margin-bottom:8px;">
-        ⚠️ Carga completa (todos los técnicos) — tu matrícula autorizada
-      </label>
-      <input type="text" id="uploader-matricula"
-             placeholder="Matrícula autorizada para carga completa"
-             maxlength="10"
-             style="background:var(--dim); border:1.5px solid rgba(212,131,26,.4); color:var(--text);
-                    border-radius:8px; padding:10px 14px; font-size:.88rem; font-family:var(--font);
-                    outline:none; width:280px; letter-spacing:.04em; text-transform:uppercase;"
-             oninput="this.value=this.value.toUpperCase()">
-      <div style="font-size:.68rem; color:var(--muted); margin-top:6px;">
-        Dejaste la matrícula de arriba en blanco → esto sube el Excel completo, sin filtrar, para que
-        lo vean todos los técnicos y JE. Solo personas autorizadas pueden hacerlo.
+        Si eres <strong style="color:var(--gold3)">técnico</strong>, verás solo tus citas. Si eres <strong style="color:var(--gold3)">jefe de equipo</strong>, las de todos tus técnicos. Si tu matrícula está autorizada para la carga completa, se sube todo sin filtrar. Sube siempre el mismo Excel global.
       </div>
     </div>
 
@@ -1074,12 +1056,7 @@
     const fd = new FormData();
     fd.append('excel', file);
     const matricula = document.getElementById('je-matricula').value.trim().toUpperCase();
-    if (matricula) {
-      fd.append('matricula', matricula);
-    } else {
-      const uploaderMat = document.getElementById('uploader-matricula').value.trim().toUpperCase();
-      fd.append('uploaderMatricula', uploaderMat);
-    }
+    fd.append('matricula', matricula);
 
     fetch('/upload', { method: 'POST', body: fd })
       .then(r => r.json())
@@ -1486,8 +1463,6 @@
     const badge = document.getElementById('je-name-badge');
     const err   = document.getElementById('je-error');
     input.value = val;
-    // Mostrar el campo de autorización de carga completa solo cuando esto queda vacío
-    document.getElementById('uploader-auth-box').style.display = val ? 'none' : '';
     if (!val) { badge.style.display = 'none'; err.style.display = 'none'; return; }
     if (JE_NAMES[val]) {
       badge.textContent = `✓ ${JE_NAMES[val]}`;
@@ -1505,7 +1480,9 @@
     }
   }
 
-  // Leer parámetro ?je= de la URL para pre-rellenar desde el portal de Aurum
+  // Leer parámetro ?je= de la URL para pre-rellenar desde el portal de Aurum.
+  // También lo usa el botón "Cargar Excel" del portal para matrículas
+  // autorizadas — el servidor decide qué hacer según esa matrícula.
   function readURLParam() {
     const params = new URLSearchParams(window.location.search);
     const je = params.get('je');
@@ -1513,16 +1490,6 @@
       const input = document.getElementById('je-matricula');
       input.value = je.toUpperCase();
       onMatriculaInput(input);
-      return;
-    }
-    // Enlace directo del botón "Cargar Excel" del portal (ya autenticado ahí,
-    // no hace falta pedir DNI de nuevo) — deja la matrícula de arriba vacía
-    // (carga completa) y rellena directamente la de autorización.
-    const uploader = params.get('uploader');
-    if (uploader) {
-      document.getElementById('je-matricula').value = '';
-      document.getElementById('uploader-auth-box').style.display = '';
-      document.getElementById('uploader-matricula').value = uploader.toUpperCase();
     }
   }
 

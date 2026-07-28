@@ -24,8 +24,9 @@ let JERARQUIA = {};
 let JE_NAMES  = { 'JR9426': 'Coordinador Regional' };
 
 // Matrículas autorizadas para hacer la carga CENTRAL del Excel (todos los técnicos, sin filtrar).
-// Una carga con matrícula de JE en blanco (modo central) solo se permite si "uploaderMatricula"
-// está en esta lista. Cargas normales filtradas por un JE/técnico concreto no la necesitan.
+// Si la matrícula escrita en el campo normal de carga coincide con una de estas,
+// se sube todo sin filtrar. Cualquier otra matrícula sigue el comportamiento normal
+// (JE ve su equipo, técnico ve solo lo suyo).
 const UPLOADERS_PERMITIDOS = ['262876', 'CM9651', 'GD5381', 'EQ5303'];
 
 function fetchCSV(url, redirects = 0) {
@@ -355,31 +356,23 @@ app.post('/upload', upload.single('excel'), (req, res) => {
   try {
     const matricula = String(req.body.matricula || '').trim().toUpperCase();
 
-    // Carga CENTRAL (matrícula en blanco = todos los técnicos, sin filtrar):
-    // solo la pueden hacer las matrículas autorizadas en UPLOADERS_PERMITIDOS.
     if (!matricula) {
-      const uploaderMatricula = String(req.body.uploaderMatricula || '').trim().toUpperCase();
-      if (!UPLOADERS_PERMITIDOS.includes(uploaderMatricula)) {
-        return res.json({
-          ok: false,
-          error: 'Tu matrícula no está autorizada para hacer la carga completa del Excel.'
-        });
-      }
+      return res.json({ ok: false, error: 'Escribe tu matrícula para continuar.' });
     }
 
     // Determinar qué citas mostrar según la matrícula que ha iniciado sesión:
+    //  - Si está en UPLOADERS_PERMITIDOS → carga completa, todos los técnicos sin filtrar
     //  - Si es un JEFE DE EQUIPO (está en JERARQUIA) → las de todos sus técnicos
     //  - Si es un TÉCNICO → solo sus propias citas (su matrícula)
-    //  - Si está vacío → todas las del Excel
     let matriculasPermitidas = null;
     let esJE = false;
-    if (matricula) {
-      if (JERARQUIA[matricula]) {
-        matriculasPermitidas = JERARQUIA[matricula].map(id => id.toUpperCase());
-        esJE = true;
-      } else {
-        matriculasPermitidas = [matricula]; // modo técnico: solo lo suyo
-      }
+    if (UPLOADERS_PERMITIDOS.includes(matricula)) {
+      matriculasPermitidas = null; // sin filtro — carga completa autorizada
+    } else if (JERARQUIA[matricula]) {
+      matriculasPermitidas = JERARQUIA[matricula].map(id => id.toUpperCase());
+      esJE = true;
+    } else {
+      matriculasPermitidas = [matricula]; // modo técnico: solo lo suyo
     }
 
     currentJE = matricula

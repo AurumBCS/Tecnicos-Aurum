@@ -571,7 +571,7 @@ const EXCEL_UPLOADERS_PERMITIDOS = ['262876', 'CM9651', 'GD5381', 'EQ5303'];
 
 function abrirCargaExcel(){
   const mat = (CURRENT_JE_ID || (CURRENT_TEC && CURRENT_TEC.id) || '').toUpperCase();
-  const url = SMS_CONFIRMACIONES_URL.replace(/\/$/, '') + '/?uploader=' + encodeURIComponent(mat);
+  const url = SMS_CONFIRMACIONES_URL.replace(/\/$/, '') + '/?je=' + encodeURIComponent(mat);
   window.open(url, '_blank');
 }
 const FICHAJE_SHEET_DRIVE_URL = "https://docs.google.com/spreadsheets/d/1vPjN71Ss7PPm_5sstr2NVQdOAwvK-Fm3n5aYO3WsrpM/edit";
