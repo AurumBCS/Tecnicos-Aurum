@@ -87,8 +87,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .topbar-name{font-size:.83rem;font-weight:600;color:var(--text);line-height:1.2}
 .topbar-id{font-size:.63rem;color:var(--muted);font-family:monospace;letter-spacing:.04em}
 .topbar-logout{background:transparent;border:1px solid var(--border2);color:var(--muted);
-  border-radius:8px;padding:6px 11px;font-size:.7rem;cursor:pointer;font-family:var(--font);transition:all .2s}
+  border-radius:8px;padding:6px 11px;font-size:.7rem;cursor:pointer;font-family:var(--font);transition:transform .08s,opacity .08s,border-color .2s,color .2s}
 .topbar-logout:hover{border-color:var(--gold3);color:var(--gold)}
+.topbar-logout:active{transform:scale(0.94);opacity:.75}
 
 .month-banner{padding:12px 16px;background:linear-gradient(135deg,#111100 0%,#0d0d0d 100%);
   border-bottom:1px solid var(--border);display:flex;align-items:center;
@@ -624,7 +625,11 @@ let MES_SELECCIONADO  = null; // null = mes actual (en vivo)
 let CURRENT_DATA_LIVE = null; // snapshot de los datos en vivo, para volver desde un mes historico
 let FICHAJE_ID = null;      // matrícula de la persona logueada (técnico, JE o JR), para fichar
 let FICHAJE_NOMBRE = null;
-let FICHAJE_HOY = {};       // {mat: {horaEntrada,horaComida,horaSalida,tipoCierre}} del día actual
+let FICHAJE_HOY = {};       // {mat: {horaEntrada,horaComida,horaSalida,tipoCierre,...}} de HOY — solo para el botón personal
+let FICHAJE_VISTA = {};     // igual que FICHAJE_HOY pero de la fecha navegada en el Gantt (JR/admin)
+let FICHAJE_FECHA_VISTA = null; // null = hoy
+let FICHAJE_FILTRO_TEXTO = '';
+let FICHAJE_CONTAINER_ACTIVO = null;
 
 // ══════════════════════════════════════════════
 //  UTILIDADES
@@ -2778,11 +2783,24 @@ function hoyISOFichaje(){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
-async function loadFichajeHoy(){
+function sumarDiasFecha(fechaISO, dias){
+  const [y,m,d]=fechaISO.split('-').map(Number);
+  const dt=new Date(y,m-1,d);
+  dt.setDate(dt.getDate()+dias);
+  return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+}
+
+function formatearFechaLegible(fechaISO){
+  const [y,m,d]=fechaISO.split('-').map(Number);
+  const dt=new Date(y,m-1,d);
+  return dt.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
+}
+
+async function fetchFichajePorFecha(fecha){
   try{
-    const url=FICHAJE_URL+'&fecha='+hoyISOFichaje()+'&t='+Date.now();
+    const url=FICHAJE_URL+'&fecha='+fecha+'&t='+Date.now();
     const res=await fetch(url,{cache:'no-store'});
-    if(!res.ok) return;
+    if(!res.ok) return {};
     const csv=await res.text();
     const rows=parseCSV(csv);
     const porMat={};
@@ -2794,11 +2812,25 @@ async function loadFichajeHoy(){
         horaEntrada: row['horaEntrada']||'',
         horaComida: row['horaComida']||'',
         horaSalida: row['horaSalida']||'',
-        tipoCierre: row['tipoCierre']||''
+        tipoCierre: row['tipoCierre']||'',
+        latEntrada: row['latEntrada']||'',
+        lngEntrada: row['lngEntrada']||'',
+        latSalida: row['latSalida']||'',
+        lngSalida: row['lngSalida']||''
       };
     });
-    FICHAJE_HOY=porMat;
-  }catch(e){console.log('Fichaje error:',e.message);}
+    return porMat;
+  }catch(e){console.log('Fichaje error:',e.message); return {};}
+}
+
+// Datos de HOY para el botón personal de fichar — independiente de la fecha que se esté navegando en el Gantt
+async function loadFichajeHoy(){
+  FICHAJE_HOY = await fetchFichajePorFecha(hoyISOFichaje());
+}
+
+// Datos de la fecha navegada en el Gantt (JR / administrativas de fichaje)
+async function loadFichajeVista(){
+  FICHAJE_VISTA = await fetchFichajePorFecha(FICHAJE_FECHA_VISTA || hoyISOFichaje());
 }
 
 function estadoFichajeBtn(mat){
@@ -2816,6 +2848,8 @@ function pintarBotonFichaje(){
     return;
   }
   btn.style.display='';
+  btn.style.opacity='1';
+  btn.title='Al fichar se registra tu ubicación.';
   const st=estadoFichajeBtn(FICHAJE_ID);
   btn.disabled=false;
   if(st.estado==='sinFichar'){
@@ -2833,50 +2867,152 @@ function pintarBotonFichaje(){
   }
 }
 
+// Best-effort: si el permiso se deniega, tarda o no hay soporte, resuelve null sin bloquear el fichaje.
+function obtenerGeolocalizacion(){
+  return new Promise(resolve=>{
+    if(!navigator.geolocation){ resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos=>resolve({lat:pos.coords.latitude, lng:pos.coords.longitude}),
+      ()=>resolve(null),
+      {timeout:2500, maximumAge:60000}
+    );
+  });
+}
+
 async function enviarFichaje(accion){
   if(!FICHAJE_ID) return;
+  const pos = await obtenerGeolocalizacion();
   try{
     await fetch(FICHAJE_URL,{
       method:'POST',
       mode:'no-cors',
-      body: JSON.stringify({mat:FICHAJE_ID, nombre:FICHAJE_NOMBRE||'', accion})
+      body: JSON.stringify({mat:FICHAJE_ID, nombre:FICHAJE_NOMBRE||'', accion, lat:pos?pos.lat:'', lng:pos?pos.lng:''})
     });
   }catch(e){console.log('Fichaje POST error:',e.message);}
   await loadFichajeHoy();
   pintarBotonFichaje();
-  if(CURRENT_USER_TYPE==='jr') renderFichajeJR('jrFichajeContainer');
-  if(CURRENT_USER_TYPE==='fichaje-admin') renderFichajeJR('fichajeAdminContainer');
+  if((CURRENT_USER_TYPE==='jr' || CURRENT_USER_TYPE==='fichaje-admin') && FICHAJE_CONTAINER_ACTIVO){
+    await loadFichajeVista();
+    renderFichajeJR(FICHAJE_CONTAINER_ACTIVO);
+  }
 }
 
 function onFichajeBtnClick(){
   const st=estadoFichajeBtn(FICHAJE_ID);
+  if(st.estado!=='sinFichar' && st.estado!=='abierto') return;
+  // Feedback inmediato (antes de esperar geolocalización/red) — deshabilita, cambia texto
+  // y atenúa el botón para que se note al instante que el toque se registró.
+  const btn=document.getElementById('fichajeBtn');
+  if(btn){
+    btn.disabled=true;
+    btn.style.opacity='.6';
+    btn.textContent='⏳ Fichando…';
+  }
   if(st.estado==='sinFichar') enviarFichaje('entrada');
   else if(st.estado==='abierto') enviarFichaje('salida');
 }
 
-function filaFichajeTec(tec){
-  const nombre=tec.nombre.trim().split(' ').slice(0,2).join(' ');
-  const st=estadoFichajeBtn(tec.id);
-  let color,label;
-  if(st.estado==='sinFichar'){ color='#e05a4a'; label='Sin fichar'; }
-  else if(st.estado==='abierto'){ color='var(--orange)'; label='Entrada '+st.entrada; }
-  else if(st.tipoCierre==='manual'){ color='var(--green2)'; label=st.entrada+'–'+st.salida+' ✓'; }
-  else { color='var(--muted)'; label=st.entrada+'–'+st.salida+' (auto)'; }
-  return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
-    <div>
-      <div style="font-size:.78rem;font-weight:700;color:var(--text)">${nombre}</div>
-      <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${tec.id}</div>
-    </div>
-    <div style="background:${color}22;border:1px solid ${color}55;border-radius:20px;padding:3px 12px;font-size:.68rem;font-weight:700;color:${color}">${label}</div>
+const FICHAJE_VENTANA_INICIO = 7*60;  // 07:00 en minutos desde medianoche
+const FICHAJE_VENTANA_MIN    = 14*60; // ventana de 14 horas (07:00–21:00)
+const FICHAJE_PX_POR_HORA    = 50;
+
+function minutosFichaje(horaStr){
+  if(!horaStr) return null;
+  const p=horaStr.split(':');
+  return (Number(p[0])||0)*60 + (Number(p[1])||0);
+}
+function pctVentanaFichaje(minutos){
+  const rel=Math.max(0, Math.min(FICHAJE_VENTANA_MIN, minutos - FICHAJE_VENTANA_INICIO));
+  return (rel/FICHAJE_VENTANA_MIN*100).toFixed(2);
+}
+
+function cabeceraGanttFichaje(){
+  let marcas='';
+  for(let h=7; h<=21; h++){
+    const pct=((h*60-FICHAJE_VENTANA_INICIO)/FICHAJE_VENTANA_MIN*100).toFixed(2);
+    marcas+=`<div style="position:absolute;left:${pct}%;top:0;bottom:0;border-left:1px solid var(--border);font-size:.55rem;color:var(--muted);padding-left:3px;white-space:nowrap">${h}h</div>`;
+  }
+  return `<div style="display:flex">
+    <div style="width:130px;flex-shrink:0;position:sticky;left:0;background:var(--dim);z-index:2"></div>
+    <div style="position:relative;flex:1;min-width:${FICHAJE_PX_POR_HORA*14}px;height:22px;background:var(--dim)">${marcas}</div>
   </div>`;
 }
 
+function filaGanttFichaje(tec, fechaVista){
+  const nombre=tec.nombre.trim().split(' ').slice(0,2).join(' ');
+  const f=FICHAJE_VISTA[tec.id.toUpperCase()];
+  const esHoy=fechaVista===hoyISOFichaje();
+  let barra='';
+  if(f && f.horaEntrada){
+    const minEntrada=minutosFichaje(f.horaEntrada);
+    let minSalida, color;
+    if(f.horaSalida){
+      minSalida=minutosFichaje(f.horaSalida);
+      color = f.tipoCierre==='manual' ? 'var(--green2)' : 'var(--muted)';
+    } else if(esHoy){
+      const ahora=new Date();
+      minSalida=ahora.getHours()*60+ahora.getMinutes();
+      color='var(--orange)';
+    } else {
+      minSalida=minEntrada+30;
+      color='var(--orange)';
+    }
+    const left=pctVentanaFichaje(minEntrada);
+    const width=Math.max(1, pctVentanaFichaje(minSalida)-pctVentanaFichaje(minEntrada));
+    const pinEntrada = (f.latEntrada && f.lngEntrada) ? `<a href="https://www.google.com/maps?q=${f.latEntrada},${f.lngEntrada}" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none;margin-left:4px" title="Ubicación de entrada">📍</a>` : '';
+    const pinSalida = (f.latSalida && f.lngSalida) ? `<a href="https://www.google.com/maps?q=${f.latSalida},${f.lngSalida}" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none;margin-left:2px" title="Ubicación de salida">📍</a>` : '';
+    barra=`<div style="position:absolute;top:6px;bottom:6px;left:${left}%;width:${width}%;background:${color};border-radius:6px;display:flex;align-items:center;padding:0 6px;font-size:.6rem;font-weight:700;color:#0a0a0a;white-space:nowrap" title="${f.horaEntrada}–${f.horaSalida||'en curso'}">${f.horaEntrada}${pinEntrada}${pinSalida}</div>`;
+  }
+  return `<div style="display:flex;border-bottom:1px solid var(--border)">
+    <div style="position:sticky;left:0;z-index:1;background:var(--s1);width:130px;flex-shrink:0;padding:8px 10px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid var(--border2)">
+      <div style="font-size:.68rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nombre}</div>
+      <div style="font-size:.55rem;color:var(--muted)">${tec.id}</div>
+    </div>
+    <div style="position:relative;flex:1;min-width:${FICHAJE_PX_POR_HORA*14}px;height:38px">${barra}</div>
+  </div>`;
+}
+
+// Rellena solo las filas (no la cabecera/filtro/nav) para no perder el foco del buscador al escribir
+function renderGanttFichajeRows(containerId){
+  const rowsEl=document.getElementById('ganttRows-'+containerId);
+  if(!rowsEl) return;
+  const fechaVista=FICHAJE_FECHA_VISTA || hoyISOFichaje();
+  const jeIds=JERARQUIA['JR9426']||[];
+  const filtro=FICHAJE_FILTRO_TEXTO.trim().toUpperCase();
+  const grupos=jeIds.map(jeId=>{
+    let tecs=getTecnicosOfJE(jeId);
+    if(filtro) tecs=tecs.filter(t=>t.nombre.toUpperCase().includes(filtro)||t.id.toUpperCase().includes(filtro));
+    if(!tecs.length) return '';
+    const jeName=JE_NAMES[jeId]||jeId;
+    return `<div style="font-size:.65rem;font-weight:700;color:var(--gold2);text-transform:uppercase;letter-spacing:.08em;padding:8px 14px;background:var(--dim);position:sticky;left:0;width:fit-content;min-width:100%">${jeName}</div>${tecs.map(t=>filaGanttFichaje(t,fechaVista)).join('')}`;
+  }).join('');
+  rowsEl.innerHTML = grupos || `<div style="padding:20px;text-align:center;color:var(--muted);font-size:.75rem">Sin técnicos que coincidan con el filtro</div>`;
+}
+
+async function cambiarFechaFichaje(delta){
+  const hoy=hoyISOFichaje();
+  const actual=FICHAJE_FECHA_VISTA || hoy;
+  if(delta===0){ FICHAJE_FECHA_VISTA=null; }
+  else {
+    const nueva=sumarDiasFecha(actual, delta);
+    if(nueva>hoy) return;
+    FICHAJE_FECHA_VISTA=nueva;
+  }
+  await loadFichajeVista();
+  if(FICHAJE_CONTAINER_ACTIVO) renderFichajeJR(FICHAJE_CONTAINER_ACTIVO);
+}
+
+function filtrarFichajeGantt(texto){
+  FICHAJE_FILTRO_TEXTO=texto;
+  if(FICHAJE_CONTAINER_ACTIVO) renderGanttFichajeRows(FICHAJE_CONTAINER_ACTIVO);
+}
+
 function descargarFichajeCSV(){
-  const fecha=hoyISOFichaje();
-  const rows=[['fecha','mat','nombre','horaEntrada','horaComida','horaSalida','tipoCierre']];
-  Object.keys(FICHAJE_HOY).forEach(mat=>{
-    const f=FICHAJE_HOY[mat];
-    rows.push([fecha,mat,f.nombre||'',f.horaEntrada||'',f.horaComida||'',f.horaSalida||'',f.tipoCierre||'']);
+  const fecha=FICHAJE_FECHA_VISTA || hoyISOFichaje();
+  const rows=[['fecha','mat','nombre','horaEntrada','horaComida','horaSalida','tipoCierre','latEntrada','lngEntrada','latSalida','lngSalida']];
+  Object.keys(FICHAJE_VISTA).forEach(mat=>{
+    const f=FICHAJE_VISTA[mat];
+    rows.push([fecha,mat,f.nombre||'',f.horaEntrada||'',f.horaComida||'',f.horaSalida||'',f.tipoCierre||'',f.latEntrada||'',f.lngEntrada||'',f.latSalida||'',f.lngSalida||'']);
   });
   const csv=rows.map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
@@ -2887,17 +3023,13 @@ function descargarFichajeCSV(){
   URL.revokeObjectURL(url);
 }
 
-// Vista de fichajes de toda la empresa, en desplegable — usada por JR y por FICHAJE_ADMIN_IDS
+// Vista Gantt de fichajes de toda la empresa, en desplegable — usada por JR y por FICHAJE_ADMIN_IDS
 function renderFichajeJR(containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
-  const jeIds=JERARQUIA['JR9426']||[];
-  const grupos=jeIds.map(jeId=>{
-    const tecs=getTecnicosOfJE(jeId);
-    if(!tecs.length) return '';
-    const jeName=JE_NAMES[jeId]||jeId;
-    return `<div style="font-size:.65rem;font-weight:700;color:var(--gold2);text-transform:uppercase;letter-spacing:.08em;padding:8px 14px;background:var(--dim)">${jeName}</div>${tecs.map(filaFichajeTec).join('')}`;
-  }).join('');
+  FICHAJE_CONTAINER_ACTIVO=containerId;
+  const fechaVista=FICHAJE_FECHA_VISTA || hoyISOFichaje();
+  const esHoy=fechaVista===hoyISOFichaje();
 
   const driveLink = FICHAJE_SHEET_DRIVE_URL
     ? `<a href="${FICHAJE_SHEET_DRIVE_URL}" target="_blank" style="flex:1;text-align:center;padding:9px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-size:.68rem;font-weight:700;text-decoration:none">📊 Abrir hoja en Drive</a>`
@@ -2906,18 +3038,38 @@ function renderFichajeJR(containerId){
   container.innerHTML=`
     <div style="margin-top:20px">
       <div class="section-head" onclick="document.getElementById('fichajeDropdown').style.display=document.getElementById('fichajeDropdown').style.display==='none'?'block':'none';document.getElementById('fichajeArrow').style.transform=document.getElementById('fichajeArrow').style.transform==='rotate(180deg)'?'rotate(0deg)':'rotate(180deg)'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-        🕐 Fichajes de hoy
+        🕐 Fichajes
         <span id="fichajeArrow" style="display:inline-block;transition:transform .2s">→</span>
       </div>
       <div id="fichajeDropdown" style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;overflow:hidden;position:relative;margin-top:8px;display:none">
         <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
-        <div style="display:flex;gap:8px;padding:10px 12px;background:var(--dim)">
-          <button onclick="descargarFichajeCSV()" style="flex:1;padding:9px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.68rem;font-weight:700;cursor:pointer">📥 Descargar CSV (hoy)</button>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:var(--dim)">
+          <button onclick="cambiarFechaFichaje(-1)" style="padding:7px 11px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">←</button>
+          <div style="flex:1;text-align:center">
+            <div style="font-size:.72rem;font-weight:700;color:var(--text);text-transform:capitalize">${formatearFechaLegible(fechaVista)}</div>
+            ${!esHoy?`<a onclick="cambiarFechaFichaje(0)" style="font-size:.6rem;color:var(--gold2);cursor:pointer;text-decoration:underline">Volver a hoy</a>`:''}
+          </div>
+          <button onclick="cambiarFechaFichaje(1)" ${esHoy?'disabled':''} style="padding:7px 11px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:${esHoy?'var(--muted)':'var(--gold2)'};font-family:var(--font);font-size:.75rem;font-weight:700;cursor:${esHoy?'default':'pointer'}">→</button>
+        </div>
+
+        <div style="padding:8px 12px;background:var(--dim)">
+          <input type="text" placeholder="Buscar técnico por nombre o matrícula…" oninput="filtrarFichajeGantt(this.value)" style="width:100%;padding:8px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem">
+        </div>
+
+        <div style="display:flex;gap:8px;padding:0 12px 10px 12px;background:var(--dim)">
+          <button onclick="descargarFichajeCSV()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.68rem;font-weight:700;cursor:pointer">📥 Descargar CSV</button>
           ${driveLink}
         </div>
-        ${grupos}
+
+        <div style="overflow-x:auto">
+          ${cabeceraGanttFichaje()}
+          <div id="ganttRows-${containerId}"></div>
+        </div>
       </div>
     </div>`;
+
+  renderGanttFichajeRows(containerId);
 }
 
 // ══════════════════════════════════════════════
@@ -3504,8 +3656,9 @@ async function doLogin(){
   Promise.all([loadVacaciones(), loadFlota(), loadCumplimiento(), loadRM()]).then(()=>{
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
-  loadFichajeHoy().then(()=>{
-    pintarBotonFichaje();
+  FICHAJE_FECHA_VISTA=null;
+  loadFichajeHoy().then(()=>pintarBotonFichaje());
+  loadFichajeVista().then(()=>{
     if(CURRENT_USER_TYPE==='jr') renderFichajeJR('jrFichajeContainer');
     if(CURRENT_USER_TYPE==='fichaje-admin') renderFichajeJR('fichajeAdminContainer');
   });
@@ -3751,7 +3904,8 @@ async function doRefreshData(){
       loadMedialiaCoord(),
       loadCumplimiento(),
       loadRM(),
-      loadFichajeHoy()
+      loadFichajeHoy(),
+      loadFichajeVista()
     ]);
 
     if(CURRENT_TEC) renderMain(CURRENT_TEC);
