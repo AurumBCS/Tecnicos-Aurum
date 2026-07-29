@@ -2849,7 +2849,6 @@ function pintarBotonFichaje(){
   }
   btn.style.display='';
   btn.style.opacity='1';
-  btn.title='Al fichar se registra tu ubicación.';
   const st=estadoFichajeBtn(FICHAJE_ID);
   btn.disabled=false;
   if(st.estado==='sinFichar'){
@@ -2867,26 +2866,13 @@ function pintarBotonFichaje(){
   }
 }
 
-// Best-effort: si el permiso se deniega, tarda o no hay soporte, resuelve null sin bloquear el fichaje.
-function obtenerGeolocalizacion(){
-  return new Promise(resolve=>{
-    if(!navigator.geolocation){ resolve(null); return; }
-    navigator.geolocation.getCurrentPosition(
-      pos=>resolve({lat:pos.coords.latitude, lng:pos.coords.longitude}),
-      ()=>resolve(null),
-      {timeout:2500, maximumAge:60000}
-    );
-  });
-}
-
 async function enviarFichaje(accion){
   if(!FICHAJE_ID) return;
-  const pos = await obtenerGeolocalizacion();
   try{
     await fetch(FICHAJE_URL,{
       method:'POST',
       mode:'no-cors',
-      body: JSON.stringify({mat:FICHAJE_ID, nombre:FICHAJE_NOMBRE||'', accion, lat:pos?pos.lat:'', lng:pos?pos.lng:''})
+      body: JSON.stringify({mat:FICHAJE_ID, nombre:FICHAJE_NOMBRE||'', accion})
     });
   }catch(e){console.log('Fichaje POST error:',e.message);}
   await loadFichajeHoy();
@@ -3718,10 +3704,10 @@ async function doLogin(){
   } else if(found.type==='jr'){
     CURRENT_USER_TYPE='jr';
     const JR_NOMBRES={
-      'JR9426':'Coordinador Regional',
-      'CM9651':'Coordinador Regional',
-      'JN4767':'Coordinador Regional',
-      'GD5381':'Coordinador Regional',
+      'JR9426':'Jose Luis Osorio',
+      'CM9651':'Cesar Trujillo',
+      'JN4767':'Jaime Almeida',
+      'GD5381':'Gustavo Perez',
       'BLAS.ALVAREZ':'Blas Álvarez',
       'BA8006':'Blas Álvarez Meléndez'
     };
