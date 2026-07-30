@@ -115,7 +115,54 @@ function fechaManana() {
 }
 
 // ── Persistencia de sesión ────────────────────────────────────────────────────
+// El archivo local (sesion.json) sirve de cache rapida dentro de una misma
+// instancia, pero NO sobrevive a un despliegue nuevo en Render (contenedor
+// desde cero). Por eso las citas TAMBIEN se guardan en una Hoja de Google
+// (fuente de verdad durable) via el Apps Script de CITAS_SHEET_URL.
 const SESSION_FILE = path.join(__dirname, 'sesion.json');
+const CITAS_SHEET_URL = 'https://script.google.com/macros/s/AKfycby06tIG3D_JuqhEt6Bqp283Xgbmg151AuzR4Uj2oIOVWN4XFmhDLR6UYLZtWqrIE8e9/exec';
+
+function postAppsScript(url, bodyObj) {
+  return new Promise((resolve, reject) => {
+    const data   = JSON.stringify(bodyObj);
+    const parsed = new URL(url);
+    const opciones = {
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    };
+    const req = https.request(opciones, res => {
+      let body = '';
+      res.on('data', c => body += c);
+      res.on('end', () => resolve(body));
+    });
+    req.on('error', reject);
+    req.write(data);
+    req.end();
+  });
+}
+
+async function guardarCitasEnSheet() {
+  try {
+    await postAppsScript(CITAS_SHEET_URL, { action: 'guardarTodo', citas: appointments });
+  } catch (e) {
+    console.error('[Sheet] Error al guardar citas:', e.message);
+  }
+}
+
+async function cargarCitasDesdeSheet() {
+  try {
+    const raw  = await fetchCSV(CITAS_SHEET_URL + '?action=cargar');
+    const data = JSON.parse(raw);
+    if (data.ok && data.citas.length > 0) {
+      appointments = data.citas;
+      console.log(`  Citas restauradas desde Google Sheets: ${appointments.length}`);
+    }
+  } catch (e) {
+    console.error('[Sheet] Error al cargar citas:', e.message, '— se intenta respaldo local');
+  }
+}
 
 function guardarSesion() {
   try {
@@ -123,6 +170,7 @@ function guardarSesion() {
   } catch (e) {
     console.error('[Sesión] Error al guardar:', e.message);
   }
+  guardarCitasEnSheet(); // fire-and-forget, no bloquea al que llamo guardarSesion()
 }
 
 function cargarSesion() {
@@ -141,6 +189,13 @@ function cargarSesion() {
     }
   } catch (e) {
     console.error('[Sesión] Error al cargar:', e.message);
+  }
+}
+
+async function iniciarPersistencia() {
+  await cargarCitasDesdeSheet();
+  if (appointments.length === 0) {
+    cargarSesion(); // respaldo local si el Sheet no tenia nada o fallo la carga
   }
 }
 
@@ -910,7 +965,7 @@ cargarJerarquia();
 setInterval(cargarJerarquia, 60 * 60 * 1000);
 cargarAuth();
 setInterval(cargarAuth, 60 * 60 * 1000);
-cargarSesion();
+iniciarPersistencia();
 programarLimpiezaMedianoche();
 
 const PORT = process.env.PORT || 3000;
