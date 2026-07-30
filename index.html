@@ -405,6 +405,10 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="section-head">KPIs del equipo</div>
       <div class="kpi-grid" id="equipoKpis"></div>
 
+      <!-- Rankings del equipo (mantenimientos, ventas, 20%) -->
+      <div class="section-head">Rankings del equipo</div>
+      <div id="equipoRankings" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
+
       <!-- RM global del equipo (se rellena dinámicamente) -->
       <div id="equipoRMGlobal"></div>
 
@@ -433,6 +437,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <button onclick="showHistoricoEquipo(null,'jrPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico de todos los técnicos</button>
       <div class="section-head">Resumen global</div>
       <div class="equipo-kpis" id="jrResumen" style="margin-bottom:14px"></div>
+      <div class="section-head">Rankings de la empresa</div>
+      <div id="jrRankings" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
       <div id="jrFichajeContainer"></div>
       <div class="section-head">Jefes de equipo</div>
       <div class="je-list" id="jeList"></div>
@@ -962,7 +968,7 @@ function opcionesMesesHTML(){
 }
 
 function poblarSelectoresMes(){
-  ['mesSelectorMain','mesSelectorEquipo','mesSelectorJR'].forEach(id=>{
+  ['mesSelectorMain','mesSelectorEquipo','mesSelectorJR','mesSelectorDash'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     el.innerHTML = opcionesMesesHTML();
@@ -1322,6 +1328,21 @@ function renderEquipoPanel(jeId){
 
   document.getElementById('equipoKpis').innerHTML = kpiHtml;
 
+  // ── Rankings del equipo: mantenimientos, ventas, conversión, 20% ──
+  const RANKING_BOTONES=[
+    {type:'mant', icon:'🔧', label:'Mantenimientos realizados'},
+    {type:'uven', icon:'📈', label:'Números de ventas'},
+    {type:'conv', icon:'💰', label:'Conversión'},
+    {type:'v20',  icon:'💶', label:'20% (€)'},
+  ];
+  document.getElementById('equipoRankings').innerHTML = RANKING_BOTONES.map(r=>`
+    <button onclick="showEquipoDash('${r.type}','${jeId}')" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;background:var(--s1);border:1px solid var(--border2);border-radius:12px;color:var(--text);font-family:var(--font);cursor:pointer;text-align:left">
+      <span style="font-size:1.3rem">${r.icon}</span>
+      <span style="flex:1;font-size:.8rem;font-weight:700">${r.label}</span>
+      <span style="font-size:.68rem;color:var(--gold3)">Ver ranking →</span>
+    </button>
+  `).join('');
+
   // ── RM Global del equipo (desde Excel) ──
   const tecIds = tecs.map(t=>t.id);
   const rmTecs = tecIds.map(id=>({id, rm:RM_DATA[id]||RM_DATA[id.toUpperCase()]})).filter(x=>x.rm);
@@ -1649,6 +1670,21 @@ function renderJRPanel(){
     <div class="equipo-kpi"><div class="equipo-kpi-name">Técnicos</div>
       <div class="equipo-kpi-val" style="color:var(--gold2)">${allTecs.length}</div></div>`;
 
+  // Rankings de la empresa: mantenimientos, ventas, conversión, 20%
+  const JR_RANKING_BOTONES=[
+    {type:'mant', icon:'🔧', label:'Mantenimientos realizados'},
+    {type:'uven', icon:'📈', label:'Números de ventas'},
+    {type:'conv', icon:'💰', label:'Conversión'},
+    {type:'v20',  icon:'💶', label:'20% (€)'},
+  ];
+  document.getElementById('jrRankings').innerHTML = JR_RANKING_BOTONES.map(r=>`
+    <button onclick="showJRDash('${r.type}')" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;background:var(--s1);border:1px solid var(--border2);border-radius:12px;color:var(--text);font-family:var(--font);cursor:pointer;text-align:left">
+      <span style="font-size:1.3rem">${r.icon}</span>
+      <span style="flex:1;font-size:.8rem;font-weight:700">${r.label}</span>
+      <span style="font-size:.68rem;color:var(--gold3)">Ver ranking →</span>
+    </button>
+  `).join('');
+
   // Lista agrupada por zonas
   let jeListHTML = '';
   const tieneCuentaEmp = Object.keys(CUENTA_DATA).length > 0;
@@ -1934,6 +1970,11 @@ function showTecDetailFromJR(tecId){
 }
 
 
+// Panel al que "← Volver" debe regresar desde equipoDashPanel (equipoPanel o jrPanel)
+let _dashBackPanel = 'equipoPanel';
+let _dashType = null;   // tipo de ranking abierto actualmente (mant, uven, conv, v20, rm, cum, ppa)
+let _dashJeId = null;   // jeId usado si _dashBackPanel==='equipoPanel'
+
 // showRMDashFromTec: abre el dashboard RM desde el panel tecDetail (equipo JE)
 let _rmBackPanel = 'detailPanel';
 function showRMDashFromTec(tecId){
@@ -2190,8 +2231,31 @@ function showDetail(type){
 //  DASHBOARD KPI EQUIPO (RM / CUM / CONV)
 // ══════════════════════════════════════════════
 function showEquipoDash(type, jeId){
-  const tecs=getTecnicosOfJE(jeId);
+  _dashBackPanel='equipoPanel';
+  _dashType=type;
+  _dashJeId=jeId;
+  _renderDashRanking(type, getTecnicosOfJE(jeId));
+}
 
+function showJRDash(type){
+  _dashBackPanel='jrPanel';
+  _dashType=type;
+  _dashJeId=null;
+  const jeIds=JERARQUIA['JR9426']||[];
+  const tecs=jeIds.flatMap(id=>getTecnicosOfJE(id));
+  _renderDashRanking(type, tecs);
+}
+
+// Cambia de mes sin salir de la vista de ranking (reusa cambiarMes, que ya
+// trae los datos historicos y actualiza CURRENT_DATA globalmente), y luego
+// vuelve a abrir el mismo ranking con los datos del mes elegido.
+async function cambiarMesDash(mes){
+  await cambiarMes(mes);
+  if(_dashBackPanel==='jrPanel') showJRDash(_dashType);
+  else showEquipoDash(_dashType, _dashJeId);
+}
+
+function _renderDashRanking(type, tecs){
   const CFG={
     rm:{
       title:'🛠️ %RM — Ratio de Mantenimiento',
@@ -2232,8 +2296,33 @@ function showEquipoDash(type, jeId){
       cols:[
         {label:'PPA',fn:t=>t.ppa.toFixed(1)+'%',color:t=>t.ppa>=10?'var(--green2)':'#e05a4a'},
       ]
+    },
+    mant:{
+      title:'🔧 Mantenimientos realizados',
+      sub:'Ranking por cantidad de mantenimientos realizados',
+      key:'palito', min:0, unit:'', sinObjetivo:true,
+      cols:[
+        {label:'Mantenimientos',fn:t=>t.palito,color:()=>'var(--gold2)'},
+      ]
+    },
+    uven:{
+      title:'📈 Números de ventas',
+      sub:'Ranking por unidades vendidas',
+      key:'uven', min:0, unit:'', sinObjetivo:true,
+      cols:[
+        {label:'Unidades',fn:t=>t.uven.toFixed(0),color:()=>'var(--gold2)'},
+      ]
+    },
+    v20:{
+      title:'💶 20% (€)',
+      sub:'Ranking por monto del 20% en euros',
+      key:'ventas', min:0, unit:'€', sinObjetivo:true,
+      cols:[
+        {label:'20% €',fn:t=>'€'+t.ventas.toFixed(0),color:()=>'var(--gold2)'},
+      ]
     }
   };
+  const ambito = _dashBackPanel==='jrPanel' ? 'de la empresa' : 'del equipo';
 
   const cfg=CFG[type];
   const tecsForCalc = (type==='rm' || type==='cum')
@@ -2249,8 +2338,9 @@ function showEquipoDash(type, jeId){
   const sorted=[...tecsForCalc].sort((a,b)=>b[cfg.key]-a[cfg.key]);
   const okCount=sorted.filter(t=>t[cfg.key]>=(cfg.min)).length;
   const avg2=tecsForCalc.length?tecsForCalc.reduce((s,t)=>s+t[cfg.key],0)/tecsForCalc.length:0;
+  const total2=tecsForCalc.reduce((s,t)=>s+t[cfg.key],0);
   const avgS=getStatus({min:cfg.min},avg2);
-  const avgCol=avgS==='ok'?'var(--green2)':avgS==='warn'?'var(--orange)':'#e05a4a';
+  const avgCol=cfg.sinObjetivo?'var(--gold2)':(avgS==='ok'?'var(--green2)':avgS==='warn'?'var(--orange)':'#e05a4a');
 
   // Barra de progreso horizontal por técnico
   const maxVal=Math.max(...sorted.map(t=>t[cfg.key]),cfg.min*1.1)||1;
@@ -2259,7 +2349,7 @@ function showEquipoDash(type, jeId){
     const val=t[cfg.key];
     const ok=val>=cfg.min;
     const barPct=Math.min(100,Math.round((val/maxVal)*100));
-    const barCol=ok?'var(--green2)':'#e05a4a';
+    const barCol=cfg.sinObjetivo?'var(--gold2)':(ok?'var(--green2)':'#e05a4a');
     const nombre=t.nombre.trim().split(' ').slice(0,2).join(' ');
 
     // Extra cols
@@ -2294,6 +2384,9 @@ function showEquipoDash(type, jeId){
   const colHeaders=cfg.cols.map(c=>`<th style="padding:6px 4px;font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:center">${c.label}</th>`).join('');
 
   document.getElementById('equipoDashContent').innerHTML=`
+    <select id="mesSelectorDash" onchange="cambiarMesDash(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+      ${opcionesMesesHTML()}
+    </select>
     <div class="detail-hero">
       <div class="detail-hero-title">${cfg.title}</div>
       <div class="detail-hero-sub">${cfg.sub}</div>
@@ -2302,8 +2395,17 @@ function showEquipoDash(type, jeId){
     <div style="display:flex;gap:9px;margin-bottom:16px">
       <div class="stat-box" style="flex:1">
         <div class="n" style="color:${avgCol}">${avg2.toFixed(1)}${cfg.unit}</div>
-        <div class="l">Promedio equipo</div>
+        <div class="l">Promedio</div>
       </div>
+      ${cfg.sinObjetivo ? `
+      <div class="stat-box" style="flex:1">
+        <div class="n" style="color:var(--gold2)">${total2.toFixed(0)}${cfg.unit}</div>
+        <div class="l">Total</div>
+      </div>
+      <div class="stat-box" style="flex:1">
+        <div class="n" style="color:var(--gold2)">${tecs.length}</div>
+        <div class="l">Técnicos</div>
+      </div>` : `
       <div class="stat-box" style="flex:1">
         <div class="n" style="color:var(--green2)">${okCount}</div>
         <div class="l">En objetivo</div>
@@ -2311,10 +2413,10 @@ function showEquipoDash(type, jeId){
       <div class="stat-box" style="flex:1">
         <div class="n" style="color:#e05a4a">${tecs.length-okCount}</div>
         <div class="l">Por debajo</div>
-      </div>
+      </div>`}
     </div>
 
-    <div class="detail-section">Ranking del equipo</div>
+    <div class="detail-section">Ranking ${ambito}</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;overflow:hidden;margin-top:4px">
       <table style="width:100%;border-collapse:collapse">
         <thead style="background:var(--dim)">
@@ -2327,9 +2429,10 @@ function showEquipoDash(type, jeId){
       </table>
     </div>
     <div style="font-size:.62rem;color:var(--muted);margin-top:10px;text-align:center">
-      ⭐ mejor del equipo · ordenado por ${cfg.title.split('—')[0].trim()}
+      ⭐ mejor ${ambito} · ordenado por ${cfg.title.split('—')[0].trim()}
     </div>`;
 
+  poblarSelectoresMes();
   showPanel('equipoDashPanel');
   window.scrollTo(0,0);
 }
@@ -3779,7 +3882,7 @@ document.getElementById('backJRBtn').addEventListener('click',()=>{
 });
 
 document.getElementById('backDashBtn').addEventListener('click',()=>{
-  showPanel('equipoPanel'); window.scrollTo(0,0);
+  showPanel(_dashBackPanel); window.scrollTo(0,0);
 });
 document.getElementById('backRMBtn').addEventListener('click',()=>{
   showPanel(_rmBackPanel); window.scrollTo(0,0);
