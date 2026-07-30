@@ -91,7 +91,23 @@
     .badge-confirmado    { background: rgba(46,125,82,.18);  color: var(--green2); }
     .badge-no_confirmado { background: rgba(192,57,43,.18);  color: var(--red2); }
     .badge-sin_telefono  { background: rgba(26,24,0,.5);     color: #3a3520; }
-    .card-actions { display:flex; gap:6px; }
+    .card-actions { display:flex; gap:6px; align-items:center; }
+    .chk-envio { width:18px; height:18px; accent-color: var(--gold); flex-shrink:0; cursor:pointer; }
+
+    .barra-acciones { display:flex; gap:8px; margin-bottom:10px; }
+    .btn-sel-todos {
+      background: rgba(122,104,64,.15); color: var(--gold3); border: 1px solid rgba(122,104,64,.35);
+      flex:1; padding: 10px; font-size: .74rem;
+    }
+    #barra-lote {
+      display:none; position:fixed; bottom:0; left:0; right:0; z-index: 30;
+      background: var(--s1); border-top: 1px solid var(--border2);
+      padding: 12px 16px; align-items:center; gap:10px;
+      box-shadow: 0 -4px 16px rgba(0,0,0,.4);
+    }
+    #barra-lote span { font-size: .8rem; flex:1; }
+    #barra-lote .btn-cancelar { background: rgba(122,104,64,.15); color: var(--muted); padding: 10px 14px; font-size: .74rem; }
+    #barra-lote .btn-gold { width:auto; margin-top:0; padding: 10px 18px; font-size: .78rem; }
 
     #empty, #login-hint { text-align:center; padding: 40px 20px; color: var(--muted); font-size: .82rem; line-height:1.6; }
     #empty .big, #login-hint .big { font-size: 40px; margin-bottom: 10px; }
@@ -137,6 +153,9 @@
       <div class="stat"><b id="st-conf">0</b><span>Confirm.</span></div>
       <div class="stat"><b id="st-no">0</b><span>No conf.</span></div>
     </div>
+    <div class="barra-acciones">
+      <button class="btn btn-sel-todos" onclick="seleccionarTodosPendientes()">☑️ Seleccionar todos los pendientes</button>
+    </div>
     <div id="grupos"></div>
     <div id="empty" style="display:none">
       <div class="big">✅</div>
@@ -146,12 +165,21 @@
 
 </main>
 
+<div id="barra-lote">
+  <span><b id="lote-count">0</b> seleccionadas</span>
+  <button class="btn btn-cancelar" onclick="cancelarSeleccion()">Cancelar</button>
+  <button class="btn btn-gold" onclick="enviarSeleccionados()">📤 Enviar</button>
+</div>
+
 <div id="toast"></div>
 
 <script>
   let citas = [];
   let openTecnicos = new Set();
   let refreshTimer = null;
+  let seleccionados = new Set();
+  let colaEnvio = [];
+  let enviandoEnCola = false;
 
   const savedMat = localStorage.getItem('mi_matricula_je');
   const savedDni = localStorage.getItem('mi_dni_je');
@@ -194,6 +222,10 @@
     document.getElementById('st-pend').textContent  = pend;
     document.getElementById('st-conf').textContent  = conf;
     document.getElementById('st-no').textContent    = noconf;
+
+    // Quitar de la seleccion las citas que ya no se pueden enviar (p.ej. si cambio de estado)
+    citas.forEach(c => { if (c.status === 'sin_telefono') seleccionados.delete(c.id); });
+    actualizarBarraSeleccion();
 
     const cont  = document.getElementById('grupos');
     const empty = document.getElementById('empty');
@@ -246,6 +278,8 @@
         📞 ${esc(c.telefono) || '—'}
       </div>
       ${puedeEnviar ? `<div class="card-actions">
+        <input type="checkbox" class="chk-envio" ${seleccionados.has(c.id) ? 'checked' : ''}
+          onchange="toggleSeleccion(${c.id}, this.checked)" title="Seleccionar para envio en lote">
         <button class="btn btn-send" onclick="enviarSMS(${c.id})">📱 Enviar SMS</button>
         <button class="btn btn-yes" onclick="marcar(${c.id},'confirmado')">✅ Sí</button>
         <button class="btn btn-no" onclick="marcar(${c.id},'no_confirmado')">❌ No</button>
@@ -259,13 +293,71 @@
     render();
   }
 
-  function enviarSMS(id) {
+  // ── Seleccion y envio en lote ───────────────────────────────────────────
+  function toggleSeleccion(id, checked) {
+    if (checked) seleccionados.add(id); else seleccionados.delete(id);
+    actualizarBarraSeleccion();
+  }
+
+  function actualizarBarraSeleccion() {
+    const n = seleccionados.size;
+    document.getElementById('lote-count').textContent = n;
+    document.getElementById('barra-lote').style.display = n > 0 ? 'flex' : 'none';
+  }
+
+  function seleccionarTodosPendientes() {
+    const pendientes = citas.filter(c => c.status === 'pendiente');
+    if (pendientes.length === 0) { showToast('No hay citas pendientes', 'error'); return; }
+    pendientes.forEach(c => seleccionados.add(c.id));
+    render();
+  }
+
+  function cancelarSeleccion() {
+    seleccionados.clear();
+    render();
+  }
+
+  function enviarSeleccionados() {
+    if (seleccionados.size === 0) return;
+    colaEnvio = Array.from(seleccionados);
+    enviandoEnCola = true;
+    showToast(`Enviando ${colaEnvio.length} SMS, uno por uno...`, 'success');
+    procesarSiguienteEnCola();
+  }
+
+  function procesarSiguienteEnCola() {
+    if (colaEnvio.length === 0) {
+      enviandoEnCola = false;
+      showToast('Listo, se abrieron todos los SMS de la seleccion', 'success');
+      return;
+    }
+    const id = colaEnvio.shift();
+    enviarSMS(id, true);
+  }
+
+  // Cuando el usuario manda el SMS y vuelve a la pestaña (el navegador se
+  // "esconde" al abrir la app de mensajes y "reaparece" al volver), se abre
+  // automaticamente el siguiente SMS de la cola.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && enviandoEnCola) {
+      setTimeout(procesarSiguienteEnCola, 800);
+    }
+  });
+
+  function enviarSMS(id, esDeCola) {
     const c = citas.find(x => x.id === id);
-    if (!c) return;
+    if (!c) { if (esDeCola) procesarSiguienteEnCola(); return; }
     const nombre = c.cliente.split(' ')[0];
-    const msg = `Hola ${nombre}, Verisure: tiene cita de ${c.tipo} el ${c.fecha} tramo ${c.timeslot}h. Responda SI o NO. Gracias`;
+    // Mensaje sin acentos (para que cuente como SMS simple, mas caracteres permitidos)
+    const msg = `Hola ${nombre}! Le recordamos su cita de ${c.tipo} el ${c.fecha}, tramo ${c.timeslot}h. `
+      + `Nos confirma si le viene bien? Responda SI o NO. Gracias, Verisure`;
     const tel = String(c.telefono || '').replace(/\D/g, '');
-    if (tel.length < 9) { showToast('Este cliente no tiene teléfono válido', 'error'); return; }
+    if (tel.length < 9) {
+      showToast('Este cliente no tiene telefono valido', 'error');
+      if (esDeCola) procesarSiguienteEnCola();
+      return;
+    }
+    seleccionados.delete(id);
     window.location.href = `sms:+34${tel}?body=${encodeURIComponent(msg)}`;
     marcar(id, 'enviado', true);
   }

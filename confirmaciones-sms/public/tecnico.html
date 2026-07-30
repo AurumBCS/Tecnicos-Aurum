@@ -267,7 +267,8 @@
     if (!c) return;
     const nombre = c.cliente.split(' ')[0];
     // Mensaje sin acentos para que cuente como SMS simple (mas caracteres permitidos)
-    const msg = `Hola ${nombre}, Verisure: tiene cita de ${c.tipo} el ${c.fecha} tramo ${c.timeslot}h. Responda SI o NO. Gracias`;
+    const msg = `Hola ${nombre}! Le recordamos su cita de ${c.tipo} el ${c.fecha}, tramo ${c.timeslot}h. `
+      + `Nos confirma si le viene bien? Responda SI o NO. Gracias, Verisure`;
     const tel = String(c.telefono || '').replace(/\D/g, '');
     if (tel.length < 9) { showToast('Este cliente no tiene teléfono válido', 'error'); return; }
     window.location.href = `sms:+34${tel}?body=${encodeURIComponent(msg)}`;
