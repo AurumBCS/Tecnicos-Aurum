@@ -2350,7 +2350,7 @@ function _renderDashRanking(type, tecs){
     const ok=val>=cfg.min;
     const barPct=Math.min(100,Math.round((val/maxVal)*100));
     const barCol=cfg.sinObjetivo?'var(--gold2)':(ok?'var(--green2)':'#e05a4a');
-    const nombre=t.nombre.trim().split(' ').slice(0,2).join(' ');
+    const nombre=t.nombre.trim();
 
     // Extra cols
     const extras=cfg.cols.map(c=>{
@@ -2372,7 +2372,8 @@ function _renderDashRanking(type, tecs){
 
     return`<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:8px 6px;min-width:0">
-        <div style="font-size:.74rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;${nameCursor}"${nameClick}>${i===0?'⭐ ':''}${nombre}</div>
+        <div style="font-size:.74rem;font-weight:600;color:var(--text);line-height:1.25;${nameCursor}"${nameClick}>${i===0?'⭐ ':''}${nombre}</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:1px">${t.id}</div>
         <div style="background:var(--dim);border-radius:3px;height:4px;margin-top:5px;overflow:hidden">
           <div style="width:${barPct}%;height:100%;border-radius:3px;background:${barCol};transition:width .5s"></div>
         </div>
