@@ -196,9 +196,15 @@ Cabecera: `👥 Técnicos · X cuentan / Y no cuentan`. Técnicos sin valor en l
 
 Cada bloque de zona agrega KPIs solo de técnicos con `CuentaEmpresa = true`. La asignación por zona usa `ZONA_DATA`, no la pertenencia al JE.
 
-### Dashboards de equipo con ranking clickeable (JE)
+### Dashboards de ranking (JE y coordinador)
 
 En la vista de equipo del JE, los 4 KPIs (`%RM`, `%Cumplimiento`, `Conversión`, `PPA`) abren un dashboard con ranking de todos los técnicos del equipo, ordenado de mayor a menor, vía `showEquipoDash(type, jeId)`.
+
+**Sección "Rankings"** (separada de los KPIs con objetivo, arriba): 4 rankings puramente comparativos (sin umbral de aprobado/reprobado) — Mantenimientos realizados (`palito`), Números de ventas (`uven`), Conversión (`conv`) y 20% en € (`ventas`). Disponibles en dos alcances:
+- **Equipo** (vista JE, `equipoPanel`) — `showEquipoDash(type, jeId)`, solo los técnicos de ese jefe de equipo.
+- **Empresa** (vista coordinador, `jrPanel` — usuarios `GD5381`/`JN4767`/`CM9651`/`JR9426`/`BLAS.ALVAREZ`/`BA8006`) — `showJRDash(type)`, todos los técnicos de la empresa (incluye los marcados "No cuentan").
+
+Ambos alcances comparten el mismo render (`_renderDashRanking(type, tecs)`) para no duplicar la lógica de tabla/ranking. Cada dashboard de ranking tiene su **propio selector de mes** (`mesSelectorDash`, muestra el mes actual primero) que permite ver el ranking de un mes histórico sin salir de la pantalla — reutiliza `cambiarMes()` y vuelve a abrir el mismo ranking (`cambiarMesDash()`). El botón "← Volver" regresa al panel correcto (`equipoPanel` o `jrPanel`) según de dónde se abrió, vía la variable `_dashBackPanel`.
 
 **Desde el ranking de RM y Cumplimiento**, el nombre de cada técnico es clickeable y abre su dashboard individual (`showRMDashFromEquipoDash` / `showCumDashFromEquipoDash`) — **solo si el técnico tiene datos** en `RM_DATA`/`CUM_DATA` respectivamente (algunos técnicos aparecen en el ranking general pero no en el Excel detallado de RM/Cumplimiento de ese mes; en ese caso el nombre no es clickeable, para evitar un callejón sin salida).
 
@@ -219,13 +225,53 @@ Mismo patrón: "Razones de incumplimiento" es clickeable y despliega los `nmant`
 
 Tres indicadores: Disfrutados, Restantes, As. Propios + desglose mensual con píldoras de colores (azul = vacaciones, naranja = asuntos propios).
 
-### Confirmaciones WhatsApp (JEs)
+### Confirmaciones SMS/WhatsApp (JEs)
 
-Pestaña **📲 Confirmaciones** que abre una herramienta local en `http://localhost:3000`.
+Pestaña **📲 Confirmaciones** que abre `confirmaciones-sms` (ver sección dedicada abajo — subproyecto separado desplegado en Render, no es `localhost`).
 
 ### Dashboard "Uso de la app" (coordinadores)
 
 Pestaña **Uso de la app** con conteo de conexiones y último acceso por matrícula.
+
+---
+
+## confirmaciones-sms (subproyecto)
+
+App Node/Express **separada** del portal principal, en la subcarpeta `confirmaciones-sms/`, desplegada en Render: **https://tecnicos-aurum.onrender.com**. Gestiona la confirmación de citas por SMS (y WhatsApp para envío en lote desde el panel admin). El botón "📂 Cargar Excel" / "📲 Confirmaciones" del portal principal simplemente abre esta URL con `?je=<matricula>`.
+
+### Flujo
+
+1. Se sube un Excel de actividades/citas (`POST /upload`, campo `excel` + `matricula`) — matrículas en `UPLOADERS_PERMITIDOS` (`262876`, `CM9651`, `GD5381`, `EQ5303`) suben todo sin filtrar; un JE (matrícula en `JERARQUIA`) sube solo su equipo; cualquier otra matrícula sube solo lo suyo.
+2. Cada fila nueva queda en estado `pendiente` (filas ya existentes con la misma clave — nº de mantenimiento, o cliente+fecha+timeslot+técnico si no hay nº — se ignoran: **volver a subir el mismo Excel no duplica**).
+3. Nadie recibe el SMS automáticamente al subir — un humano tiene que entrar y mandar:
+   - **`je.html`** (coordinador, matrícula+DNI de JE) — ve las citas de todo su equipo agrupadas por técnico. Puede enviar una por una (📱 Enviar SMS) o **en lote**: checkbox por cita + "☑️ Seleccionar todos los pendientes" + barra inferior "📤 Enviar", que abre los SMS nativos uno detrás de otro (detecta cuándo el usuario vuelve de la app de mensajes — `visibilitychange` — y abre el siguiente automáticamente).
+   - **`tecnico.html`** (técnico individual, matrícula+DNI propios) — mismo patrón, solo sus propias citas, sin envío en lote.
+   - Panel admin (`index.html` de este subproyecto, sin login) — conectado a un número de WhatsApp real vía QR, con envío en lote automatizado (`client.sendMessage`) y control de tope diario.
+4. Mensaje SMS (igual en `je.html` y `tecnico.html`, sin acentos para que cuente como SMS simple):
+   > `Hola {nombre}! Le recordamos su cita de {tipo} el {fecha}, tramo {timeslot}h. Nos confirma si le viene bien? Responda SI o NO. Gracias, Verisure`
+5. Las citas sin enviar/confirmar se limpian automáticamente a **medianoche** (`programarLimpiezaMedianoche()`), junto con el contador diario de envíos.
+
+### Persistencia en Google Sheets (evita perder citas en cada despliegue de Render)
+
+Render no tiene disco persistente en este servicio — cada `git push` que dispara un redeploy crea un contenedor nuevo, y el archivo local `sesion.json` (con las citas del día) se pierde. Para que sobreviva:
+
+- Hoja de Google **"Citas Confirmaciones SMS - Aurum"** (pestaña `Citas`), con Apps Script desplegado como Aplicación Web (código en `confirmaciones-sms/apps-script-citas.gs`, ejecutar como el dueño de la hoja, acceso "Cualquier usuario").
+- `CITAS_SHEET_URL` en `server.js` apunta a ese Apps Script. Endpoints: `?action=cargar` (GET, trae todas las citas), `guardarTodo` (POST, reemplaza todas las citas — se llama automáticamente dentro de `guardarSesion()`, fire-and-forget), `borrarTodo` (POST, limpia todo).
+- Al arrancar, `iniciarPersistencia()` intenta cargar desde la Hoja primero; si está vacía o falla, cae al respaldo local (`sesion.json`).
+- El Apps Script fuerza formato de texto plano (`setNumberFormat('@')`) en las columnas antes de escribir — si no, Google Sheets convierte matrícula/teléfono en número y la fecha en un objeto `Date`, rompiendo el formato esperado (ej. `31/07/2026` → timestamp ISO).
+- **Si se edita `apps-script-citas.gs`**, hay que pegar el cambio en el editor de Apps Script de la Hoja y volver a implementar (Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar) para que el cambio tome efecto en la URL ya desplegada.
+
+### Archivos
+
+```
+confirmaciones-sms/
+  server.js               ← Express + WebSocket + whatsapp-web.js (opcional, WHATSAPP_ENABLED)
+  apps-script-citas.gs    ← Código a pegar en el Apps Script de la Hoja de citas (persistencia)
+  public/
+    index.html             ← Panel admin (WhatsApp QR, envío en lote)
+    je.html                ← Vista de coordinador/JE (matrícula+DNI), envío individual y en lote
+    tecnico.html            ← Vista de técnico individual (matrícula+DNI)
+```
 
 ---
 
@@ -266,19 +312,20 @@ Columnas usadas: A=Nº instalación, B=Nº mantenimiento, C=fecha, D=matrícula,
 ### Pendiente para completar la migración
 - Endpoint(s) que lean directo de los Excel archivados (o del "Historico" cuando aplique) y calculen los KPIs con la fórmula de arriba
 - Reemplazar `loadSheets()` / `SHEETS_CSV_URL` en el cliente
-- Selector de mes histórico + estadísticas trimestrales/semestrales para coordinador (`GD5381`)
+- Estadísticas trimestrales/semestrales para coordinador (`GD5381`) — el selector de mes histórico ya está implementado (ver "Dashboards de ranking" arriba)
 
 ---
 
 ## Archivos del proyecto
 
 ```
-index.html      ← Toda la app (HTML + CSS + JS)
-manifest.json   ← PWA manifest
-sw.js           ← Service Worker (Network First, caché por versión)
-icon-192.png    ← Icono PWA 192×192
-icon-512.png    ← Icono PWA 512×512
-favicon.ico     ← Favicon navegador 32×32
-CLAUDE.md       ← Instrucciones para Claude Code
-README.md       ← Este archivo
+index.html          ← Toda la app (HTML + CSS + JS)
+manifest.json       ← PWA manifest
+sw.js               ← Service Worker (Network First, caché por versión)
+icon-192.png        ← Icono PWA 192×192
+icon-512.png        ← Icono PWA 512×512
+favicon.ico         ← Favicon navegador 32×32
+CLAUDE.md           ← Instrucciones para Claude Code
+README.md           ← Este archivo
+confirmaciones-sms/ ← Subproyecto separado (Node/Express, desplegado en Render) — ver sección dedicada arriba
 ```
