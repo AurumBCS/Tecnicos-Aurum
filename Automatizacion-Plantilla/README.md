@@ -9,12 +9,12 @@ de Oracle Field Service (`https://securitasdirect.etadirect.com/`), usando
 - **Usuario "capturas"** (`ETADIRECT_USER_CAPTURAS` / `ETADIRECT_PASS_CAPTURAS`):
   uno distinto, solo para tomar las capturas de pantalla.
 
-## Modo de ejecución: PC local (Task Scheduler) vs GitHub Actions (en prueba)
+## Modo de ejecución: GitHub Actions (activo) — PC local queda como respaldo
 
-Estos mismos 3 scripts se pueden correr de dos formas:
+Estos mismos 3 scripts se pueden correr de dos formas. **Desde el 31/07/2026, GitHub Actions es el sistema activo** — se probaron los 3 (`manana`, `mediodia`, `tarde`) y corrieron sin problema, confirmando que la consola de OFS **no bloquea** el tráfico desde las IPs de GitHub Actions.
 
-1. **PC local con el Programador de tareas de Windows** — la forma original, documentada más abajo. Depende de que la PC esté encendida (o se active con temporizador) a la hora programada.
-2. **GitHub Actions** (`.github/workflows/ofs-automation.yml`, en la raíz del repo) — corre en la nube, sin depender de esta PC. **En fase de prueba**: no se sabe todavía si la consola de OFS bloquea el tráfico desde las IPs de GitHub Actions (son IPs de centro de datos conocidas, algunos sistemas anti-bot las bloquean por defecto).
+1. **GitHub Actions** (`.github/workflows/ofs-automation.yml`, en la raíz del repo) — corre en la nube por horario, sin depender de que ninguna PC esté encendida. **Es el sistema en uso actualmente.**
+2. **PC local con el Programador de tareas de Windows** — la forma original, documentada más abajo. Las 4 tareas quedaron **deshabilitadas** (no borradas) en el Programador de tareas de esta PC, como respaldo por si hiciera falta volver a activarlas.
 
 ### Configurar los Secrets para GitHub Actions
 
@@ -31,7 +31,7 @@ En el repositorio de GitHub → **Settings** → **Secrets and variables** → *
 
 1. Pestaña **Actions** del repositorio → workflow **"Automatizacion OFS"** → **"Run workflow"**.
 2. Elige qué tarea correr (`manana`, `mediodia` o `tarde`) y dale a **Run workflow**.
-3. Cuando termine, revisa los logs de cada paso, y descarga el artefacto **"resultado-N"** (capturas, Excel, `automatizacion.log`) para ver qué pasó — especialmente si falla, para confirmar si es el bloqueo de IP u otra cosa.
+3. Cuando termine, revisa los logs de cada paso, y descarga el artefacto **"resultado-N"** (capturas, Excel, `automatizacion.log`) si falla, para diagnosticar qué pasó.
 
 ### Diferencia clave vs la versión local
 
