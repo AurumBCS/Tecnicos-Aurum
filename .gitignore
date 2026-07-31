@@ -1,0 +1,11 @@
+# Node (confirmaciones-sms)
+node_modules/
+confirmaciones-sms/sesion.json
+
+# Automatizacion-Plantilla (Python/Playwright) — nunca commitear sesiones ni salidas
+Automatizacion-Plantilla/sesion_ofs_*.json
+Automatizacion-Plantilla/capturas/
+Automatizacion-Plantilla/descargas/
+Automatizacion-Plantilla/automatizacion.log
+Automatizacion-Plantilla/__pycache__/
+Automatizacion-Plantilla/venv/

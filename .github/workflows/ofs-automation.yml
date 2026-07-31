@@ -1,0 +1,90 @@
+name: Automatizacion OFS
+
+# Prueba: correr los scripts de Automatizacion-Plantilla (capturas, correo
+# matutino, descarga+subida de ruta) desde GitHub Actions en vez de la PC
+# local, para ver si la consola de OFS (securitasdirect.etadirect.com)
+# bloquea o no el trafico desde las IPs de los runners de GitHub.
+#
+# Credenciales: SIEMPRE desde GitHub Secrets (Settings > Secrets and
+# variables > Actions), nunca escritas aqui.
+
+on:
+  schedule:
+    - cron: '15 7 * * *'   # 7:15am Madrid — capturas + correo a Mercedes
+      timezone: 'Europe/Madrid'
+    - cron: '0 14 * * *'   # 2:00pm Madrid — ruta del dia siguiente
+      timezone: 'Europe/Madrid'
+    - cron: '0 18 * * *'   # 6:00pm Madrid — ruta del dia siguiente (repaso)
+      timezone: 'Europe/Madrid'
+  workflow_dispatch:
+    inputs:
+      tarea:
+        description: 'Que tarea correr manualmente (prueba)'
+        required: true
+        type: choice
+        options:
+          - manana
+          - mediodia
+          - tarde
+        default: manana
+
+jobs:
+  correr:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Automatizacion-Plantilla
+    env:
+      ETADIRECT_USER: ${{ secrets.ETADIRECT_USER }}
+      ETADIRECT_PASS: ${{ secrets.ETADIRECT_PASS }}
+      ETADIRECT_USER_CAPTURAS: ${{ secrets.ETADIRECT_USER_CAPTURAS }}
+      ETADIRECT_PASS_CAPTURAS: ${{ secrets.ETADIRECT_PASS_CAPTURAS }}
+      GMAIL_USER: ${{ secrets.GMAIL_USER }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Determinar tarea segun el horario disparado
+        id: tarea
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.tarea }}" ]; then
+            echo "cual=${{ inputs.tarea }}" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.event.schedule }}" in
+              "15 7 * * *") echo "cual=manana" >> "$GITHUB_OUTPUT" ;;
+              "0 14 * * *") echo "cual=mediodia" >> "$GITHUB_OUTPUT" ;;
+              "0 18 * * *") echo "cual=tarde" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+
+      - name: Manana — capturas + correo a Mercedes
+        if: steps.tarea.outputs.cual == 'manana'
+        run: |
+          python tomar_capturas.py
+          python enviar_correo_matutino.py
+
+      - name: Mediodia/Tarde — descargar ruta y subir a confirmaciones
+        if: steps.tarea.outputs.cual == 'mediodia' || steps.tarea.outputs.cual == 'tarde'
+        run: python descargar_ruta_y_subir.py
+
+      - name: Subir capturas/descargas/log para diagnostico
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-${{ github.run_number }}
+          path: |
+            Automatizacion-Plantilla/capturas/
+            Automatizacion-Plantilla/descargas/
+            Automatizacion-Plantilla/automatizacion.log
+          retention-days: 7
+          if-no-files-found: ignore
