@@ -10,11 +10,15 @@ name: Automatizacion OFS
 
 on:
   schedule:
-    - cron: '15 7 * * *'   # 7:15am Madrid — capturas + correo a Mercedes
+    # Horas fuera de "en punto"/cuartos exactos a propósito: GitHub retrasa
+    # mas los horarios programados justo al inicio de cada hora (alta
+    # demanda global) -- confirmado en vivo (retrasos de 1h45 a 2h20 con
+    # los horarios redondos anteriores, 7:15/14:00/18:00).
+    - cron: '3 7 * * *'    # 7:03am Madrid — capturas + correo a Mercedes
       timezone: 'Europe/Madrid'
-    - cron: '0 14 * * *'   # 2:00pm Madrid — ruta del dia siguiente
+    - cron: '58 13 * * *'  # 1:58pm Madrid — ruta del dia siguiente
       timezone: 'Europe/Madrid'
-    - cron: '0 18 * * *'   # 6:00pm Madrid — ruta del dia siguiente (repaso)
+    - cron: '53 17 * * *'  # 5:53pm Madrid — ruta del dia siguiente (repaso)
       timezone: 'Europe/Madrid'
   workflow_dispatch:
     inputs:
@@ -61,9 +65,9 @@ jobs:
             echo "cual=${{ inputs.tarea }}" >> "$GITHUB_OUTPUT"
           else
             case "${{ github.event.schedule }}" in
-              "15 7 * * *") echo "cual=manana" >> "$GITHUB_OUTPUT" ;;
-              "0 14 * * *") echo "cual=mediodia" >> "$GITHUB_OUTPUT" ;;
-              "0 18 * * *") echo "cual=tarde" >> "$GITHUB_OUTPUT" ;;
+              "3 7 * * *") echo "cual=manana" >> "$GITHUB_OUTPUT" ;;
+              "58 13 * * *") echo "cual=mediodia" >> "$GITHUB_OUTPUT" ;;
+              "53 17 * * *") echo "cual=tarde" >> "$GITHUB_OUTPUT" ;;
             esac
           fi
 

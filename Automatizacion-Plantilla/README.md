@@ -13,7 +13,7 @@ de Oracle Field Service (`https://securitasdirect.etadirect.com/`), usando
 
 Estos mismos 3 scripts se pueden correr de dos formas. **Desde el 31/07/2026, GitHub Actions es el sistema activo** — se probaron los 3 (`manana`, `mediodia`, `tarde`) y corrieron sin problema, confirmando que la consola de OFS **no bloquea** el tráfico desde las IPs de GitHub Actions.
 
-1. **GitHub Actions** (`.github/workflows/ofs-automation.yml`, en la raíz del repo) — corre en la nube por horario, sin depender de que ninguna PC esté encendida. **Es el sistema en uso actualmente.**
+1. **GitHub Actions** (`.github/workflows/ofs-automation.yml`, en la raíz del repo) — corre en la nube por horario, sin depender de que ninguna PC esté encendida. **Es el sistema en uso actualmente.** Horarios (hora Madrid): **7:03am** (capturas + correo), **1:58pm** y **5:53pm** (ruta). Las horas NO son redondas a propósito — GitHub retrasa más los horarios en punto/cuartos exactos por alta demanda (confirmado en vivo: con 7:15/14:00/18:00 los retrasos eran de 1h45 a 2h20; con minutos "raros" el objetivo es evitar esa congestión).
 2. **PC local con el Programador de tareas de Windows** — la forma original, documentada más abajo. Las 4 tareas quedaron **deshabilitadas** (no borradas) en el Programador de tareas de esta PC, como respaldo por si hiciera falta volver a activarlas.
 
 ### Configurar los Secrets para GitHub Actions
