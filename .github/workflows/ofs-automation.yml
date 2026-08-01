@@ -14,11 +14,13 @@ on:
     # mas los horarios programados justo al inicio de cada hora (alta
     # demanda global) -- confirmado en vivo (retrasos de 1h45 a 2h20 con
     # los horarios redondos anteriores, 7:15/14:00/18:00).
-    - cron: '3 7 * * *'    # 7:03am Madrid — capturas + correo a Mercedes
+    # Dia de la semana "1-6" = lunes a sabado -- domingo no hay ruta ni
+    # actividad de tecnicos, no corre nada ese dia.
+    - cron: '3 7 * * 1-6'    # 7:03am Madrid, lun-sab — capturas + correo a Mercedes
       timezone: 'Europe/Madrid'
-    - cron: '58 13 * * *'  # 1:58pm Madrid — ruta del dia siguiente
+    - cron: '58 13 * * 1-6'  # 1:58pm Madrid, lun-sab — ruta del dia siguiente
       timezone: 'Europe/Madrid'
-    - cron: '53 17 * * *'  # 5:53pm Madrid — ruta del dia siguiente (repaso)
+    - cron: '53 17 * * 1-6'  # 5:53pm Madrid, lun-sab — ruta del dia siguiente (repaso)
       timezone: 'Europe/Madrid'
   workflow_dispatch:
     inputs:
@@ -65,9 +67,9 @@ jobs:
             echo "cual=${{ inputs.tarea }}" >> "$GITHUB_OUTPUT"
           else
             case "${{ github.event.schedule }}" in
-              "3 7 * * *") echo "cual=manana" >> "$GITHUB_OUTPUT" ;;
-              "58 13 * * *") echo "cual=mediodia" >> "$GITHUB_OUTPUT" ;;
-              "53 17 * * *") echo "cual=tarde" >> "$GITHUB_OUTPUT" ;;
+              "3 7 * * 1-6") echo "cual=manana" >> "$GITHUB_OUTPUT" ;;
+              "58 13 * * 1-6") echo "cual=mediodia" >> "$GITHUB_OUTPUT" ;;
+              "53 17 * * 1-6") echo "cual=tarde" >> "$GITHUB_OUTPUT" ;;
             esac
           fi
 
