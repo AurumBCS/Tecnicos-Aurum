@@ -2944,6 +2944,30 @@ function estadoFichajeBtn(mat){
   return {estado:'cerrado', entrada:f.horaEntrada, salida:f.horaSalida, tipoCierre:f.tipoCierre};
 }
 
+// Espera obligatoria despues de fichar entrada/salida: sin esto, un doble
+// toque sin querer justo despues de "Fichar entrada" cerraria la jornada
+// al instante (el boton pasa a "Finalizar jornada" de inmediato). Se marca
+// en localStorage (no en memoria) para que la espera sobreviva si se
+// recarga la pagina o se cierra y reabre la app dentro de esos 10 minutos.
+const FICHAJE_COOLDOWN_MIN = 10;
+let FICHAJE_COOLDOWN_TIMER = null;
+
+function marcarCooldownFichaje(mat){
+  if(!mat) return;
+  localStorage.setItem('fichajeCooldown_'+mat, String(Date.now()));
+}
+
+function msRestantesCooldownFichaje(mat){
+  if(!mat) return 0;
+  const ts = Number(localStorage.getItem('fichajeCooldown_'+mat) || 0);
+  if(!ts) return 0;
+  return Math.max(0, ts + FICHAJE_COOLDOWN_MIN*60000 - Date.now());
+}
+
+function fichajeEnCooldown(mat){
+  return msRestantesCooldownFichaje(mat) > 0;
+}
+
 function pintarBotonFichaje(){
   const btn=document.getElementById('fichajeBtn');
   if(!btn || !FICHAJE_ID) return;
@@ -2954,6 +2978,19 @@ function pintarBotonFichaje(){
   btn.style.display='';
   btn.style.opacity='1';
   const st=estadoFichajeBtn(FICHAJE_ID);
+
+  if(FICHAJE_COOLDOWN_TIMER){ clearTimeout(FICHAJE_COOLDOWN_TIMER); FICHAJE_COOLDOWN_TIMER=null; }
+  const restante = st.estado==='cerrado' ? 0 : msRestantesCooldownFichaje(FICHAJE_ID);
+  if(restante > 0){
+    const minRestantes = Math.ceil(restante/60000);
+    btn.disabled=true;
+    btn.style.opacity='.6';
+    btn.style.color='var(--muted)'; btn.style.borderColor='var(--border2)';
+    btn.textContent = '🔒 Espera '+minRestantes+' min';
+    FICHAJE_COOLDOWN_TIMER = setTimeout(pintarBotonFichaje, restante+1000);
+    return;
+  }
+
   btn.disabled=false;
   if(st.estado==='sinFichar'){
     btn.textContent='🕐 Fichar entrada';
@@ -2990,6 +3027,7 @@ async function enviarFichaje(accion){
 function onFichajeBtnClick(){
   const st=estadoFichajeBtn(FICHAJE_ID);
   if(st.estado!=='sinFichar' && st.estado!=='abierto') return;
+  if(fichajeEnCooldown(FICHAJE_ID)) return; // el boton ya deberia estar bloqueado, doble seguro
   // Feedback inmediato (antes de esperar geolocalización/red) — deshabilita, cambia texto
   // y atenúa el botón para que se note al instante que el toque se registró.
   const btn=document.getElementById('fichajeBtn');
@@ -2998,6 +3036,10 @@ function onFichajeBtnClick(){
     btn.style.opacity='.6';
     btn.textContent='⏳ Fichando…';
   }
+  // Se marca ANTES de que responda el servidor (fetch es no-cors, no hay
+  // forma fiable de confirmar éxito) para bloquear cualquier segundo toque
+  // que llegue mientras la solicitud todavía está en curso.
+  marcarCooldownFichaje(FICHAJE_ID);
   if(st.estado==='sinFichar') enviarFichaje('entrada');
   else if(st.estado==='abierto') enviarFichaje('salida');
 }
