@@ -73,34 +73,81 @@ que la región arriba a la derecha sea **eu-south-2** → **Create repository**:
 - Repository name: `aurum-ofs-automatizacion`
 - Deja el resto por defecto → **Create**
 
-### Paso 2 — Subir la primera imagen (una sola vez, desde CloudShell)
+### Paso 2 — Permitir que GitHub Actions despliegue solo (OIDC, sin Access Keys)
 
-Lambda exige que ya exista **al menos una imagen** en ECR antes de poder
-crear la función. Para no tener que instalar Docker en tu PC, usa
-**AWS CloudShell** (terminal en el navegador, ya viene con Docker y
-`aws` instalados y con tu sesión ya iniciada):
+**2a. Proveedor de identidad OIDC** (una sola vez por cuenta de AWS) — IAM →
+**Identity providers** → si ya existe uno con URL
+`token.actions.githubusercontent.com`, sáltate este paso. Si no:
+**Add provider** → OpenID Connect → Provider URL:
+`https://token.actions.githubusercontent.com` → Audience: `sts.amazonaws.com`
+→ **Add provider**.
 
-1. En la consola de AWS, icono de terminal `>_` en la barra superior
-   ("CloudShell") — se abre una terminal abajo.
-2. Pega estos comandos (cambia `<ID_DE_CUENTA>` por tu ID de cuenta de AWS
-   de 12 dígitos — lo ves arriba a la derecha, en el menú con tu nombre):
+**2b. Rol IAM que GitHub Actions puede asumir** — IAM → **Roles** →
+**Create role** → **Web identity** → Identity provider: el que acabas de
+crear → Audience: `sts.amazonaws.com` → GitHub organization: `AurumBCS` →
+GitHub repository: `Tecnicos-Aurum` → **Next**. En permisos, **Create
+policy** (pestaña JSON) y pega esto (ya con tu ID de cuenta):
 
-```bash
-git clone --depth 1 https://github.com/AurumBCS/Tecnicos-Aurum.git
-cd Tecnicos-Aurum/Automatizacion-Plantilla
-
-aws ecr get-login-password --region eu-south-2 | \
-  docker login --username AWS --password-stdin <ID_DE_CUENTA>.dkr.ecr.eu-south-2.amazonaws.com
-
-docker build -t aurum-ofs-automatizacion .
-docker tag aurum-ofs-automatizacion:latest <ID_DE_CUENTA>.dkr.ecr.eu-south-2.amazonaws.com/aurum-ofs-automatizacion:latest
-docker push <ID_DE_CUENTA>.dkr.ecr.eu-south-2.amazonaws.com/aurum-ofs-automatizacion:latest
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:PutImage",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload"
+      ],
+      "Resource": "arn:aws:ecr:eu-south-2:289076681164:repository/aurum-ofs-automatizacion"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["lambda:UpdateFunctionCode", "lambda:GetFunction", "lambda:GetFunctionConfiguration"],
+      "Resource": "arn:aws:lambda:eu-south-2:289076681164:function:aurum-ofs-automatizacion"
+    }
+  ]
+}
 ```
 
-Si CloudShell no está disponible en tu cuenta, avísame y lo hacemos
-instalando Docker Desktop localmente en su lugar.
+Nómbrala `deploy-ofs-lambda` y adjúntala al rol. Nombra el rol
+`github-actions-deploy-ofs-lambda` → **Create role**.
 
-### Paso 3 — Crear la función Lambda
+Por seguridad extra, entra al rol recién creado → pestaña **Trust
+relationships** → **Edit trust policy** y cambia la condición
+`"...:sub"` para que sea exactamente:
+`"repo:AurumBCS/Tecnicos-Aurum:ref:refs/heads/main"` (así solo pushes a
+`main` de ese repo pueden usarlo, no cualquier PR).
+
+**2c. Copiar el Role ARN** (arriba en la página del rol, algo como
+`arn:aws:iam::289076681164:role/github-actions-deploy-ofs-lambda`) y
+crear el secret `AWS_ROLE_ARN` en GitHub → **Settings** → **Secrets and
+variables** → **Actions** con ese valor.
+
+### Paso 3 — Construir y subir la primera imagen (desde GitHub Actions, no CloudShell)
+
+Lambda exige que ya exista **al menos una imagen** en ECR antes de poder
+crear la función. AWS CloudShell no tiene disco suficiente para construir
+esta imagen (Chromium + Playwright pesan casi 1GB solo la capa base — un
+intento real se quedó sin espacio a mitad del `pip install`), así que en
+vez de eso usamos el propio workflow de GitHub Actions, que corre en un
+runner con mucho más disco:
+
+1. Repositorio en GitHub → pestaña **Actions** → workflow **"Deploy Lambda
+   OFS"** en la barra izquierda → **Run workflow** → **Run workflow**
+   (rama `main`).
+2. Va a construir la imagen y subirla a ECR sin problema. **Va a fallar en
+   el último paso** ("Actualizar la función Lambda") con un error de que
+   la función no existe todavía — es esperado, la creamos en el Paso 4.
+   Lo que importa es que el paso anterior ("Construir y subir la imagen")
+   haya quedado en verde.
+
+### Paso 4 — Crear la función Lambda
 
 Consola de AWS → **Lambda** → **Create function**:
 
@@ -128,61 +175,10 @@ Después de creada, en la pestaña **Configuration**:
   correo a Mercedes de nuevo**, y uno de mediodía/tarde volvería a subir el
   Excel. Dejarlo en 0 evita eso.
 
-### Paso 4 — Permitir que GitHub Actions despliegue solo (OIDC, sin Access Keys)
-
-**4a. Proveedor de identidad OIDC** (una sola vez por cuenta de AWS) — IAM →
-**Identity providers** → si ya existe uno con URL
-`token.actions.githubusercontent.com`, sáltate este paso. Si no:
-**Add provider** → OpenID Connect → Provider URL:
-`https://token.actions.githubusercontent.com` → Audience: `sts.amazonaws.com`
-→ **Add provider**.
-
-**4b. Rol IAM que GitHub Actions puede asumir** — IAM → **Roles** →
-**Create role** → **Web identity** → Identity provider: el que acabas de
-crear → Audience: `sts.amazonaws.com` → GitHub organization: `AurumBCS` →
-GitHub repository: `Tecnicos-Aurum` → **Next**. En permisos, **Create
-policy** (pestaña JSON) y pega, cambiando `<ID_DE_CUENTA>`:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    { "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ecr:BatchCheckLayerAvailability",
-        "ecr:GetDownloadUrlForLayer",
-        "ecr:BatchGetImage",
-        "ecr:PutImage",
-        "ecr:InitiateLayerUpload",
-        "ecr:UploadLayerPart",
-        "ecr:CompleteLayerUpload"
-      ],
-      "Resource": "arn:aws:ecr:eu-south-2:<ID_DE_CUENTA>:repository/aurum-ofs-automatizacion"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["lambda:UpdateFunctionCode", "lambda:GetFunction", "lambda:GetFunctionConfiguration"],
-      "Resource": "arn:aws:lambda:eu-south-2:<ID_DE_CUENTA>:function:aurum-ofs-automatizacion"
-    }
-  ]
-}
-```
-
-Nómbrala `deploy-ofs-lambda` y adjúntala al rol. Nombra el rol
-`github-actions-deploy-ofs-lambda` → **Create role**.
-
-Por seguridad extra, entra al rol recién creado → pestaña **Trust
-relationships** → **Edit trust policy** y cambia la condición
-`"...:sub"` para que sea exactamente:
-`"repo:AurumBCS/Tecnicos-Aurum:ref:refs/heads/main"` (así solo pushes a
-`main` de ese repo pueden usarlo, no cualquier PR).
-
-**4c. Copiar el Role ARN** (arriba en la página del rol, algo como
-`arn:aws:iam::<ID_DE_CUENTA>:role/github-actions-deploy-ofs-lambda`) y
-crear el secret `AWS_ROLE_ARN` en GitHub → **Settings** → **Secrets and
-variables** → **Actions** con ese valor.
+Con la función ya creada, vuelve a la pestaña **Actions** de GitHub y
+corre **"Deploy Lambda OFS"** una vez más (o simplemente el próximo push
+a `main` lo hará solo) — esta vez el paso "Actualizar la función Lambda"
+sí debería quedar en verde.
 
 ### Paso 5 — Crear los 3 horarios en EventBridge Scheduler
 
@@ -211,7 +207,7 @@ Para cada uno, en el asistente:
 - **Target**: AWS Lambda → **Invoke** → función `aurum-ofs-automatizacion`.
 - **Input**: pega el JSON de la columna "Input" de la tabla.
 - **Retry policy**: **Maximum retry attempts = 0** (mismo motivo que en el
-  Paso 3 — evitar correos/subidas duplicadas si algo falla a mitad de
+  Paso 4 — evitar correos/subidas duplicadas si algo falla a mitad de
   camino). Deja **Maximum age of event** en su valor por defecto.
 - **Flexible time window**: Off (para que dispare exactamente a la hora).
 - Crea un rol de ejecución nuevo si te lo pide (permiso para invocar esa
