@@ -9,12 +9,13 @@ de Oracle Field Service (`https://securitasdirect.etadirect.com/`), usando
 - **Usuario "capturas"** (`ETADIRECT_USER_CAPTURAS` / `ETADIRECT_PASS_CAPTURAS`):
   uno distinto, solo para tomar las capturas de pantalla.
 
-## Modo de ejecución: GitHub Actions (activo) — PC local queda como respaldo
+## Modo de ejecución: AWS Lambda (la mañana) + GitHub Actions (mediodía/tarde, transición) — PC local queda como respaldo
 
-Estos mismos 3 scripts se pueden correr de dos formas. **Desde el 31/07/2026, GitHub Actions es el sistema activo** — se probaron los 3 (`manana`, `mediodia`, `tarde`) y corrieron sin problema, confirmando que la consola de OFS **no bloquea** el tráfico desde las IPs de GitHub Actions.
+Estos mismos 3 scripts corrieron primero desde una PC local, después desde GitHub Actions, y **desde el 03/08/2026 la tarea de la mañana (capturas + correo a Mercedes) corre en AWS Lambda + EventBridge Scheduler** (ver sección "Migración a AWS Lambda" más abajo) — GitHub Actions no garantizaba hora exacta (retrasos de hasta 2h+), Lambda sí.
 
-1. **GitHub Actions** (`.github/workflows/ofs-automation.yml`, en la raíz del repo) — corre en la nube por horario, sin depender de que ninguna PC esté encendida. **Es el sistema en uso actualmente.** Horarios (hora Madrid), **de lunes a sábado** (domingo no corre nada, no hay ruta ni actividad de técnicos ese día): **6:03am** (capturas + correo — adelantado desde 7:03am para dar margen al retraso típico de GitHub y que llegue como tarde ~8:30am), **1:58pm** y **5:53pm** (ruta). Las horas NO son redondas a propósito — GitHub retrasa más los horarios en punto/cuartos exactos por alta demanda (confirmado en vivo: retrasos de 1h45 a 2h20+ son normales en el plan gratuito, sin garantía de hora exacta).
-2. **PC local con el Programador de tareas de Windows** — la forma original, documentada más abajo. Las 4 tareas quedaron **deshabilitadas** (no borradas) en el Programador de tareas de esta PC, como respaldo por si hiciera falta volver a activarlas.
+1. **AWS Lambda** (`aurum-ofs-automatizacion`, región eu-south-2) — **`manana` (7:30am) corre acá exclusivamente**, ya retirada de GitHub Actions para no duplicar el correo a Mercedes. `mediodia`/`tarde` (descarga de ruta) también están configuradas en Lambda, corriendo por ahora **en paralelo** con GitHub Actions a modo de prueba (es seguro duplicarlas, confirmaciones-sms no sube citas repetidas).
+2. **GitHub Actions** (`.github/workflows/ofs-automation.yml`, en la raíz del repo) — sigue corriendo `mediodia` (1:58pm) y `tarde` (5:53pm) en paralelo con Lambda mientras se termina de confirmar que Lambda es estable. Cuando se confirme, se retiran también estos dos horarios de acá (queda `workflow_dispatch` como respaldo manual). Las horas no son redondas a propósito — GitHub retrasa más los horarios en punto/cuartos exactos por alta demanda (confirmado en vivo: retrasos de 1h45 a 2h20+ son normales en el plan gratuito).
+3. **PC local con el Programador de tareas de Windows** — la forma original, documentada más abajo. Las 4 tareas quedaron **deshabilitadas** (no borradas), como respaldo por si hiciera falta volver a activarlas.
 
 ### Configurar los Secrets para GitHub Actions
 

@@ -16,11 +16,12 @@ on:
     # los horarios redondos anteriores, 7:15/14:00/18:00).
     # Dia de la semana "1-6" = lunes a sabado -- domingo no hay ruta ni
     # actividad de tecnicos, no corre nada ese dia.
-    # 6:03am en vez de 7:03am: le da margen al retraso tipico de GitHub
-    # (hasta ~2h20 visto en vivo) para que el correo a Mercedes llegue
-    # como tarde ~8:30am en vez de correr el riesgo de pasar de las 9am.
-    - cron: '3 6 * * 1-6'    # 6:03am Madrid, lun-sab — capturas + correo a Mercedes
-      timezone: 'Europe/Madrid'
+    # La tarea de la mañana (capturas + correo a Mercedes) ya se retiro de
+    # aqui -- la corre AWS Lambda + EventBridge Scheduler a las 7:30am, ver
+    # Automatizacion-Plantilla/README.md. Dejarla activa aca tambien
+    # mandaria un correo duplicado a Mercedes todos los dias. Mediodia y
+    # tarde siguen aca por ahora en paralelo con Lambda -- son seguros de
+    # duplicar (confirmaciones-sms ya evita subir citas repetidas).
     - cron: '58 13 * * 1-6'  # 1:58pm Madrid, lun-sab — ruta del dia siguiente
       timezone: 'Europe/Madrid'
     - cron: '53 17 * * 1-6'  # 5:53pm Madrid, lun-sab — ruta del dia siguiente (repaso)
