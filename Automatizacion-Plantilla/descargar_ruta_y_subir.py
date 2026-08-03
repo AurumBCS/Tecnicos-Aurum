@@ -22,16 +22,15 @@ Programacion diaria: ver README.md (Task Scheduler), a las 17:30.
 
 import sys
 from datetime import date, timedelta
-from pathlib import Path
 
 import requests
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-from comun_ofs import ruta_sesion, leer_credenciales_ofs, abrir_sesion_ofs, aplicar_filtro_aurum, exportar_excel, registrar_error
+from comun_ofs import CARPETA_BASE, LAUNCH_ARGS, ruta_sesion, leer_credenciales_ofs, abrir_sesion_ofs, aplicar_filtro_aurum, exportar_excel, registrar_error
 
 # ── Configuracion ──────────────────────────────────────────────────────────
 
-CARPETA_DESCARGAS = Path(__file__).parent / "descargas"
+CARPETA_DESCARGAS = CARPETA_BASE / "descargas"
 ARCHIVO_SESION = ruta_sesion("mantenimientos")  # mismo usuario que el correo matutino
 URL_SUBIDA = "https://tecnicos-aurum.onrender.com/upload"
 MATRICULA_SUBIDA = "GD5381"  # uploader autorizado sin filtro (Gustavo Perez)
@@ -110,7 +109,7 @@ def main():
     fecha_objetivo = calcular_fecha_objetivo()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
         context = (
             browser.new_context(storage_state=str(ARCHIVO_SESION))
             if ARCHIVO_SESION.exists()

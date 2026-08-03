@@ -19,8 +19,20 @@ from datetime import datetime
 from pathlib import Path
 
 URL_LOGIN = "https://securitasdirect.etadirect.com/"
-CARPETA_BASE = Path(__file__).parent
+
+# En AWS Lambda solo /tmp es escribible (el resto del contenedor, incluida
+# la carpeta del script, es de solo lectura). AWS pone AWS_LAMBDA_FUNCTION_NAME
+# automaticamente en el entorno de ejecucion, asi que sirve para detectar
+# Lambda sin tocar nada en local/GitHub Actions.
+EN_LAMBDA = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+CARPETA_BASE = Path("/tmp") if EN_LAMBDA else Path(__file__).parent
 LOG_FILE = CARPETA_BASE / "automatizacion.log"
+
+# Chromium necesita estos flags para arrancar dentro del contenedor de
+# Lambda (su sandbox normal no funciona ahi por las restricciones del
+# entorno, y /dev/shm viene muy limitado de tamaño). No se aplican fuera de
+# Lambda porque GitHub Actions/local ya funcionan bien sin ellos.
+LAUNCH_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"] if EN_LAMBDA else []
 
 
 def registrar_error(script, mensaje):

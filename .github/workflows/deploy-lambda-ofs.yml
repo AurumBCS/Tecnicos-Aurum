@@ -1,0 +1,62 @@
+name: Deploy Lambda OFS
+
+# Construye la imagen Docker de Automatizacion-Plantilla/, la sube a ECR y
+# actualiza la funcion Lambda para que use esa imagen nueva. Sustituye a
+# "correr el script" -- este workflow NO ejecuta la automatizacion, solo la
+# despliega; la ejecucion diaria la disparan las reglas de EventBridge
+# Scheduler configuradas en la consola de AWS (ver README.md).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Automatizacion-Plantilla/**'
+      - '.github/workflows/deploy-lambda-ofs.yml'
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: eu-south-2
+  ECR_REPOSITORIO: aurum-ofs-automatizacion
+  LAMBDA_FUNCION: aurum-ofs-automatizacion
+
+permissions:
+  id-token: write   # necesario para autenticar con AWS via OIDC (sin access keys)
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Autenticacion sin secretos de larga duracion: GitHub le presenta un
+      # token OIDC a AWS, que lo cambia por credenciales temporales del rol
+      # AWS_ROLE_ARN (creado una vez en la consola de IAM, ver README.md).
+      # Nunca hay un Access Key guardado en GitHub Secrets.
+      - name: Autenticar con AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Iniciar sesion en ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Construir y subir la imagen
+        working-directory: Automatizacion-Plantilla
+        env:
+          REGISTRO: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          IMAGEN="$REGISTRO/$ECR_REPOSITORIO:${{ github.sha }}"
+          docker build -t "$IMAGEN" -t "$REGISTRO/$ECR_REPOSITORIO:latest" .
+          docker push "$IMAGEN"
+          docker push "$REGISTRO/$ECR_REPOSITORIO:latest"
+          echo "IMAGEN=$IMAGEN" >> "$GITHUB_ENV"
+
+      - name: Actualizar la funcion Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCION" \
+            --image-uri "$IMAGEN" \
+            --no-cli-pager
+          aws lambda wait function-updated --function-name "$LAMBDA_FUNCION"

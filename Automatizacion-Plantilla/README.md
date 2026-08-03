@@ -37,6 +37,198 @@ En el repositorio de GitHub → **Settings** → **Secrets and variables** → *
 
 En GitHub Actions **cada ejecución programada es un entorno nuevo y aislado** — no hay archivo de sesión guardado entre corridas (cada vez hace login completo desde cero, lo cual es más lento pero más simple/seguro que guardar cookies de sesión en el repositorio). Por eso la tarea de la mañana corre `tomar_capturas.py` y `enviar_correo_matutino.py` **en el mismo job, uno después del otro** (no en jobs/horarios separados como en Task Scheduler), para que el segundo script sí encuentre las capturas que dejó el primero.
 
+## Migración a AWS Lambda + EventBridge Scheduler (en progreso)
+
+**Por qué:** el plan gratuito de GitHub Actions no garantiza hora exacta para
+triggers `schedule:` — retrasos de 1h45 a 2h20+ son normales, y no se
+arregla pagando GitHub Pro/Team. AWS Lambda + EventBridge Scheduler son
+**gratis para siempre** (no solo los 6 meses de crédito nuevo-cliente) para
+este volumen de uso, y EventBridge Scheduler sí ejecuta a la hora exacta.
+El código ya está listo en este repo:
+
+- `lambda_handler.py` — punto de entrada; recibe `{"tarea": "manana"}` /
+  `{"tarea": "mediodia"}` / `{"tarea": "tarde"}` y llama a los mismos
+  `main()` de siempre. `"manana"` corre `tomar_capturas` + `enviar_correo_matutino`
+  **en la misma invocación** (comparten el `/tmp` de esa ejecución).
+- `Dockerfile` — imagen de contenedor para Lambda (Playwright + Chromium ya
+  vienen incluidos en la imagen base).
+- `comun_ofs.py` — ahora detecta si corre dentro de Lambda
+  (`AWS_LAMBDA_FUNCTION_NAME`) y usa `/tmp` en vez de la carpeta del script
+  (en Lambda todo excepto `/tmp` es de solo lectura).
+- `.github/workflows/deploy-lambda-ofs.yml` — construye la imagen y
+  actualiza la función Lambda automáticamente en cada push a
+  `Automatizacion-Plantilla/`. Usa un rol de AWS vía OIDC, **nunca** un
+  Access Key guardado en GitHub.
+
+Lo que falta es **crear los recursos en la consola de AWS** (esto lo tienes
+que hacer tú — nunca con tus credenciales de AWS pasando por este chat).
+Región: **eu-south-2** (España, Aragón). Sigue estos pasos en orden.
+
+### Paso 1 — Crear el repositorio en ECR
+
+Consola de AWS → busca **"ECR"** (Elastic Container Registry) → asegúrate
+que la región arriba a la derecha sea **eu-south-2** → **Create repository**:
+
+- Visibility: **Private**
+- Repository name: `aurum-ofs-automatizacion`
+- Deja el resto por defecto → **Create**
+
+### Paso 2 — Subir la primera imagen (una sola vez, desde CloudShell)
+
+Lambda exige que ya exista **al menos una imagen** en ECR antes de poder
+crear la función. Para no tener que instalar Docker en tu PC, usa
+**AWS CloudShell** (terminal en el navegador, ya viene con Docker y
+`aws` instalados y con tu sesión ya iniciada):
+
+1. En la consola de AWS, icono de terminal `>_` en la barra superior
+   ("CloudShell") — se abre una terminal abajo.
+2. Pega estos comandos (cambia `<ID_DE_CUENTA>` por tu ID de cuenta de AWS
+   de 12 dígitos — lo ves arriba a la derecha, en el menú con tu nombre):
+
+```bash
+git clone --depth 1 https://github.com/AurumBCS/Tecnicos-Aurum.git
+cd Tecnicos-Aurum/Automatizacion-Plantilla
+
+aws ecr get-login-password --region eu-south-2 | \
+  docker login --username AWS --password-stdin <ID_DE_CUENTA>.dkr.ecr.eu-south-2.amazonaws.com
+
+docker build -t aurum-ofs-automatizacion .
+docker tag aurum-ofs-automatizacion:latest <ID_DE_CUENTA>.dkr.ecr.eu-south-2.amazonaws.com/aurum-ofs-automatizacion:latest
+docker push <ID_DE_CUENTA>.dkr.ecr.eu-south-2.amazonaws.com/aurum-ofs-automatizacion:latest
+```
+
+Si CloudShell no está disponible en tu cuenta, avísame y lo hacemos
+instalando Docker Desktop localmente en su lugar.
+
+### Paso 3 — Crear la función Lambda
+
+Consola de AWS → **Lambda** → **Create function**:
+
+- Elige **Container image**
+- Function name: `aurum-ofs-automatizacion`
+- Container image URI → **Browse images** → repositorio
+  `aurum-ofs-automatizacion` → tag `latest`
+- **Create function**
+
+Después de creada, en la pestaña **Configuration**:
+
+- **General configuration** → Edit → **Memory** = `2048 MB`, **Timeout** =
+  `5 min 0 sec` (el flujo de la mañana hace login en dos consolas distintas
+  + 9 capturas + envío de correo; 5 min da margen).
+- **Environment variables** → Edit → agrega estas 6 (mismos nombres y
+  valores que los GitHub Secrets — **nunca los escribas en un chat
+  conmigo**, cópialos directo desde tu gestor de contraseñas o desde donde
+  los tengas guardados):
+  - `ETADIRECT_USER`, `ETADIRECT_PASS`
+  - `ETADIRECT_USER_CAPTURAS`, `ETADIRECT_PASS_CAPTURAS`
+  - `GMAIL_USER`, `GMAIL_APP_PASSWORD`
+- **Asynchronous invocation** → Edit → **Retry attempts** = **0**.
+  Importante: por defecto Lambda reintenta 2 veces una invocación asíncrona
+  que falla — un reintento de la tarea de la mañana volvería a **enviar el
+  correo a Mercedes de nuevo**, y uno de mediodía/tarde volvería a subir el
+  Excel. Dejarlo en 0 evita eso.
+
+### Paso 4 — Permitir que GitHub Actions despliegue solo (OIDC, sin Access Keys)
+
+**4a. Proveedor de identidad OIDC** (una sola vez por cuenta de AWS) — IAM →
+**Identity providers** → si ya existe uno con URL
+`token.actions.githubusercontent.com`, sáltate este paso. Si no:
+**Add provider** → OpenID Connect → Provider URL:
+`https://token.actions.githubusercontent.com` → Audience: `sts.amazonaws.com`
+→ **Add provider**.
+
+**4b. Rol IAM que GitHub Actions puede asumir** — IAM → **Roles** →
+**Create role** → **Web identity** → Identity provider: el que acabas de
+crear → Audience: `sts.amazonaws.com` → GitHub organization: `AurumBCS` →
+GitHub repository: `Tecnicos-Aurum` → **Next**. En permisos, **Create
+policy** (pestaña JSON) y pega, cambiando `<ID_DE_CUENTA>`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:PutImage",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload"
+      ],
+      "Resource": "arn:aws:ecr:eu-south-2:<ID_DE_CUENTA>:repository/aurum-ofs-automatizacion"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["lambda:UpdateFunctionCode", "lambda:GetFunction", "lambda:GetFunctionConfiguration"],
+      "Resource": "arn:aws:lambda:eu-south-2:<ID_DE_CUENTA>:function:aurum-ofs-automatizacion"
+    }
+  ]
+}
+```
+
+Nómbrala `deploy-ofs-lambda` y adjúntala al rol. Nombra el rol
+`github-actions-deploy-ofs-lambda` → **Create role**.
+
+Por seguridad extra, entra al rol recién creado → pestaña **Trust
+relationships** → **Edit trust policy** y cambia la condición
+`"...:sub"` para que sea exactamente:
+`"repo:AurumBCS/Tecnicos-Aurum:ref:refs/heads/main"` (así solo pushes a
+`main` de ese repo pueden usarlo, no cualquier PR).
+
+**4c. Copiar el Role ARN** (arriba en la página del rol, algo como
+`arn:aws:iam::<ID_DE_CUENTA>:role/github-actions-deploy-ofs-lambda`) y
+crear el secret `AWS_ROLE_ARN` en GitHub → **Settings** → **Secrets and
+variables** → **Actions** con ese valor.
+
+### Paso 5 — Crear los 3 horarios en EventBridge Scheduler
+
+Consola de AWS → **EventBridge** → **Scheduler** → **Create schedule**,
+uno por cada fila (región eu-south-2):
+
+| Nombre | Cron (UTC no — usa el campo Timezone) | Timezone | Input |
+|---|---|---|---|
+| `ofs-manana` | `cron(30 7 ? * MON-SAT *)` | `Europe/Madrid` | `{"tarea": "manana"}` |
+| `ofs-mediodia` | `cron(0 14 ? * MON-SAT *)` | `Europe/Madrid` | `{"tarea": "mediodia"}` |
+| `ofs-tarde` | `cron(30 17 ? * MON-SAT *)` | `Europe/Madrid` | `{"tarea": "tarde"}` |
+
+`ofs-manana` vuelve a la hora original que pediste (7:30am) en vez del
+6:03am al que se había adelantado en GitHub Actions — ese adelanto era
+para absorber el retraso típico del plan gratuito (hasta 2h+), algo que
+EventBridge Scheduler no tiene: dispara a la hora exacta, con margen de
+segundos. Ya no hace falta usar horas "no redondas" como 6:03/1:58/5:53
+tampoco, esas eran para esquivar la congestión de GitHub Actions en horas
+en punto/cuartos exactos. Si prefieres otro horario, ajusta el cron.
+
+Para cada uno, en el asistente:
+
+- **Schedule pattern**: Recurring schedule → Cron-based → pega el cron de
+  la tabla → **Timezone**: `Europe/Madrid` (así el horario de verano/invierno
+  se ajusta solo, igual que con GitHub Actions).
+- **Target**: AWS Lambda → **Invoke** → función `aurum-ofs-automatizacion`.
+- **Input**: pega el JSON de la columna "Input" de la tabla.
+- **Retry policy**: **Maximum retry attempts = 0** (mismo motivo que en el
+  Paso 3 — evitar correos/subidas duplicadas si algo falla a mitad de
+  camino). Deja **Maximum age of event** en su valor por defecto.
+- **Flexible time window**: Off (para que dispare exactamente a la hora).
+- Crea un rol de ejecución nuevo si te lo pide (permiso para invocar esa
+  Lambda específica).
+
+### Paso 6 — Probar antes de confiar en el horario
+
+1. En Lambda → pestaña **Test** → crea un evento de prueba con
+   `{"tarea": "manana"}` (o `"mediodia"`/`"tarde"`) → **Test** → revisa
+   los logs (CloudWatch Logs, enlazado desde el resultado) para confirmar
+   que corrió de punta a punta.
+2. Cuando las 3 pruebas manuales funcionen, deja correr los horarios reales
+   1-2 días y compara con lo que llega por correo/confirmaciones-sms.
+3. **Recién ahí**, para no tener doble ejecución, avísame y quitamos los
+   triggers `schedule:` de `.github/workflows/ofs-automation.yml` (dejando
+   solo `workflow_dispatch` como respaldo manual).
+
 ## Los 3 scripts
 
 1. **`tomar_capturas.py`** (~7:15am, usuario capturas) — entra a la

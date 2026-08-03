@@ -23,15 +23,14 @@ Programacion diaria: ver README.md (Task Scheduler), un poco antes de las
 
 import sys
 from datetime import datetime
-from pathlib import Path
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-from comun_ofs import ruta_sesion, leer_credenciales_ofs, abrir_sesion_ofs, registrar_error
+from comun_ofs import CARPETA_BASE, LAUNCH_ARGS, ruta_sesion, leer_credenciales_ofs, abrir_sesion_ofs, registrar_error
 
 # ── Configuracion ──────────────────────────────────────────────────────────
 
-CARPETA_CAPTURAS = Path(__file__).parent / "capturas"
+CARPETA_CAPTURAS = CARPETA_BASE / "capturas"
 ARCHIVO_SESION = ruta_sesion("capturas")
 
 # Los 9 equipos del panel izquierdo, en el orden en que hay que capturarlos
@@ -82,7 +81,7 @@ def main():
     usuario, clave = leer_credenciales_ofs("_CAPTURAS")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
 
         # Ventana grande para que se vean mas horas en cada captura (de 7 a
         # 23 o mas, a pantalla completa).

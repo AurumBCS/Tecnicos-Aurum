@@ -32,11 +32,12 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.application import MIMEApplication
-from pathlib import Path
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 from comun_ofs import (
+    CARPETA_BASE,
+    LAUNCH_ARGS,
     ruta_sesion,
     leer_credenciales_ofs,
     abrir_sesion_ofs,
@@ -47,8 +48,8 @@ from comun_ofs import (
 
 # ── Configuracion ──────────────────────────────────────────────────────────
 
-CARPETA_CAPTURAS = Path(__file__).parent / "capturas"
-CARPETA_DESCARGAS = Path(__file__).parent / "descargas"
+CARPETA_CAPTURAS = CARPETA_BASE / "capturas"
+CARPETA_DESCARGAS = CARPETA_BASE / "descargas"
 ARCHIVO_SESION = ruta_sesion("mantenimientos")
 DESTINATARIO = "mercedes.savarino@aurumbcs.com"
 COPIA = "gustavo.perez@aurumbcs.com"
@@ -113,7 +114,7 @@ def main():
     capturas = buscar_capturas_de_hoy()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
 
         if ARCHIVO_SESION.exists():
             context = browser.new_context(storage_state=str(ARCHIVO_SESION))
