@@ -29,10 +29,20 @@ CARPETA_BASE = Path("/tmp") if EN_LAMBDA else Path(__file__).parent
 LOG_FILE = CARPETA_BASE / "automatizacion.log"
 
 # Chromium necesita estos flags para arrancar dentro del contenedor de
-# Lambda (su sandbox normal no funciona ahi por las restricciones del
-# entorno, y /dev/shm viene muy limitado de tamaño). No se aplican fuera de
-# Lambda porque GitHub Actions/local ya funcionan bien sin ellos.
-LAUNCH_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"] if EN_LAMBDA else []
+# Lambda. --single-process es el importante: el entorno restringido de
+# Lambda no soporta el modelo normal de Chromium de varios procesos
+# (zygote + renderers separados) -- sin el, el navegador se cae apenas
+# arranca con "Connection closed while reading from the driver" (visto en
+# vivo). Los demas evitan el sandbox normal (no soportado en Lambda) y el
+# uso de /dev/shm (viene muy limitado de tamaño ahi). No se aplican fuera
+# de Lambda porque GitHub Actions/local ya funcionan bien sin ellos.
+LAUNCH_ARGS = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--single-process",
+] if EN_LAMBDA else []
 
 
 def registrar_error(script, mensaje):
