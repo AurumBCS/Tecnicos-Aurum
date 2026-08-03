@@ -55,8 +55,15 @@ jobs:
 
       - name: Actualizar la funcion Lambda
         run: |
+          # --query limita lo que se imprime en el log a un solo campo de
+          # estado. Sin esto, el comando devuelve la configuracion COMPLETA
+          # de la funcion en JSON -- incluidas las variables de entorno en
+          # texto plano (contraseñas de OFS/Gmail) -- y este log queda en
+          # un repositorio publico. No quitar este --query.
           aws lambda update-function-code \
             --function-name "$LAMBDA_FUNCION" \
             --image-uri "$IMAGEN" \
-            --no-cli-pager
+            --query 'LastUpdateStatus' \
+            --output text
           aws lambda wait function-updated --function-name "$LAMBDA_FUNCION"
+          echo "Funcion actualizada correctamente."
