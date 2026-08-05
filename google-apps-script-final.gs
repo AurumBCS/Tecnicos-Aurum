@@ -390,7 +390,13 @@ function configurarTrigger() {
 const CORREOS_LABEL_PROCESADO = 'Procesado-Aurum';
 
 function procesarCorreosAurum() {
-  const query = `(from:${REMITENTE} OR from:${REMITENTE_DIRECTO}) is:unread has:attachment`;
+  // El RM puede llegar de remitentes distintos a los dos conocidos (REMITENTE/
+  // REMITENTE_DIRECTO) -- en vez de mantener una lista de remitentes, se busca
+  // tambien por el asunto, que siempre es "Repeated Maintenance Aurum <mes>"
+  // sin importar quien lo envie. La clasificacion por asunto (esRM, mas abajo)
+  // ya funcionaba bien; lo que faltaba era que la busqueda de Gmail ni
+  // siquiera traia esos correos si el remitente no coincidia.
+  const query = `(from:${REMITENTE} OR from:${REMITENTE_DIRECTO} OR subject:"Repeated Maintenance Aurum") is:unread has:attachment`;
   const threads = GmailApp.search(query);
   if (threads.length === 0) { Logger.log('Sin correos nuevos.'); return; }
   const label = getOrCreateLabel_(CORREOS_LABEL_PROCESADO);
