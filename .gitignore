@@ -9,3 +9,9 @@ Automatizacion-Plantilla/descargas/
 Automatizacion-Plantilla/automatizacion.log
 Automatizacion-Plantilla/__pycache__/
 Automatizacion-Plantilla/venv/
+
+# Copia de referencia del Apps Script — tiene IDs de Sheets y URLs de
+# hojas publicadas (una expone DNIs). No auto-deploy, no la necesita la
+# app para funcionar; se sigue editando localmente, solo no va al repo
+# publico.
+google-apps-script-final.gs
