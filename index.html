@@ -388,9 +388,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <!-- Panel equipo JE -->
   <div id="equipoPanel">
     <div style="padding:14px 13px 48px;max-width:680px;margin:0 auto">
-      <div class="data-banner" style="margin-bottom:14px">
-        <div class="sync-dot"></div>
-        <span id="equipoBanner">—</span>
+      <div class="data-banner" style="margin-bottom:14px;flex-direction:column;align-items:flex-start;gap:2px">
+        <div style="display:flex;align-items:center;gap:8px"><div class="sync-dot"></div><span id="equipoBanner">—</span></div>
+        <span class="fecha-datos" style="font-size:.62rem;color:var(--muted)"></span>
       </div>
       <select id="mesSelectorEquipo" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
         <option value="">Cargando meses…</option>
@@ -427,9 +427,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <!-- Panel JR: lista JEs -->
   <div id="jrPanel">
     <div style="padding:14px 13px 48px;max-width:680px;margin:0 auto">
-      <div class="data-banner" style="margin-bottom:14px">
-        <div class="sync-dot"></div>
-        Vista global · Todos los jefes de equipo
+      <div class="data-banner" style="margin-bottom:14px;flex-direction:column;align-items:flex-start;gap:2px">
+        <div style="display:flex;align-items:center;gap:8px"><div class="sync-dot"></div>Vista global · Todos los jefes de equipo</div>
+        <span class="fecha-datos" style="font-size:.62rem;color:var(--muted)"></span>
       </div>
       <select id="mesSelectorJR" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
         <option value="">Cargando meses…</option>
@@ -627,6 +627,24 @@ const FALLBACK_DATA = {"tecnicos":[{"id":"Q30910-Claudio Febres DeMartini","nomb
 
 let CURRENT_DATA = FALLBACK_DATA;
 let CSV_FECHA    = null; // fecha de actualización del sheet (col A)
+
+// La columna "Fecha" del sheet es el dia en que se genero el reporte, pero
+// los datos que contiene reflejan actividad hasta el dia ANTERIOR a esa
+// fecha -- por eso el mensaje siempre resta un dia antes de mostrarlo.
+function textoFechaDatosActualizados(){
+  if(!CSV_FECHA) return '';
+  const partes = CSV_FECHA.split('/');
+  const dia = parseInt(partes[0]||0), mes = parseInt(partes[1]||0)-1, anio = parseInt(partes[2]||0);
+  if(!dia || isNaN(mes) || !anio) return '';
+  const f = new Date(anio, mes, dia);
+  f.setDate(f.getDate()-1);
+  const nombresMeses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return `Datos actualizados hasta el ${f.getDate()} de ${nombresMeses[f.getMonth()]} de ${f.getFullYear()}`;
+}
+function actualizarBannerFechaDatos(){
+  const texto = textoFechaDatosActualizados();
+  document.querySelectorAll('.fecha-datos').forEach(el=>{ el.textContent = texto; });
+}
 let CURRENT_TEC  = null;
 let CURRENT_USER_TYPE = null; // 'tecnico' | 'je' | 'jr'
 let CURRENT_JE_ID = null;
@@ -946,6 +964,7 @@ async function loadSheets(){
         // Tomar la fecha de actualización de la primera fila
         if(tecs[0].fecha) CSV_FECHA = tecs[0].fecha;
         _datosActualizados = true;
+        actualizarBannerFechaDatos();
         console.log(`Sheets OK: ${tecs.length} técnicos · mes: ${mes||'actual'} · fecha sheet: ${CSV_FECHA}`);
         poblarSelectoresMes();
         return;
@@ -1115,7 +1134,7 @@ function renderMain(tec, returnToEquipo=false){
     const anio = parseInt(partes[2]||0);
     mesActual  = meses[mes] || meses[new Date().getMonth()];
     anioActual = anio || new Date().getFullYear();
-    fechaCorta = `${dia} de ${mesActual.toLowerCase()} de ${anioActual}`;
+    fechaCorta = textoFechaDatosActualizados();
   } else {
     const ahora = new Date();
     mesActual  = meses[ahora.getMonth()];
@@ -1128,7 +1147,7 @@ function renderMain(tec, returnToEquipo=false){
   const banner = document.querySelector('.data-banner');
   if(banner){
     if(_datosActualizados){
-      const textoFecha = fechaCorta ? `Actualizado al ${fechaCorta}` : `${mesActual} ${anioActual}`;
+      const textoFecha = fechaCorta || `${mesActual} ${anioActual}`;
       banner.innerHTML=`<div class="sync-dot"></div>${textoFecha}`;
     } else {
       banner.innerHTML=`<div style="width:6px;height:6px;border-radius:50%;background:var(--orange);flex-shrink:0"></div><span style="color:var(--orange)">Datos locales (sin conexión)</span> · Última actualización conocida`;
