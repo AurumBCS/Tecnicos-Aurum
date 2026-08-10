@@ -607,6 +607,7 @@ let AUTH_DATA = {
 let AUTH_CUADRANTE_LOADED = false;
 let ZONA_DATA = {};
 let CUENTA_DATA = {}; // mat -> {je: bool, empresa: bool}
+let ROSTER_NOMBRES = {}; // mat -> nombre, del Cuadrante (incluye tecnicos sin datos este mes)
 let FLOTA_DATA = {};
 let DOCS_DATA = [];
 let VACACIONES_DATA = {};
@@ -870,10 +871,12 @@ async function loadJerarquia(){
       // Reconstruir desde el cuadrante
       ZONA_DATA = {};
       CUENTA_DATA = {};
+      ROSTER_NOMBRES = {};
       rows.forEach(row=>{
         const je       = String(row['JE']||'').trim().toUpperCase();
         const mat      = String(row['Matricula']||'').trim().toUpperCase();
         const zona     = String(row['Zona']||'').trim();
+        const nombre   = String(row['Nombre']||'').trim();
         const rawJE  = String(row['CuentaJE']||'').trim().toLowerCase();
         const rawEmp = String(row['CuentaEmpresa']||'').trim().toLowerCase();
         const cuentaJE  = rawJE  ? rawJE.includes('si')  : null;
@@ -885,6 +888,7 @@ async function loadJerarquia(){
           }
           if(zona) ZONA_DATA[mat] = zona;
           CUENTA_DATA[mat] = {je: cuentaJE, empresa: cuentaEmp};
+          if(nombre) ROSTER_NOMBRES[mat] = nombre;
         }
       });
       // Actualizar la lista de JEs visible para el JR
@@ -1473,6 +1477,23 @@ function renderEquipoPanel(jeId){
       <div style="flex:1;height:1px;background:#2a2010"></div>
     </div>` : '';
 
+  // Técnicos que están en el roster (Cuadrante) pero todavía no tienen
+  // ninguna fila de KPIs este mes -- se muestran aparte, sin datos para
+  // no inflar los promedios/rankings, solo para que no "desaparezcan".
+  const sinDatosIds = (JERARQUIA[jeId]||[]).filter(mat=>!tecs.some(t=>t.id.toUpperCase()===mat.toUpperCase()));
+  const buildSinDatosRow = mat => `<div class="tec-row" style="opacity:.5;cursor:default">
+      <div class="tec-info">
+        <div class="tec-name">${ROSTER_NOMBRES[mat]||mat}</div>
+        <div class="tec-sub">${mat} · sin datos este mes</div>
+      </div>
+    </div>`;
+  const sinDatosRows = sinDatosIds.map(buildSinDatosRow).join('');
+  const separadorSinDatos = sinDatosIds.length ? `
+    <div style="margin:6px 0 4px;padding:6px 12px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase">Sin datos este mes · ${sinDatosIds.length}</span>
+      <div style="flex:1;height:1px;background:#2a2010"></div>
+    </div>` : '';
+
   const encabezado = tieneCuentaData && cuentan.length < tecs.length
     ? `👥 Técnicos · <span style="color:var(--green2)">${cuentan.length} cuentan</span> / <span style="color:var(--muted)">${noCuentan.length} no cuentan</span>`
     : `👥 Técnicos del equipo · ${tecs.length}`;
@@ -1485,7 +1506,7 @@ function renderEquipoPanel(jeId){
       </div>
       <div id="tecList-${jeId}" style="background:var(--dim);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-top:8px;display:none;padding:0 !important">
         <div class="tec-list">
-          ${cuentanRows}${separador}${noCuentanRows}
+          ${cuentanRows}${separador}${noCuentanRows}${separadorSinDatos}${sinDatosRows}
         </div>
       </div>
     </div>`;
@@ -1954,6 +1975,13 @@ function showJEDetail(jeId){
         </div>
       </div>`;
     }).join('')}
+    ${(JERARQUIA[jeId]||[]).filter(mat=>!tecs.some(t=>t.id.toUpperCase()===mat.toUpperCase())).map(mat=>`
+      <div class="tec-row" style="opacity:.5;cursor:default">
+        <div class="tec-info">
+          <div class="tec-name">${ROSTER_NOMBRES[mat]||mat}</div>
+          <div class="tec-sub">${mat} · sin datos este mes</div>
+        </div>
+      </div>`).join('')}
     </div>`;
 
   showPanel('jrDetailPanel');
