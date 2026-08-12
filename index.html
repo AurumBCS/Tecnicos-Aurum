@@ -852,10 +852,34 @@ function csvRow(r){
     fecha:  r['Fecha'] || ''
   };
 }
+
+// Los endpoints del Apps Script a veces fallan con un 404 transitorio del
+// propio redirect de Google -- no es un bug del script, pasa porque la app
+// dispara muchos fetch en paralelo al iniciar sesion (auth, csv, docs,
+// jerarquia, rm, cumplimiento, etc. todos a la vez) y choca con el limite
+// de ejecuciones simultaneas de Apps Script (confirmado en vivo: RM y
+// meses fallaron con 404 en un login real mientras el resto cargaba bien
+// al mismo tiempo). Reintenta un par de veces con una pausa corta antes de
+// darse por vencido, en vez de quedarse sin esos datos.
+async function fetchConReintento(url, opciones, intentos=3){
+  let ultimoError;
+  for(let i=0; i<intentos; i++){
+    try{
+      const res = await fetch(url, opciones);
+      if(res.ok || i===intentos-1) return res;
+    }catch(e){
+      ultimoError = e;
+      if(i===intentos-1) throw e;
+    }
+    await new Promise(r=>setTimeout(r, 400*(i+1))); // pausa creciente: 400ms, 800ms
+  }
+  throw ultimoError;
+}
+
 async function loadAuth(){
   try{
     const url = AUTH_URL + (AUTH_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
-    const res=await fetch(url,{cache:'no-store'});
+    const res=await fetchConReintento(url,{cache:'no-store'});
     if(!res.ok) return;
     const csv=await res.text();
     // Usar parseCSV para manejar correctamente campos con comillas
@@ -878,7 +902,7 @@ async function loadAuth(){
 async function loadJerarquia(){
   try{
     const url = JERARQUIA_URL + '&t=' + Date.now();
-    const res = await fetch(url,{cache:'no-store'});
+    const res = await fetchConReintento(url,{cache:'no-store'});
     if(!res.ok) return;
     const text = await res.text();
     const rows = parseCSV(text);
@@ -920,7 +944,7 @@ async function loadJerarquia(){
 async function loadDocs(){
   try{
     const url = DOCS_URL + (DOCS_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
-    const res=await fetch(url,{cache:'no-store'});
+    const res=await fetchConReintento(url,{cache:'no-store'});
     if(!res.ok) return;
     const text=await res.text();
     const rows=parseCSV(text);
@@ -950,7 +974,7 @@ async function loadSheets(){
       const url = mes
         ? SHEETS_CSV_URL + '&mes=' + encodeURIComponent(mes) + '&t=' + Date.now()
         : SHEETS_CSV_URL + '&t=' + Date.now();
-      const res = await fetch(url, {cache: 'no-store'});
+      const res = await fetchConReintento(url, {cache: 'no-store'});
       if(!res.ok) continue;
       const text = await res.text();
       const rows = parseCSV(text);
@@ -981,7 +1005,7 @@ async function loadSheets(){
 // ══════════════════════════════════════════════
 async function loadMeses(){
   try{
-    const res = await fetch(MESES_URL + '&t=' + Date.now(), {cache:'no-store'});
+    const res = await fetchConReintento(MESES_URL + '&t=' + Date.now(), {cache:'no-store'});
     if(!res.ok) return;
     const text = await res.text();
     MESES_DISPONIBLES = text.split(',').map(m=>m.trim()).filter(Boolean);
@@ -1008,7 +1032,7 @@ async function cambiarMes(mes){
 
   try{
     const url = SHEETS_CSV_URL + '&mes=' + encodeURIComponent(mes) + '&t=' + Date.now();
-    const res = await fetch(url, {cache:'no-store'});
+    const res = await fetchConReintento(url, {cache:'no-store'});
     const csv = await res.text();
     const rows = parseCSV(csv);
     const tecs = rows.filter(r=>r['Técnico']).map(r=>{
@@ -2683,7 +2707,7 @@ function renderDocsEquipoCollapsible(jeId, containerId){
 async function loadFlota(){
   try{
     const url = FLOTA_URL + (FLOTA_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
-    const res=await fetch(url,{cache:'no-store'});
+    const res=await fetchConReintento(url,{cache:'no-store'});
     if(!res.ok) return;
     const csv=await res.text();
     const rows=parseCSV(csv);
@@ -2704,7 +2728,7 @@ async function loadFlota(){
 
 async function loadVacaciones(){
   try{
-    const res=await fetch(VACACIONES_URL+'&t='+Date.now(),{cache:'no-store'});
+    const res=await fetchConReintento(VACACIONES_URL+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok) return;
     const text=await res.text();
     const rows=parseCSV(text);
@@ -2734,7 +2758,7 @@ async function loadVacaciones(){
 
 async function loadMedialiaCoord(){
   try{
-    const res=await fetch(MEDALIA_COORD_URL+'&t='+Date.now(),{cache:'no-store'});
+    const res=await fetchConReintento(MEDALIA_COORD_URL+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok) return;
     const csv=await res.text();
     const rows=parseCSV(csv);
@@ -2757,7 +2781,7 @@ async function loadMedialiaCoord(){
 async function loadCumplimiento(){
   console.log('📥 Iniciando loadCumplimiento...');
   try{
-    const res=await fetch(CUMPLIMIENTO_URL+'&t='+Date.now(),{cache:'no-store'});
+    const res=await fetchConReintento(CUMPLIMIENTO_URL+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok){
       console.log('Cumplimiento error: status',res.status);
       return;
@@ -2801,7 +2825,7 @@ let USAGE_DATA = null;
 
 async function loadUsage(){
   try{
-    const res = await fetch(USAGE_URL + '&t=' + Date.now(), {cache:'no-store'});
+    const res = await fetchConReintento(USAGE_URL + '&t=' + Date.now(), {cache:'no-store'});
     if(!res.ok) return;
     const text = await res.text();
     const rows = parseCSV(text);
@@ -2875,7 +2899,7 @@ function renderUsagePanel(){
 async function loadRM(){
   console.log('📥 Iniciando loadRM...');
   try{
-    const res=await fetch(RM_URL+'&t='+Date.now(),{cache:'no-store'});
+    const res=await fetchConReintento(RM_URL+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok){
       console.log('RM error: status',res.status);
       return;
@@ -2954,7 +2978,7 @@ function formatearFechaLegible(fechaISO){
 async function fetchFichajePorFecha(fecha){
   try{
     const url=FICHAJE_URL+'&fecha='+fecha+'&t='+Date.now();
-    const res=await fetch(url,{cache:'no-store'});
+    const res=await fetchConReintento(url,{cache:'no-store'});
     if(!res.ok) return {};
     const csv=await res.text();
     const rows=parseCSV(csv);
@@ -3061,7 +3085,7 @@ function pintarBotonFichaje(){
 async function enviarFichaje(accion){
   if(!FICHAJE_ID) return;
   try{
-    await fetch(FICHAJE_URL,{
+    await fetchConReintento(FICHAJE_URL,{
       method:'POST',
       mode:'no-cors',
       body: JSON.stringify({mat:FICHAJE_ID, nombre:FICHAJE_NOMBRE||'', accion})
@@ -3278,7 +3302,7 @@ async function loadHistorico(){
     const entries = await Promise.all(MESES_DISPONIBLES.map(async mes=>{
       try{
         const url = SHEETS_CSV_URL + '&mes=' + encodeURIComponent(mes) + '&t=' + Date.now();
-        const res = await fetch(url, {cache:'no-store'});
+        const res = await fetchConReintento(url, {cache:'no-store'});
         if(!res.ok) return [mes, {}];
         const text = await res.text();
         const rows = parseCSV(text);
