@@ -334,6 +334,10 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     </div>
   </div>
 
+  <div id="fichajeComidaBar" style="display:none;padding:6px 14px;background:var(--dim);border-bottom:1px solid var(--border);text-align:right">
+    <a id="fichajeComidaLink" onclick="onComidaLinkClick()" style="font-size:.68rem;color:var(--gold2);cursor:pointer;font-weight:700;text-decoration:none">🍽️ Iniciar comida</a>
+  </div>
+
   <div class="month-banner">
     <div>
       <div class="month-label">Periodo activo</div>
@@ -571,6 +575,9 @@ const USAGE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYC
 const JERARQUIA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=jerarquia&token=" + APP_TOKEN;
 const MESES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=meses&token=" + APP_TOKEN;
 const FICHAJE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje&token=" + APP_TOKEN;
+const FICHAJE_INFORME_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje-informe&token=" + APP_TOKEN;
+const FICHAJE_PDF_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje-pdf&token=" + APP_TOKEN;
+const FICHAJE_HISTORIAL_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje-historial&token=" + APP_TOKEN;
 
 // Confirmaciones por SMS (servidor en la nube) — ACTUALIZAR con la URL real de Render
 // una vez desplegado, ej: "https://confirmaciones-sms-aurum.onrender.com"
@@ -2992,10 +2999,19 @@ async function fetchFichajePorFecha(fecha){
         horaComida: row['horaComida']||'',
         horaSalida: row['horaSalida']||'',
         tipoCierre: row['tipoCierre']||'',
+        horaInicioComida: row['horaInicioComida']||'',
+        horaFinComida: row['horaFinComida']||'',
+        planificadoEntrada: row['planificadoEntrada']||'',
+        planificadoSalida: row['planificadoSalida']||'',
+        ausenciaTipo: row['ausenciaTipo']||'',
+        esCierreTecnico: row['esCierreTecnico']==='true',
+        tieneIncidencia: row['tieneIncidencia']==='true',
         latEntrada: row['latEntrada']||'',
         lngEntrada: row['lngEntrada']||'',
         latSalida: row['latSalida']||'',
-        lngSalida: row['lngSalida']||''
+        lngSalida: row['lngSalida']||'',
+        idEventoEntrada: row['idEventoEntrada']||'',
+        idEventoSalida: row['idEventoSalida']||''
       };
     });
     return porMat;
@@ -3015,7 +3031,7 @@ async function loadFichajeVista(){
 function estadoFichajeBtn(mat){
   const f=FICHAJE_HOY[String(mat||'').toUpperCase()];
   if(!f || !f.horaEntrada) return {estado:'sinFichar'};
-  if(!f.horaSalida) return {estado:'abierto', entrada:f.horaEntrada};
+  if(!f.horaSalida) return {estado:'abierto', entrada:f.horaEntrada, horaInicioComida:f.horaInicioComida, horaFinComida:f.horaFinComida};
   return {estado:'cerrado', entrada:f.horaEntrada, salida:f.horaSalida, tipoCierre:f.tipoCierre};
 }
 
@@ -3080,6 +3096,182 @@ function pintarBotonFichaje(){
     btn.style.borderColor = manual ? '#1a3d2a' : 'var(--border2)';
     btn.disabled=true;
   }
+  pintarComidaLink(st);
+}
+
+// Comida real (Iniciar/Finalizar) — opcional, no obliga un orden: se puede finalizar
+// la jornada sin haber fichado la comida ese día. Enlace pequeño bajo el topbar,
+// distinto del botón principal de entrada/salida.
+const FICHAJE_COMIDA_COOLDOWN_SEG = 10;
+function marcarCooldownComida(mat){
+  if(!mat) return;
+  localStorage.setItem('fichajeComidaCooldown_'+mat, String(Date.now()));
+}
+function msRestantesCooldownComida(mat){
+  if(!mat) return 0;
+  const ts = Number(localStorage.getItem('fichajeComidaCooldown_'+mat) || 0);
+  if(!ts) return 0;
+  return Math.max(0, ts + FICHAJE_COMIDA_COOLDOWN_SEG*1000 - Date.now());
+}
+
+function pintarComidaLink(st){
+  const barra=document.getElementById('fichajeComidaBar');
+  const link=document.getElementById('fichajeComidaLink');
+  if(!barra || !link) return;
+
+  if(st.estado!=='abierto' || st.horaFinComida){
+    barra.style.display='none';
+    return;
+  }
+  barra.style.display='block';
+
+  const restante = msRestantesCooldownComida(FICHAJE_ID);
+  if(restante > 0){
+    link.textContent='🔒 Espera unos segundos…';
+    link.style.pointerEvents='none';
+    link.style.color='var(--muted)';
+    setTimeout(()=>pintarBotonFichaje(), restante+300);
+    return;
+  }
+  link.style.pointerEvents='';
+  link.style.color='var(--gold2)';
+  link.textContent = st.horaInicioComida ? '🍽️ Finalizar comida' : '🍽️ Iniciar comida';
+}
+
+function onComidaLinkClick(){
+  const st=estadoFichajeBtn(FICHAJE_ID);
+  if(st.estado!=='abierto' || st.horaFinComida) return;
+  if(msRestantesCooldownComida(FICHAJE_ID) > 0) return;
+
+  const link=document.getElementById('fichajeComidaLink');
+  if(link){ link.style.pointerEvents='none'; link.style.color='var(--muted)'; link.textContent='⏳…'; }
+  marcarCooldownComida(FICHAJE_ID);
+
+  if(st.horaInicioComida) enviarFichaje('finalizar_comida');
+  else enviarFichaje('iniciar_comida');
+}
+
+// Regularización con modal e historial. Solo visible/activo para JR y administrativas de
+// fichaje, que son quienes ven el Gantt donde vive este click. Nunca modifica el evento
+// original: el backend añade una fila REGULARIZACION nueva que lo referencia.
+function onGanttBarraClick(el){
+  if(CURRENT_USER_TYPE!=='jr' && CURRENT_USER_TYPE!=='fichaje-admin') return;
+  const mat=el.getAttribute('data-mat');
+  const fecha=el.getAttribute('data-fecha');
+  const f=FICHAJE_VISTA[String(mat||'').toUpperCase()];
+  if(!f) return;
+  abrirModalRegularizacion(mat, fecha, f);
+}
+
+let REG_MODAL_OPCIONES=[];
+
+function abrirModalRegularizacion(mat, fecha, f){
+  const opciones=[];
+  if(f.idEventoEntrada) opciones.push({valor:'E', idEvento:f.idEventoEntrada, label:'Entrada ('+f.horaEntrada+')', horaActual:f.horaEntrada});
+  if(f.idEventoSalida) opciones.push({valor:'S', idEvento:f.idEventoSalida, label:'Salida ('+f.horaSalida+(f.tieneIncidencia?' — cierre técnico, olvido de fichaje':'')+')', horaActual:f.horaSalida});
+  if(!opciones.length) return;
+  REG_MODAL_OPCIONES=opciones;
+
+  const existente=document.getElementById('modal-regularizacion');
+  if(existente) existente.remove();
+
+  const overlay=document.createElement('div');
+  overlay.id='modal-regularizacion';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML=`
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:22px;max-width:400px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 40px 80px rgba(0,0,0,.8)">
+      <h3 style="color:var(--gold2);font-family:var(--font);margin-bottom:4px;font-size:.95rem">Regularizar fichaje</h3>
+      <div style="color:var(--muted);font-size:.7rem;margin-bottom:16px">${mat} · ${fecha}</div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">Evento a corregir</label>
+        <select id="regEventoSelect" style="width:100%;padding:9px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.75rem">
+          ${opciones.map(o=>`<option value="${o.valor}">${o.label}</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">Hora real correcta</label>
+        <input type="time" id="regHoraInput" value="${opciones[0].horaActual}" style="width:100%;padding:9px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.75rem">
+      </div>
+
+      <div style="margin-bottom:16px">
+        <label style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">Motivo (obligatorio, quedará registrado)</label>
+        <textarea id="regMotivoInput" rows="3" style="width:100%;padding:9px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.75rem;resize:vertical"></textarea>
+      </div>
+
+      <div id="regHistorial" style="margin-bottom:16px"></div>
+
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('modal-regularizacion').remove()" style="flex:1;padding:10px;background:transparent;border:1px solid var(--border2);border-radius:9px;color:var(--muted);font-family:var(--font);font-size:.72rem;font-weight:700;cursor:pointer">Cancelar</button>
+        <button id="regConfirmarBtn" onclick="confirmarRegularizacion('${mat}','${fecha}')" style="flex:1;padding:10px;background:var(--gold);border:none;border-radius:9px;color:#0a0a0a;font-family:var(--font);font-size:.72rem;font-weight:700;cursor:pointer">Confirmar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) overlay.remove(); });
+
+  document.getElementById('regEventoSelect').addEventListener('change', function(){
+    const o=REG_MODAL_OPCIONES.find(x=>x.valor===this.value);
+    if(o) document.getElementById('regHoraInput').value=o.horaActual;
+  });
+
+  cargarHistorialRegularizacion(mat, fecha);
+}
+
+async function cargarHistorialRegularizacion(mat, fecha){
+  const cont=document.getElementById('regHistorial');
+  if(!cont) return;
+  cont.innerHTML='<div style="font-size:.62rem;color:var(--muted)">Cargando historial…</div>';
+  try{
+    const url=FICHAJE_HISTORIAL_URL+'&mat='+encodeURIComponent(mat)+'&fecha='+encodeURIComponent(fecha)+'&t='+Date.now();
+    const res=await fetchConReintento(url,{cache:'no-store'});
+    const csv=await res.text();
+    const rows=parseCSV(csv);
+    const regularizaciones=rows.filter(r=>r['tipoEvento']==='REGULARIZACION');
+    if(!regularizaciones.length){ cont.innerHTML='<div style="font-size:.62rem;color:var(--muted)">Sin correcciones previas.</div>'; return; }
+    cont.innerHTML='<div style="font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Historial de correcciones</div>' +
+      regularizaciones.map(r=>`<div style="font-size:.65rem;color:var(--text);padding:6px 0;border-top:1px solid var(--border)">
+        <strong style="color:var(--gold2)">${r['hora']||'—'}</strong> por ${r['autor']} — ${r['motivo']}
+      </div>`).join('');
+  }catch(e){
+    cont.innerHTML='<div style="font-size:.62rem;color:var(--muted)">No se pudo cargar el historial.</div>';
+  }
+}
+
+async function confirmarRegularizacion(mat, fecha){
+  const select=document.getElementById('regEventoSelect');
+  const o=REG_MODAL_OPCIONES.find(x=>x.valor===select.value);
+  if(!o) return;
+  const horaCorregida=document.getElementById('regHoraInput').value;
+  const motivo=(document.getElementById('regMotivoInput').value||'').trim();
+  if(!horaCorregida){ alert('Indica la hora correcta.'); return; }
+  if(!motivo){ alert('El motivo es obligatorio — sin él no se puede regularizar.'); return; }
+
+  const btn=document.getElementById('regConfirmarBtn');
+  btn.disabled=true; btn.textContent='Guardando…';
+
+  await enviarRegularizacion(mat, fecha, o.idEvento, horaCorregida, motivo);
+  const overlay=document.getElementById('modal-regularizacion');
+  if(overlay) overlay.remove();
+}
+
+async function enviarRegularizacion(matObjetivo, fecha, idEventoRef, horaCorregida, motivo){
+  if(!FICHAJE_ID) return;
+  try{
+    const res = await fetchConReintento(FICHAJE_URL, {
+      method:'POST',
+      body: JSON.stringify({mat:FICHAJE_ID, accion:'regularizar', matObjetivo, fecha, idEventoRef, horaCorregida, motivo})
+    });
+    let data=null;
+    try{ data = await res.json(); }catch(e){}
+    if(!data || data.ok===false){ alert('No se pudo regularizar: '+((data&&data.error)||'error desconocido')); return; }
+  }catch(e){
+    console.log('Regularización error:', e.message);
+    alert('No se pudo enviar la regularización (revisa tu conexión).');
+    return;
+  }
+  await loadFichajeVista();
+  if(FICHAJE_CONTAINER_ACTIVO) renderFichajeJR(FICHAJE_CONTAINER_ACTIVO);
 }
 
 async function enviarFichaje(accion){
@@ -3145,17 +3337,25 @@ function cabeceraGanttFichaje(){
   </div>`;
 }
 
+const FICHAJE_AUSENCIA_INFO = {
+  BAJA_MEDICA: {icono:'🏥', label:'Baja médica'},
+  VACACIONES:  {icono:'🏖️', label:'Vacaciones'},
+  FESTIVO:     {icono:'🎉', label:'Festivo'}
+};
+
 function filaGanttFichaje(tec, fechaVista){
   const nombre=tec.nombre.trim().split(' ').slice(0,2).join(' ');
   const f=FICHAJE_VISTA[tec.id.toUpperCase()];
   const esHoy=fechaVista===hoyISOFichaje();
   let barra='';
+  let etiquetaAusencia='';
+
   if(f && f.horaEntrada){
     const minEntrada=minutosFichaje(f.horaEntrada);
     let minSalida, color;
     if(f.horaSalida){
       minSalida=minutosFichaje(f.horaSalida);
-      color = f.tipoCierre==='manual' ? 'var(--green2)' : 'var(--muted)';
+      color = f.tipoCierre==='manual' ? 'var(--green2)' : f.tipoCierre==='regularizado' ? 'var(--gold)' : 'var(--muted)';
     } else if(esHoy){
       const ahora=new Date();
       minSalida=ahora.getHours()*60+ahora.getMinutes();
@@ -3166,16 +3366,43 @@ function filaGanttFichaje(tec, fechaVista){
     }
     const left=pctVentanaFichaje(minEntrada);
     const width=Math.max(1, pctVentanaFichaje(minSalida)-pctVentanaFichaje(minEntrada));
+
+    // Hueco visual para la pausa de comida REAL (si se fichó) — distingue de la
+    // pausa planificada fija 14:00-15:00, que nunca se descuenta si no se fichó.
+    let huecoComida='';
+    if(f.horaInicioComida && f.horaFinComida){
+      const minIni=minutosFichaje(f.horaInicioComida), minFin=minutosFichaje(f.horaFinComida);
+      const leftC=pctVentanaFichaje(minIni), widthC=Math.max(0.3, pctVentanaFichaje(minFin)-pctVentanaFichaje(minIni));
+      huecoComida=`<div style="position:absolute;top:0;bottom:0;left:${leftC}%;width:${widthC}%;background:var(--s1);opacity:.85" title="Comida ${f.horaInicioComida}–${f.horaFinComida}"></div>`;
+    }
+
     const pinEntrada = (f.latEntrada && f.lngEntrada) ? `<a href="https://www.google.com/maps?q=${f.latEntrada},${f.lngEntrada}" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none;margin-left:4px" title="Ubicación de entrada">📍</a>` : '';
     const pinSalida = (f.latSalida && f.lngSalida) ? `<a href="https://www.google.com/maps?q=${f.latSalida},${f.lngSalida}" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none;margin-left:2px" title="Ubicación de salida">📍</a>` : '';
-    barra=`<div style="position:absolute;top:6px;bottom:6px;left:${left}%;width:${width}%;background:${color};border-radius:6px;display:flex;align-items:center;padding:0 6px;font-size:.6rem;font-weight:700;color:#0a0a0a;white-space:nowrap" title="${f.horaEntrada}–${f.horaSalida||'en curso'}">${f.horaEntrada}${pinEntrada}${pinSalida}</div>`;
+    const avisoIncidencia = f.tieneIncidencia ? `<span title="Olvido de fichaje — cierre técnico, no es una salida real" style="margin-left:3px">⚠️</span>` : '';
+    const idRef = f.tieneIncidencia||f.horaSalida ? `data-mat="${tec.id}" data-fecha="${fechaVista}" onclick="onGanttBarraClick(this)" style="cursor:pointer"` : '';
+
+    barra=`<div ${idRef} style="position:absolute;top:6px;bottom:6px;left:${left}%;width:${width}%;background:${color};border-radius:6px;display:flex;align-items:center;padding:0 6px;font-size:.6rem;font-weight:700;color:#0a0a0a;white-space:nowrap;overflow:visible" title="${f.horaEntrada}–${f.horaSalida||'en curso'}">${huecoComida}<span style="position:relative">${f.horaEntrada}${avisoIncidencia}${pinEntrada}${pinSalida}</span></div>`;
+  } else if(f && f.ausenciaTipo && FICHAJE_AUSENCIA_INFO[f.ausenciaTipo]){
+    const info=FICHAJE_AUSENCIA_INFO[f.ausenciaTipo];
+    etiquetaAusencia=`<div style="position:absolute;top:6px;bottom:6px;left:0;padding:0 8px;display:flex;align-items:center;font-size:.62rem;font-weight:700;color:var(--muted)" title="${info.label}">${info.icono} ${info.label}</div>`;
   }
+
+  // Franja de horario planificado como contorno fino de fondo, para comparar de un vistazo con la barra real.
+  let contornoPlanificado='';
+  if(f && f.planificadoEntrada && f.planificadoSalida){
+    const pIni=minutosFichaje(f.planificadoEntrada), pFin=minutosFichaje(f.planificadoSalida);
+    if(pIni!==null && pFin!==null && pFin>pIni){
+      const leftP=pctVentanaFichaje(pIni), widthP=Math.max(1, pctVentanaFichaje(pFin)-pctVentanaFichaje(pIni));
+      contornoPlanificado=`<div style="position:absolute;top:2px;bottom:2px;left:${leftP}%;width:${widthP}%;border:1px dashed var(--border2);border-radius:6px;pointer-events:none" title="Planificado ${f.planificadoEntrada}–${f.planificadoSalida}"></div>`;
+    }
+  }
+
   return `<div style="display:flex;border-bottom:1px solid var(--border)">
     <div style="position:sticky;left:0;z-index:1;background:var(--s1);width:130px;flex-shrink:0;padding:8px 10px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid var(--border2)">
       <div style="font-size:.68rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nombre}</div>
       <div style="font-size:.55rem;color:var(--muted)">${tec.id}</div>
     </div>
-    <div style="position:relative;flex:1;min-width:${FICHAJE_PX_POR_HORA*14}px;height:38px">${barra}</div>
+    <div style="position:relative;flex:1;min-width:${FICHAJE_PX_POR_HORA*14}px;height:38px">${contornoPlanificado}${barra}${etiquetaAusencia}</div>
   </div>`;
 }
 
@@ -3230,6 +3457,92 @@ function descargarFichajeCSV(){
   URL.revokeObjectURL(url);
 }
 
+function toggleInformeMensual(){
+  const panel=document.getElementById('informeMensualPanel');
+  const arrow=document.getElementById('informeArrow');
+  const abierto=panel.style.display!=='none';
+  panel.style.display=abierto?'none':'block';
+  if(arrow) arrow.style.transform=abierto?'rotate(0deg)':'rotate(180deg)';
+}
+
+const FICHAJE_MOTIVO_INFO = {
+  BAJA_MEDICA:'🏥 Baja médica', VACACIONES:'🏖️ Vacaciones', FESTIVO:'🎉 Festivo',
+  DESCANSO:'💤 Descanso', INJUSTIFICADO:'⚠️ Injustificado'
+};
+
+async function cargarInformeMensual(){
+  const mat=(document.getElementById('informeMatInput').value||'').trim().toUpperCase();
+  const mes=document.getElementById('informeMesInput').value; // YYYY-MM
+  const resultado=document.getElementById('informeMensualResultado');
+  if(!mat || !mes){ resultado.innerHTML='<div style="padding:8px;color:var(--muted);font-size:.68rem">Indica matrícula y mes.</div>'; return; }
+
+  resultado.innerHTML='<div style="padding:8px;color:var(--muted);font-size:.68rem">Cargando…</div>';
+  try{
+    const url=FICHAJE_INFORME_URL+'&mat='+encodeURIComponent(mat)+'&mes='+encodeURIComponent(mes)+'&t='+Date.now();
+    const res=await fetchConReintento(url,{cache:'no-store'});
+    const csv=await res.text();
+    const rows=parseCSV(csv);
+    if(!rows.length){ resultado.innerHTML='<div style="padding:8px;color:var(--muted);font-size:.68rem">Sin datos para ese mes.</div>'; return; }
+
+    const filas=rows.map(r=>{
+      const esTotal=r['fecha']==='TOTAL';
+      const motivo=FICHAJE_MOTIVO_INFO[r['motivo']] || r['motivo'] || '';
+      return `<tr style="${esTotal?'font-weight:700;border-top:2px solid var(--border2)':'border-top:1px solid var(--border)'}">
+        <td style="padding:4px 6px;white-space:nowrap">${r['fecha']}</td>
+        <td style="padding:4px 6px">${r['horaEntrada']}</td>
+        <td style="padding:4px 6px">${r['horaInicioComida']}</td>
+        <td style="padding:4px 6px">${r['horaFinComida']}</td>
+        <td style="padding:4px 6px">${r['horaSalida']}</td>
+        <td style="padding:4px 6px">${r['tiempoEfectivo']}</td>
+        <td style="padding:4px 6px">${r['incidencias']!=='0'?r['incidencias']:''}</td>
+        <td style="padding:4px 6px">${r['regularizaciones']!=='0'?r['regularizaciones']:''}</td>
+        <td style="padding:4px 6px;color:var(--muted);white-space:nowrap">${motivo}</td>
+      </tr>`;
+    }).join('');
+
+    resultado.innerHTML=`
+      <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.62rem;color:var(--text);min-width:600px">
+          <thead style="position:sticky;top:0;background:var(--dim)"><tr style="color:var(--muted);text-align:left">
+            <th style="padding:4px 6px">Fecha</th><th style="padding:4px 6px">Entrada</th><th style="padding:4px 6px">Ini. comida</th><th style="padding:4px 6px">Fin comida</th><th style="padding:4px 6px">Salida</th><th style="padding:4px 6px">T. efectivo</th><th style="padding:4px 6px">Incid.</th><th style="padding:4px 6px">Regul.</th><th style="padding:4px 6px">Motivo</th>
+          </tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+      <button id="btnDescargarPDF" onclick="descargarInformePDF('${mat}','${mes}')" style="display:block;width:100%;margin-top:10px;padding:9px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);text-align:center;font-size:.68rem;font-weight:700;cursor:pointer;font-family:var(--font)">📄 Descargar PDF</button>
+    `;
+  }catch(e){
+    console.log('Informe mensual error:',e.message);
+    resultado.innerHTML='<div style="padding:8px;color:#e05a4a;font-size:.68rem">Error al cargar el informe.</div>';
+  }
+}
+
+// El backend devuelve el PDF codificado en base64 como texto plano (devolver un Blob
+// directo desde doGet no sirve el PDF de forma fiable) — aquí se reconstruye como Blob
+// real en el navegador y se abre en una pestaña nueva con el visor de PDF nativo.
+async function descargarInformePDF(mat, mes){
+  const btn=document.getElementById('btnDescargarPDF');
+  if(btn){ btn.disabled=true; btn.textContent='Generando PDF…'; }
+  try{
+    const url=FICHAJE_PDF_URL+'&mat='+encodeURIComponent(mat)+'&mes='+encodeURIComponent(mes)+'&t='+Date.now();
+    const res=await fetchConReintento(url,{cache:'no-store'});
+    const base64=await res.text();
+    if(base64.startsWith('Error')) throw new Error(base64);
+    const byteChars=atob(base64);
+    const byteNumbers=new Array(byteChars.length);
+    for(let i=0;i<byteChars.length;i++) byteNumbers[i]=byteChars.charCodeAt(i);
+    const blob=new Blob([new Uint8Array(byteNumbers)],{type:'application/pdf'});
+    const blobUrl=URL.createObjectURL(blob);
+    window.open(blobUrl,'_blank');
+    setTimeout(()=>URL.revokeObjectURL(blobUrl), 30000);
+  }catch(e){
+    console.log('Descargar PDF error:',e.message);
+    alert('No se pudo generar el PDF.');
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='📄 Descargar PDF'; }
+  }
+}
+
 // Vista Gantt de fichajes de toda la empresa, en desplegable — usada por JR y por FICHAJE_ADMIN_IDS
 function renderFichajeJR(containerId){
   const container=document.getElementById(containerId);
@@ -3272,6 +3585,21 @@ function renderFichajeJR(containerId){
         <div style="overflow-x:auto">
           ${cabeceraGanttFichaje()}
           <div id="ganttRows-${containerId}"></div>
+        </div>
+
+        <div style="padding:10px 12px;border-top:1px solid var(--border2)">
+          <div class="section-head" onclick="toggleInformeMensual()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+            📊 Informe mensual
+            <span id="informeArrow" style="display:inline-block;transition:transform .2s">→</span>
+          </div>
+          <div id="informeMensualPanel" style="display:none;margin-top:8px">
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+              <input type="text" id="informeMatInput" placeholder="Matrícula…" style="flex:1;min-width:0;padding:8px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem">
+              <input type="month" id="informeMesInput" style="padding:8px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem">
+              <button onclick="cargarInformeMensual()" style="padding:8px 12px;background:var(--gold);border:none;border-radius:9px;color:#0a0a0a;font-family:var(--font);font-size:.68rem;font-weight:700;cursor:pointer;white-space:nowrap">Ver</button>
+            </div>
+            <div id="informeMensualResultado"></div>
+          </div>
         </div>
       </div>
     </div>`;
