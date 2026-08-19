@@ -475,6 +475,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="sync-dot"></div>
       Conexiones registradas por matrícula
     </div>
+    <select id="mesSelectorUsage" onchange="renderUsagePanel(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+      <option value="">Total (todo el histórico)</option>
+    </select>
     <div id="usageContent"><div style="text-align:center;color:var(--text2);padding:40px 0">Cargando datos de uso…</div></div>
   </div>
 
@@ -2830,33 +2833,70 @@ async function loadCumplimiento(){
 // ════════════════════════════════════════════════════════
 let USAGE_DATA = null;
 
+let USAGE_MESES_DISPONIBLES = []; // ["2026-08","2026-07",...] mas reciente primero
+
 async function loadUsage(){
   try{
     const res = await fetchConReintento(USAGE_URL + '&t=' + Date.now(), {cache:'no-store'});
     if(!res.ok) return;
     const text = await res.text();
     const rows = parseCSV(text);
-    USAGE_DATA = rows.filter(r => r['Matricula']).map(r => ({
-      mat:    String(r['Matricula']||'').trim().toUpperCase(),
-      total:  parseInt(r['Total']||0),
-      ultimo: String(r['UltimoAcceso']||'—')
-    })).sort((a,b) => b.total - a.total);
+    const clavesMes = rows.length ? Object.keys(rows[0]).filter(k=>/^\d{4}-\d{2}$/.test(k)) : [];
+    USAGE_MESES_DISPONIBLES = clavesMes.slice().sort().reverse();
+    USAGE_DATA = rows.filter(r => r['Matricula']).map(r => {
+      const porMes = {};
+      clavesMes.forEach(c => porMes[c] = parseInt(r[c]||0));
+      return {
+        mat:    String(r['Matricula']||'').trim().toUpperCase(),
+        total:  parseInt(r['Total']||0),
+        ultimo: String(r['UltimoAcceso']||'—'),
+        porMes
+      };
+    }).sort((a,b) => b.total - a.total);
   }catch(e){ console.log('Usage error:', e.message); }
 }
 
-function renderUsagePanel(){
+// Nombre legible del mes ("2026-08" -> "Agosto 2026") para el selector
+function nombreMesUsage(clave){
+  const nombresMeses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const [anio, mes] = clave.split('-');
+  return nombresMeses[parseInt(mes,10)-1] + ' ' + anio;
+}
+
+function renderUsagePanel(mesSeleccionado){
   const el = document.getElementById('usageContent');
   if(!USAGE_DATA){
     el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px 0">Cargando…</div>';
-    loadUsage().then(()=> renderUsagePanel());
+    loadUsage().then(()=> renderUsagePanel(mesSeleccionado));
     return;
   }
   if(!USAGE_DATA.length){
     el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px 0">Sin datos de acceso aún. Los accesos se registran al hacer login.</div>';
     return;
   }
-  const totalConexiones = USAGE_DATA.reduce((s,r)=>s+r.total,0);
-  const totalUsuarios   = USAGE_DATA.length;
+
+  // Poblar el selector de mes una sola vez (si todavia no tiene opciones de mes)
+  const selector = document.getElementById('mesSelectorUsage');
+  if(selector && selector.options.length===1 && USAGE_MESES_DISPONIBLES.length){
+    USAGE_MESES_DISPONIBLES.forEach(clave=>{
+      const opt = document.createElement('option');
+      opt.value = clave;
+      opt.textContent = nombreMesUsage(clave);
+      selector.appendChild(opt);
+    });
+  }
+  if(selector) selector.value = mesSeleccionado || '';
+
+  // Con mes elegido: usar el conteo de ese mes y ocultar a quien no conecto ese mes.
+  // Sin mes (Total): usar el historico completo, como antes.
+  const conMes = mesSeleccionado && USAGE_MESES_DISPONIBLES.includes(mesSeleccionado);
+  const datosVista = (conMes
+    ? USAGE_DATA.map(r=>({...r, totalVista: r.porMes[mesSeleccionado]||0})).filter(r=>r.totalVista>0)
+    : USAGE_DATA.map(r=>({...r, totalVista: r.total}))
+  ).sort((a,b)=>b.totalVista-a.totalVista);
+
+  const totalConexiones = datosVista.reduce((s,r)=>s+r.totalVista,0);
+  const totalUsuarios   = datosVista.length;
 
   // Buscar nombre del técnico/JE por matrícula
   const getNombre = mat => {
@@ -2865,11 +2905,11 @@ function renderUsagePanel(){
     return tec ? tec.nombre : '—';
   };
 
-  const filas = USAGE_DATA.map((r,i) => `
+  const filas = datosVista.map((r,i) => `
     <tr style="background:${i%2===0?'var(--s1)':'var(--s2)'}">
       <td style="padding:8px 10px;font-weight:600;color:var(--gold2)">${r.mat}</td>
       <td style="padding:8px 10px;color:var(--text1);font-size:.85rem">${getNombre(r.mat)}</td>
-      <td style="padding:8px 10px;text-align:center;font-weight:700;color:var(--green)">${r.total}</td>
+      <td style="padding:8px 10px;text-align:center;font-weight:700;color:var(--green)">${r.totalVista}</td>
       <td style="padding:8px 10px;color:var(--text2);font-size:.8rem">${r.ultimo}</td>
     </tr>`).join('');
 
@@ -2877,7 +2917,7 @@ function renderUsagePanel(){
     <div style="display:flex;gap:10px;margin-bottom:14px">
       <div style="flex:1;background:var(--s1);border-radius:12px;padding:12px 14px;border:1px solid var(--border2);text-align:center">
         <div style="font-size:1.6rem;font-weight:800;color:var(--gold2)">${totalConexiones}</div>
-        <div style="font-size:.78rem;color:var(--text2)">Conexiones totales</div>
+        <div style="font-size:.78rem;color:var(--text2)">Conexiones ${conMes?'del mes':'totales'}</div>
       </div>
       <div style="flex:1;background:var(--s1);border-radius:12px;padding:12px 14px;border:1px solid var(--border2);text-align:center">
         <div style="font-size:1.6rem;font-weight:800;color:var(--green)">${totalUsuarios}</div>
@@ -2897,7 +2937,7 @@ function renderUsagePanel(){
         <tbody>${filas}</tbody>
       </table>
     </div>
-    <button onclick="USAGE_DATA=null;renderUsagePanel()" style="margin-top:12px;width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.85rem;cursor:pointer">↻ Actualizar datos</button>`;
+    <button onclick="USAGE_DATA=null;renderUsagePanel(document.getElementById('mesSelectorUsage').value)" style="margin-top:12px;width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.85rem;cursor:pointer">↻ Actualizar datos</button>`;
 }
 
 // ════════════════════════════════════════════════════════
