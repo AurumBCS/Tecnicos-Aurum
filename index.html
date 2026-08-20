@@ -439,6 +439,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         <option value="">Cargando meses…</option>
       </select>
       <button onclick="showHistoricoEquipo(null,'jrPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico de todos los técnicos</button>
+      <button id="btnEquipoTF" onclick="showEquipoTF()" style="display:none;width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📍 Equipo TF</button>
       <div class="section-head">Resumen global</div>
       <div class="equipo-kpis" id="jrResumen" style="margin-bottom:14px"></div>
       <div class="section-head">Rankings de la empresa</div>
@@ -2051,6 +2052,72 @@ function showTecDetailFromJR(tecId){
     showPanel('jrDetailPanel'); window.scrollTo(0,0);
   };
   showPanel('tecDetailPanel');
+  window.scrollTo(0,0);
+}
+
+// Vista especial solo para GD5381: los tecnicos de provincia TF (Tenerife),
+// con el mismo detalle completo por tecnico que ve un JE de su propio
+// equipo (no es un JE real en la JERARQUIA, se filtra directo por provincia).
+function showEquipoTF(){
+  const tecs = CURRENT_DATA.tecnicos.filter(t=>(t.provincia||'').toUpperCase()==='TF');
+  const av = calcAvg(tecs);
+  const sorted = [...tecs].sort((a,b)=>b.mlv-a.mlv);
+  const mlvG=getGrade(av.mlv||0), mabG=getGrade(av.mab||0);
+
+  document.getElementById('jrDetailContent').innerHTML=`
+    <div class="detail-hero">
+      <div class="detail-hero-title">📍 Equipo TF</div>
+      <div class="detail-hero-val" style="font-size:1.3rem;color:var(--gold2)">Tenerife</div>
+      <div class="detail-hero-sub">${tecs.length} técnicos</div>
+    </div>
+
+    <div class="detail-section">Promedios del equipo</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="hero-card g-${mlvG}">
+        <div class="hero-label">ML-V promedio</div>
+        <div class="hero-val g-${mlvG}">${(av.mlv||0).toFixed(2)}</div>
+        <span class="hero-badge g-${mlvG}">${gradeLabel(mlvG)}</span>
+      </div>
+      <div class="hero-card g-${mabG}">
+        <div class="hero-label">MA+B promedio</div>
+        <div class="hero-val g-${mabG}">${(av.mab||0).toFixed(2)}</div>
+        <span class="hero-badge g-${mabG}">${gradeLabel(mabG)}</span>
+      </div>
+    </div>
+
+    <div class="equipo-kpis" style="margin-bottom:14px">
+      <div class="equipo-kpi"><div class="equipo-kpi-name">%RM</div>
+        <div class="equipo-kpi-val" style="color:${(av.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(av.pRM||0).toFixed(1)}%</div></div>
+      <div class="equipo-kpi"><div class="equipo-kpi-name">%Cum</div>
+        <div class="equipo-kpi-val" style="color:${(av.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(av.pCum||0).toFixed(1)}%</div></div>
+      <div class="equipo-kpi"><div class="equipo-kpi-name">Conv</div>
+        <div class="equipo-kpi-val" style="color:${(av.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(av.conv||0).toFixed(1)}%</div></div>
+    </div>
+
+    <div class="detail-section">Técnicos</div>
+    <div class="tec-list">
+    ${sorted.map((t,i)=>{
+      const g2=getGrade(t.mlv);
+      const col2=gradeColor(g2);
+      return`<div class="tec-row g-${g2}" onclick="showTecDetailFromJR('${t.id}')">
+        <div class="tec-rank">${i+1}</div>
+        <div class="tec-info">
+          <div class="tec-name">${t.nombre.trim()}</div>
+          <div class="tec-sub">${t.id} · ${t.provincia} · ${t.lab} lab.</div>
+          ${buildKpiAlertBadges(t)}
+        </div>
+        <div class="tec-vals">
+          <div>
+            <div class="tec-mlv" style="color:${col2}">${t.mlv.toFixed(2)}</div>
+            <div class="tec-mab">MA+B ${t.mab.toFixed(2)}</div>
+          </div>
+          <div class="tec-arrow">›</div>
+        </div>
+      </div>`;
+    }).join('')}
+    </div>`;
+
+  showPanel('jrDetailPanel');
   window.scrollTo(0,0);
 }
 
@@ -4306,6 +4373,7 @@ async function doLogin(){
     document.getElementById('scorePill').innerHTML='<span style="color:var(--gold2);font-weight:700">Vista global</span>';
     document.getElementById('tabsBarJR').style.display='flex';
     document.getElementById('tabsBar').style.display='none';
+    document.getElementById('btnEquipoTF').style.display = found.id==='GD5381' ? 'block' : 'none';
     renderJRPanel();
     loadMedialiaCoord().then(()=>renderMedialiaCoord());
     showPanel('jrPanel');
