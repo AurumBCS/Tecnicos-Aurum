@@ -100,16 +100,33 @@ def _completar_formulario_login(page, usuario, clave):
     # corridas previas que fallaron y nunca cerraron sesion del lado del
     # servidor -- OFS no deja pasar directo a la consola. En su lugar
     # muestra "Maximum number of sessions exceeded" con la opcion "Delete
-    # the oldest user session and login": marcarla NO alcanza, hay que
-    # volver a apretar el mismo boton "Sign in" (#sign-in) para confirmar y
-    # recien ahi entra. Sin este segundo clic la tabla de tecnicos nunca
-    # aparece y el wait_for_selector de abajo siempre agota el timeout
-    # (confirmado en vivo: fallaba igual solo marcando la opcion).
+    # the oldest user session and login" (un radio/checkbox de Oracle JET,
+    # igual que el combobox de "Empresa Contratista" en aplicar_filtro_aurum:
+    # el control real esta detras de una capa decorativa que Playwright
+    # marca "no visible", por eso hace falta force=True) y despues hay que
+    # volver a apretar el mismo boton "Sign in" (#sign-in) para confirmar.
+    # Sin force=True el clic "funciona" pero no marca de verdad la opcion,
+    # y el boton #sign-in queda disabled para siempre (confirmado en vivo:
+    # Page.click en #sign-in agotaba su propio timeout esperando que se
+    # habilitara).
     aviso_sesiones = page.get_by_text("Delete the oldest user session and login")
     if aviso_sesiones.count() > 0 and aviso_sesiones.first.is_visible():
-        aviso_sesiones.first.click()
-        page.wait_for_timeout(500)
-        page.click("#sign-in")
+        try:
+            html_opcion = aviso_sesiones.first.locator("xpath=..").first.evaluate("el => el.outerHTML")
+            print(f"[diagnostico] HTML alrededor de la opcion 'Delete the oldest...': {html_opcion!r}")
+        except Exception as e_diag:
+            print(f"[diagnostico] No se pudo leer el HTML de la opcion: {e_diag}")
+
+        aviso_sesiones.first.click(force=True)
+        page.wait_for_timeout(800)
+
+        boton_signin = page.locator("#sign-in")
+        try:
+            print(f"[diagnostico] #sign-in disabled tras marcar la opcion: {boton_signin.get_attribute('disabled')!r}")
+        except Exception as e_diag:
+            print(f"[diagnostico] No se pudo leer el atributo disabled de #sign-in: {e_diag}")
+
+        boton_signin.click(force=True)
         page.wait_for_timeout(1500)
 
     # Esperar a que cargue la consola de despacho (la tabla de tecnicos).
