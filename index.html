@@ -2155,22 +2155,27 @@ function toggleMantenimientosMotivo(rowId){
   if(!listEl) return;
   if(listEl.style.display !== 'none'){ listEl.style.display='none'; return; }
 
-  let nMants = [];
+  let pares = []; // [{n, nuevo}]
   if(info.tipo==='cum'){
     const cum = CUM_DATA[info.tecId] || CUM_DATA[info.tecId.toUpperCase()];
-    nMants = (cum && cum.visitas || []).filter(v => !v.ok && v.razon===info.motivo).map(v=>v.nMant);
+    pares = (cum && cum.visitas || []).filter(v => !v.ok && v.razon===info.motivo).map(v=>({n:v.nMant, nuevo:false}));
   } else if(info.tipo==='rm'){
     const rm = RM_DATA[info.tecId] || RM_DATA[info.tecId.toUpperCase()];
-    nMants = (rm && rm.visitas || []).filter(v => v.repetido && v.motivo===info.motivo).map(v=>v.nMant);
+    pares = (rm && rm.visitas || []).filter(v => v.repetido && v.motivo===info.motivo).map(v=>({n:v.nMant, nuevo:!!v.nuevo}));
   } else {
     const rm = RM_DATA[info.tecId] || RM_DATA[info.tecId.toUpperCase()];
-    nMants = (rm && rm.visitas || []).filter(v => v.motivo_post===info.motivo).map(v=>v.nMantPost||v.nMant);
+    pares = (rm && rm.visitas || []).filter(v => v.motivo_post===info.motivo).map(v=>({n:v.nMantPost||v.nMant, nuevo:!!v.nuevo}));
   }
-  nMants = [...new Set(nMants.filter(n=>n))];
+  // Deduplicar por numero de mantenimiento, quedandose con "nuevo" si algun
+  // duplicado lo era.
+  const porNumero = new Map();
+  pares.filter(p=>p.n).forEach(p=>{
+    porNumero.set(p.n, porNumero.get(p.n) || p.nuevo);
+  });
 
-  listEl.innerHTML = nMants.length
-    ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${nMants.map(n=>
-        `<span style="background:var(--dim);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;font-size:.66rem;color:var(--gold2);font-weight:600;user-select:text;cursor:text">#${n}</span>`
+  listEl.innerHTML = porNumero.size
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${[...porNumero.entries()].map(([n,nuevo])=>
+        `<span style="background:${nuevo?'rgba(232,201,106,.15)':'var(--dim)'};border:1px solid ${nuevo?'#3d3300':'var(--border2)'};border-radius:6px;padding:3px 8px;font-size:.66rem;color:var(--gold2);font-weight:600;user-select:text;cursor:text">#${n}${nuevo?' 🆕':''}</span>`
       ).join('')}</div>`
     : '<div style="color:var(--muted);font-size:.68rem">Sin mantenimientos encontrados</div>';
   listEl.style.display='block';
@@ -2238,6 +2243,7 @@ function _openRMDash(tecId){
       <div class="stat-box" style="flex:1"><div class="n">${rm.total}</div><div class="l">Total<br>visitas</div></div>
       <div class="stat-box" style="flex:1"><div class="n" style="color:#e05a4a">${rm.reps}</div><div class="l">Visitas<br>repetidas</div></div>
       <div class="stat-box" style="flex:1"><div class="n" style="color:var(--green2)">${totalOk}</div><div class="l">Resueltas<br>1ª visita</div></div>
+      <div class="stat-box" style="flex:1"><div class="n" style="color:${(rm.nuevos||0)>0?'var(--gold2)':'var(--muted)'}">${rm.nuevos||0}</div><div class="l">Nuevas<br>esta tanda</div></div>
     </div>
 
     <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
@@ -3032,11 +3038,13 @@ async function loadRM(){
         const repetido=String(row['repetido']||'').trim().toUpperCase();
         const motivo_post=String(row['motivo_post']||'').trim();
         const nMantPost=String(row['nMantPost']||'').trim();
+        const esNuevo=String(row['nuevo']||'').trim().toUpperCase()==='SI';
 
         if(mat && nMant){
-          if(!rmByTec[mat]) rmByTec[mat]={visitas:[],reps:0,postMap:{},rmMap:{},rmOnlyMap:{}};
+          if(!rmByTec[mat]) rmByTec[mat]={visitas:[],reps:0,postMap:{},rmMap:{},rmOnlyMap:{},nuevos:0};
           const isRep = repetido==='SI' || repetido==='SÍ' || repetido==='1' || repetido==='TRUE';
-          rmByTec[mat].visitas.push({nMant,motivo,motivo_post,nMantPost,repetido:isRep});
+          rmByTec[mat].visitas.push({nMant,motivo,motivo_post,nMantPost,repetido:isRep,nuevo:esNuevo});
+          if(esNuevo) rmByTec[mat].nuevos++;
           if(isRep) rmByTec[mat].reps++;
           if(motivo_post) rmByTec[mat].postMap[motivo_post]=(rmByTec[mat].postMap[motivo_post]||0)+1;
           if(motivo) rmByTec[mat].rmMap[motivo]=(rmByTec[mat].rmMap[motivo]||0)+1;
@@ -3056,7 +3064,8 @@ async function loadRM(){
         RM_DATA[mat]={
           visitas: data.visitas,
           total, reps, pctRM,
-          topPost, motivosRM, topMotivos
+          topPost, motivosRM, topMotivos,
+          nuevos: data.nuevos
         };
       });
 
