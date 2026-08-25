@@ -93,12 +93,21 @@ def _completar_formulario_login(page, usuario, clave):
     page.fill("#username", usuario)
     page.fill("#password", clave)
     page.click("#sign-in")
+    page.wait_for_timeout(1500)
+
+    # Caso observado en vivo (causante real de las fallas del 2026-08-24/25):
+    # si la cuenta ya tiene demasiadas sesiones abiertas -- por ejemplo,
+    # corridas previas que fallaron y nunca cerraron sesion del lado del
+    # servidor -- OFS no deja pasar directo a la consola. En su lugar
+    # muestra "Maximum number of sessions exceeded" con un link "Delete the
+    # oldest user session and login" que hay que clickear para poder
+    # continuar. Sin esto, la tabla de tecnicos nunca aparece y el
+    # wait_for_selector de abajo siempre agota el timeout.
+    aviso_sesiones = page.get_by_text("Delete the oldest user session and login")
+    if aviso_sesiones.count() > 0 and aviso_sesiones.first.is_visible():
+        aviso_sesiones.first.click()
 
     # Esperar a que cargue la consola de despacho (la tabla de tecnicos).
-    # Subido de 30s a 60s: desde que se agrego el equipo GD5381-TF el arbol
-    # de tecnicos tiene mas nodos y tarda un poco mas en renderizar, y con
-    # Chromium en modo --single-process (Lambda) ese margen extra a veces no
-    # alcanzaba con 30s (visto en vivo: timeouts el 2026-08-24/25).
     page.wait_for_selector(".toaGantt-provTree", timeout=60000)
 
 
