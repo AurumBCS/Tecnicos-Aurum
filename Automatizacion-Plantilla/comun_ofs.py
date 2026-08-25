@@ -99,32 +99,21 @@ def _completar_formulario_login(page, usuario, clave):
     # si la cuenta ya tiene demasiadas sesiones abiertas -- por ejemplo,
     # corridas previas que fallaron y nunca cerraron sesion del lado del
     # servidor -- OFS no deja pasar directo a la consola. En su lugar
-    # muestra "Maximum number of sessions exceeded" con la opcion "Delete
-    # the oldest user session and login" (un radio/checkbox de Oracle JET).
-    # El HTML del texto es puro <span> decorativo (confirmado en vivo), y
-    # NO tiene ningun ancestro con role="radio" (tambien confirmado en
-    # vivo -- esa hipotesis se descarto). En vez de seguir adivinando la
-    # jerarquia, se busca directamente cualquier input[type=radio/checkbox]
-    # o elemento role=radio/checkbox en TODA la pagina (debería haber uno
-    # solo relevante en esta pantalla) y se clickea ese, con diagnostico
-    # de lo encontrado por si esto tampoco alcanza.
+    # muestra "Maximum number of sessions exceeded" con un checkbox real
+    # <input id="delsession" type="checkbox">, confirmado en vivo (el texto
+    # "Delete the oldest user session and login" es solo la etiqueta
+    # decorativa, un <span> sin relacion directa en el DOM). Un .click()
+    # normal -- incluso con force=True -- no alcanzaba a habilitar
+    # #sign-in; .check() es el metodo de Playwright pensado para
+    # checkboxes y dispara los eventos internos de forma mas fiel.
     aviso_sesiones = page.get_by_text("Delete the oldest user session and login")
     if aviso_sesiones.count() > 0 and aviso_sesiones.first.is_visible():
-        candidatos = page.locator(
-            "input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox']"
-        )
-        n_candidatos = candidatos.count()
-        print(f"[diagnostico] Candidatos radio/checkbox en la pagina: {n_candidatos}")
-        for i in range(min(n_candidatos, 6)):
-            try:
-                print(f"[diagnostico] candidato #{i}: {candidatos.nth(i).evaluate('el => el.outerHTML')!r}")
-            except Exception as e_diag:
-                print(f"[diagnostico] Error leyendo candidato #{i}: {e_diag}")
-
-        if n_candidatos > 0:
-            candidatos.first.click(force=True)
-        else:
-            aviso_sesiones.first.click(force=True)
+        checkbox_borrar_sesion = page.locator("#delsession")
+        try:
+            checkbox_borrar_sesion.check(force=True)
+            print(f"[diagnostico] #delsession marcado tras check(): {checkbox_borrar_sesion.is_checked()!r}")
+        except Exception as e_diag:
+            print(f"[diagnostico] Error al marcar #delsession: {e_diag}")
         page.wait_for_timeout(800)
 
         boton_signin = page.locator("#sign-in")
