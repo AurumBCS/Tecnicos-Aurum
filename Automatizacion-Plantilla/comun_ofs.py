@@ -100,24 +100,27 @@ def _completar_formulario_login(page, usuario, clave):
     # corridas previas que fallaron y nunca cerraron sesion del lado del
     # servidor -- OFS no deja pasar directo a la consola. En su lugar
     # muestra "Maximum number of sessions exceeded" con la opcion "Delete
-    # the oldest user session and login" (un radio/checkbox de Oracle JET,
-    # igual que el combobox de "Empresa Contratista" en aplicar_filtro_aurum:
-    # el control real esta detras de una capa decorativa que Playwright
-    # marca "no visible", por eso hace falta force=True) y despues hay que
-    # volver a apretar el mismo boton "Sign in" (#sign-in) para confirmar.
-    # Sin force=True el clic "funciona" pero no marca de verdad la opcion,
-    # y el boton #sign-in queda disabled para siempre (confirmado en vivo:
-    # Page.click en #sign-in agotaba su propio timeout esperando que se
-    # habilitara).
+    # the oldest user session and login" (un radio de Oracle JET). El HTML
+    # real es <span id="del-oldest-session"> adentro de un
+    # <span class="oj-radiocheckbox-label-text"> -- puro texto decorativo,
+    # clickearlo (aunque sea con force=True) no marca nada porque el
+    # control interactivo de verdad es el ancestro con role="radio" que
+    # envuelve tanto el icono como esta etiqueta (confirmado en vivo:
+    # clickeando el span, #sign-in seguia con el atributo disabled). Por
+    # eso se sube hasta ese ancestro y se clickea a el.
     aviso_sesiones = page.get_by_text("Delete the oldest user session and login")
     if aviso_sesiones.count() > 0 and aviso_sesiones.first.is_visible():
+        control_radio = aviso_sesiones.first.locator("xpath=ancestor::*[@role='radio'][1]")
         try:
-            html_opcion = aviso_sesiones.first.locator("xpath=..").first.evaluate("el => el.outerHTML")
-            print(f"[diagnostico] HTML alrededor de la opcion 'Delete the oldest...': {html_opcion!r}")
+            html_radio = control_radio.first.evaluate("el => el.outerHTML")
+            print(f"[diagnostico] Ancestro role=radio encontrado: {html_radio!r}")
         except Exception as e_diag:
-            print(f"[diagnostico] No se pudo leer el HTML de la opcion: {e_diag}")
+            print(f"[diagnostico] No se encontro ancestro role=radio: {e_diag}")
 
-        aviso_sesiones.first.click(force=True)
+        if control_radio.count() > 0:
+            control_radio.first.click(force=True)
+        else:
+            aviso_sesiones.first.click(force=True)
         page.wait_for_timeout(800)
 
         boton_signin = page.locator("#sign-in")
