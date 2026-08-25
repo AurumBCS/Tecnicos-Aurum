@@ -33,11 +33,15 @@ from comun_ofs import CARPETA_BASE, LAUNCH_ARGS, ruta_sesion, leer_credenciales_
 CARPETA_CAPTURAS = CARPETA_BASE / "capturas"
 ARCHIVO_SESION = ruta_sesion("capturas")
 
-# Los 9 equipos del panel izquierdo, en el orden en que hay que capturarlos
-# (de "Ezequiel Pugliese" a "Jose Luis Osorio"). Se busca por el nombre
-# porque es la parte estable del texto -- el codigo delante (BCN-286800,
-# MD-273371, etc) tiene formato inconsistente en distintas filas.
+# Los 9 equipos del panel izquierdo, en el orden en que hay que capturarlos.
+# Se busca por el nombre porque es la parte estable del texto -- el codigo
+# delante (BCN-286800, MD-273371, etc) tiene formato inconsistente en
+# distintas filas.
+#
+# "Jose Luis Osorio" se renombro a "GD5381-TF - Gustavo Perez" en la
+# consola (visto en vivo el 2026-08-25) -- mismo equipo, nombre nuevo.
 EQUIPOS = [
+    "Gustavo Perez",
     "Ezequiel Pugliese",
     "Armando Jose Madrid",
     "Humberto Chacon",
@@ -46,7 +50,6 @@ EQUIPOS = [
     "Manuel Enrique Sequeira",
     "Maykel Ramon Gutierrez",
     "Fernando David Alves Andujar",
-    "Jose Luis Osorio",
 ]
 
 
@@ -66,6 +69,9 @@ def tomar_capturas(page):
     rutas = []
     for numero, nombre in enumerate(EQUIPOS, start=1):
         equipo = page.get_by_text(nombre, exact=False).first
+        # Por si el equipo cae fuera del area visible del panel (la lista
+        # puede crecer/reordenarse con el tiempo).
+        equipo.scroll_into_view_if_needed()
         equipo.click()
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(1500)
