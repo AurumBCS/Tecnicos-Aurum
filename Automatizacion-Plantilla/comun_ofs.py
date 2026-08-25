@@ -100,25 +100,29 @@ def _completar_formulario_login(page, usuario, clave):
     # corridas previas que fallaron y nunca cerraron sesion del lado del
     # servidor -- OFS no deja pasar directo a la consola. En su lugar
     # muestra "Maximum number of sessions exceeded" con la opcion "Delete
-    # the oldest user session and login" (un radio de Oracle JET). El HTML
-    # real es <span id="del-oldest-session"> adentro de un
-    # <span class="oj-radiocheckbox-label-text"> -- puro texto decorativo,
-    # clickearlo (aunque sea con force=True) no marca nada porque el
-    # control interactivo de verdad es el ancestro con role="radio" que
-    # envuelve tanto el icono como esta etiqueta (confirmado en vivo:
-    # clickeando el span, #sign-in seguia con el atributo disabled). Por
-    # eso se sube hasta ese ancestro y se clickea a el.
+    # the oldest user session and login" (un radio/checkbox de Oracle JET).
+    # El HTML del texto es puro <span> decorativo (confirmado en vivo), y
+    # NO tiene ningun ancestro con role="radio" (tambien confirmado en
+    # vivo -- esa hipotesis se descarto). En vez de seguir adivinando la
+    # jerarquia, se busca directamente cualquier input[type=radio/checkbox]
+    # o elemento role=radio/checkbox en TODA la pagina (debería haber uno
+    # solo relevante en esta pantalla) y se clickea ese, con diagnostico
+    # de lo encontrado por si esto tampoco alcanza.
     aviso_sesiones = page.get_by_text("Delete the oldest user session and login")
     if aviso_sesiones.count() > 0 and aviso_sesiones.first.is_visible():
-        control_radio = aviso_sesiones.first.locator("xpath=ancestor::*[@role='radio'][1]")
-        try:
-            html_radio = control_radio.first.evaluate("el => el.outerHTML")
-            print(f"[diagnostico] Ancestro role=radio encontrado: {html_radio!r}")
-        except Exception as e_diag:
-            print(f"[diagnostico] No se encontro ancestro role=radio: {e_diag}")
+        candidatos = page.locator(
+            "input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox']"
+        )
+        n_candidatos = candidatos.count()
+        print(f"[diagnostico] Candidatos radio/checkbox en la pagina: {n_candidatos}")
+        for i in range(min(n_candidatos, 6)):
+            try:
+                print(f"[diagnostico] candidato #{i}: {candidatos.nth(i).evaluate('el => el.outerHTML')!r}")
+            except Exception as e_diag:
+                print(f"[diagnostico] Error leyendo candidato #{i}: {e_diag}")
 
-        if control_radio.count() > 0:
-            control_radio.first.click(force=True)
+        if n_candidatos > 0:
+            candidatos.first.click(force=True)
         else:
             aviso_sesiones.first.click(force=True)
         page.wait_for_timeout(800)
