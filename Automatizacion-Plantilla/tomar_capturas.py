@@ -59,7 +59,7 @@ def tomar_capturas(page):
     CARPETA_CAPTURAS.mkdir(exist_ok=True)
     fecha = datetime.now().strftime("%Y-%m-%d")
 
-    page.wait_for_selector(".toaGantt-provTree", timeout=30000)
+    page.wait_for_selector(".toaGantt-provTree", timeout=60000)
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(2000)
 

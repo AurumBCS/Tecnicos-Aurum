@@ -94,8 +94,12 @@ def _completar_formulario_login(page, usuario, clave):
     page.fill("#password", clave)
     page.click("#sign-in")
 
-    # Esperar a que cargue la consola de despacho (la tabla de tecnicos)
-    page.wait_for_selector(".toaGantt-provTree", timeout=30000)
+    # Esperar a que cargue la consola de despacho (la tabla de tecnicos).
+    # Subido de 30s a 60s: desde que se agrego el equipo GD5381-TF el arbol
+    # de tecnicos tiene mas nodos y tarda un poco mas en renderizar, y con
+    # Chromium en modo --single-process (Lambda) ese margen extra a veces no
+    # alcanzaba con 30s (visto en vivo: timeouts el 2026-08-24/25).
+    page.wait_for_selector(".toaGantt-provTree", timeout=60000)
 
 
 def iniciar_sesion(page, usuario, clave):
