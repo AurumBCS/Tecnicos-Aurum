@@ -711,13 +711,12 @@ function statusLabel(s){
   return s==='ok'?'✓ Objetivo cumplido':s==='warn'?'⚠ Cerca':'✗ Por debajo';
 }
 function buildKpiAlertBadges(t){
-  const pRM=t.pRM||0, pCum=t.pCum||0, conv=t.conv||0, ppa=t.ppa||0;
+  const pRM=t.pRM||0, pCum=t.pCum||0, conv=t.conv||0;
   const badges=[];
   if(!t.pRMSinDatos) badges.push({label:`RM ${pRM.toFixed(1)}%`, bad:pRM<89.5});
   badges.push(
     {label:`Cumpl. ${pCum.toFixed(1)}%`, bad:pCum<90},
     {label:`Conv ${conv.toFixed(1)}%`, bad:conv<15},
-    {label:`PPA ${ppa.toFixed(1)}%`, bad:ppa<10},
   );
   if((t.falt||0)>0) badges.push({label:`Falt. ${t.falt}`, bad:true});
   const exced = (t.ab||0)-(t.nec||0);
