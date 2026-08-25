@@ -99,13 +99,18 @@ def _completar_formulario_login(page, usuario, clave):
     # si la cuenta ya tiene demasiadas sesiones abiertas -- por ejemplo,
     # corridas previas que fallaron y nunca cerraron sesion del lado del
     # servidor -- OFS no deja pasar directo a la consola. En su lugar
-    # muestra "Maximum number of sessions exceeded" con un link "Delete the
-    # oldest user session and login" que hay que clickear para poder
-    # continuar. Sin esto, la tabla de tecnicos nunca aparece y el
-    # wait_for_selector de abajo siempre agota el timeout.
+    # muestra "Maximum number of sessions exceeded" con la opcion "Delete
+    # the oldest user session and login": marcarla NO alcanza, hay que
+    # volver a apretar el mismo boton "Sign in" (#sign-in) para confirmar y
+    # recien ahi entra. Sin este segundo clic la tabla de tecnicos nunca
+    # aparece y el wait_for_selector de abajo siempre agota el timeout
+    # (confirmado en vivo: fallaba igual solo marcando la opcion).
     aviso_sesiones = page.get_by_text("Delete the oldest user session and login")
     if aviso_sesiones.count() > 0 and aviso_sesiones.first.is_visible():
         aviso_sesiones.first.click()
+        page.wait_for_timeout(500)
+        page.click("#sign-in")
+        page.wait_for_timeout(1500)
 
     # Esperar a que cargue la consola de despacho (la tabla de tecnicos).
     page.wait_for_selector(".toaGantt-provTree", timeout=60000)
