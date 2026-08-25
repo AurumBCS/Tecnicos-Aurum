@@ -9,12 +9,12 @@ de Oracle Field Service (`https://securitasdirect.etadirect.com/`), usando
 - **Usuario "capturas"** (`ETADIRECT_USER_CAPTURAS` / `ETADIRECT_PASS_CAPTURAS`):
   uno distinto, solo para tomar las capturas de pantalla.
 
-## Modo de ejecución: AWS Lambda (la mañana) + GitHub Actions (mediodía/tarde, transición) — PC local queda como respaldo
+## Modo de ejecución: AWS Lambda (las 3 tareas) — GitHub Actions y PC local quedan como respaldo
 
-Estos mismos 3 scripts corrieron primero desde una PC local, después desde GitHub Actions, y **desde el 03/08/2026 la tarea de la mañana (capturas + correo a Mercedes) corre en AWS Lambda + EventBridge Scheduler** (ver sección "Migración a AWS Lambda" más abajo) — GitHub Actions no garantizaba hora exacta (retrasos de hasta 2h+), Lambda sí.
+Estos mismos 3 scripts corrieron primero desde una PC local, después desde GitHub Actions, y **desde el 03/08/2026 la tarea de la mañana (capturas + correo a Mercedes) corre en AWS Lambda + EventBridge Scheduler** (ver sección "Migración a AWS Lambda" más abajo) — GitHub Actions no garantizaba hora exacta (retrasos de hasta 2h+), Lambda sí. **Desde el 25/08/2026, `mediodia` y `tarde` también corren exclusivamente en Lambda** — confirmado estable, se retiraron sus horarios de GitHub Actions para no duplicar la subida del Excel de ruta.
 
-1. **AWS Lambda** (`aurum-ofs-automatizacion`, región eu-south-2) — **`manana` (7:30am) corre acá exclusivamente**, ya retirada de GitHub Actions para no duplicar el correo a Mercedes. `mediodia`/`tarde` (descarga de ruta) también están configuradas en Lambda, corriendo por ahora **en paralelo** con GitHub Actions a modo de prueba (es seguro duplicarlas, confirmaciones-sms no sube citas repetidas).
-2. **GitHub Actions** (`.github/workflows/ofs-automation.yml`, en la raíz del repo) — sigue corriendo `mediodia` (1:58pm) y `tarde` (5:53pm) en paralelo con Lambda mientras se termina de confirmar que Lambda es estable. Cuando se confirme, se retiran también estos dos horarios de acá (queda `workflow_dispatch` como respaldo manual). Las horas no son redondas a propósito — GitHub retrasa más los horarios en punto/cuartos exactos por alta demanda (confirmado en vivo: retrasos de 1h45 a 2h20+ son normales en el plan gratuito).
+1. **AWS Lambda** (`aurum-ofs-automatizacion`, región eu-south-2) — **las 3 tareas (`manana`, `mediodia`, `tarde`) corren acá exclusivamente**, disparadas por los 3 horarios de EventBridge Scheduler (ver tabla más abajo).
+2. **GitHub Actions** (`.github/workflows/ofs-automation.yml`, en la raíz del repo) — ya no tiene ningún horario `schedule:` propio; queda solo `workflow_dispatch` como respaldo manual para probar un script suelto sin tocar Lambda.
 3. **PC local con el Programador de tareas de Windows** — la forma original, documentada más abajo. Las 4 tareas quedaron **deshabilitadas** (no borradas), como respaldo por si hiciera falta volver a activarlas.
 
 ### Configurar los Secrets para GitHub Actions
@@ -222,9 +222,10 @@ Para cada uno, en el asistente:
    que corrió de punta a punta.
 2. Cuando las 3 pruebas manuales funcionen, deja correr los horarios reales
    1-2 días y compara con lo que llega por correo/confirmaciones-sms.
-3. **Recién ahí**, para no tener doble ejecución, avísame y quitamos los
-   triggers `schedule:` de `.github/workflows/ofs-automation.yml` (dejando
-   solo `workflow_dispatch` como respaldo manual).
+
+**Completado el 25/08/2026** — las 3 tareas corren solo en Lambda, se
+retiraron los triggers `schedule:` de `.github/workflows/ofs-automation.yml`
+(queda solo `workflow_dispatch` como respaldo manual).
 
 ## Los 3 scripts
 

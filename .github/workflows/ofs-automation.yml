@@ -1,31 +1,16 @@
 name: Automatizacion OFS
 
-# Prueba: correr los scripts de Automatizacion-Plantilla (capturas, correo
-# matutino, descarga+subida de ruta) desde GitHub Actions en vez de la PC
-# local, para ver si la consola de OFS (securitasdirect.etadirect.com)
-# bloquea o no el trafico desde las IPs de los runners de GitHub.
+# Las 3 tareas (capturas+correo matutino, ruta mediodia, ruta tarde) corren
+# exclusivamente en AWS Lambda + EventBridge Scheduler -- ver
+# Automatizacion-Plantilla/README.md. Este workflow ya no tiene triggers
+# `schedule:` (se retiraron una vez confirmado que Lambda es estable, para
+# no duplicar correos/subidas); queda solo `workflow_dispatch` como
+# respaldo manual para probar un script suelto sin tocar Lambda.
 #
 # Credenciales: SIEMPRE desde GitHub Secrets (Settings > Secrets and
 # variables > Actions), nunca escritas aqui.
 
 on:
-  schedule:
-    # Horas fuera de "en punto"/cuartos exactos a propósito: GitHub retrasa
-    # mas los horarios programados justo al inicio de cada hora (alta
-    # demanda global) -- confirmado en vivo (retrasos de 1h45 a 2h20 con
-    # los horarios redondos anteriores, 7:15/14:00/18:00).
-    # Dia de la semana "1-6" = lunes a sabado -- domingo no hay ruta ni
-    # actividad de tecnicos, no corre nada ese dia.
-    # La tarea de la mañana (capturas + correo a Mercedes) ya se retiro de
-    # aqui -- la corre AWS Lambda + EventBridge Scheduler a las 7:30am, ver
-    # Automatizacion-Plantilla/README.md. Dejarla activa aca tambien
-    # mandaria un correo duplicado a Mercedes todos los dias. Mediodia y
-    # tarde siguen aca por ahora en paralelo con Lambda -- son seguros de
-    # duplicar (confirmaciones-sms ya evita subir citas repetidas).
-    - cron: '58 13 * * 1-6'  # 1:58pm Madrid, lun-sab — ruta del dia siguiente
-      timezone: 'Europe/Madrid'
-    - cron: '53 17 * * 1-6'  # 5:53pm Madrid, lun-sab — ruta del dia siguiente (repaso)
-      timezone: 'Europe/Madrid'
   workflow_dispatch:
     inputs:
       tarea:
@@ -63,28 +48,14 @@ jobs:
           pip install -r requirements.txt
           playwright install --with-deps chromium
 
-      - name: Determinar tarea segun el horario disparado
-        id: tarea
-        shell: bash
-        run: |
-          if [ -n "${{ inputs.tarea }}" ]; then
-            echo "cual=${{ inputs.tarea }}" >> "$GITHUB_OUTPUT"
-          else
-            case "${{ github.event.schedule }}" in
-              "3 6 * * 1-6") echo "cual=manana" >> "$GITHUB_OUTPUT" ;;
-              "58 13 * * 1-6") echo "cual=mediodia" >> "$GITHUB_OUTPUT" ;;
-              "53 17 * * 1-6") echo "cual=tarde" >> "$GITHUB_OUTPUT" ;;
-            esac
-          fi
-
       - name: Manana — capturas + correo a Mercedes
-        if: steps.tarea.outputs.cual == 'manana'
+        if: inputs.tarea == 'manana'
         run: |
           python tomar_capturas.py
           python enviar_correo_matutino.py
 
       - name: Mediodia/Tarde — descargar ruta y subir a confirmaciones
-        if: steps.tarea.outputs.cual == 'mediodia' || steps.tarea.outputs.cual == 'tarde'
+        if: inputs.tarea == 'mediodia' || inputs.tarea == 'tarde'
         run: python descargar_ruta_y_subir.py
 
       - name: Subir capturas/descargas/log para diagnostico

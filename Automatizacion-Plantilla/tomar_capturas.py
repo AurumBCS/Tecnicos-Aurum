@@ -101,6 +101,14 @@ def main():
             registrar_error("tomar_capturas", f"la pagina tardo demasiado o no encontro un elemento esperado: {e}")
             CARPETA_CAPTURAS.mkdir(exist_ok=True)
             page.screenshot(path=str(CARPETA_CAPTURAS / "error_debug.png"))
+            # Diagnostico: el screenshot queda en /tmp de Lambda, inaccesible
+            # desde CloudWatch -- imprimir URL y texto visible es lo unico
+            # que sale en el log para saber en que pantalla se quedo.
+            try:
+                print(f"[diagnostico] URL al momento del error: {page.url}")
+                print(f"[diagnostico] Texto visible (primeros 1000 caracteres): {page.locator('body').inner_text()[:1000]!r}")
+            except Exception as e_diag:
+                print(f"[diagnostico] No se pudo leer URL/texto de la pagina: {e_diag}")
             sys.exit(1)
         finally:
             browser.close()
