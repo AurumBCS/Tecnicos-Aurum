@@ -75,7 +75,10 @@ async function cargarJerarquia() {
 }
 
 // ── Cuadrante de autenticación (matrícula → DNI) — el mismo que usa el portal ─
-const AUTH_URL = 'https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=auth';
+// El Apps Script exige un token compartido en cada petición (ver APP_TOKEN
+// en google-apps-script-final.gs e Index.html) — sin él devuelve "no autorizado".
+const APP_TOKEN = '74ffa953c19c831f33d06b8b0d5e38ab1ee707ed881c3426';
+const AUTH_URL = 'https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=auth&token=' + APP_TOKEN;
 let AUTH_DATA = {};
 
 async function cargarAuth() {
