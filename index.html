@@ -1940,6 +1940,31 @@ function renderMedialiaCoord(){
         </div>
       </div>` : '';
 
+    // Técnicos de esta zona que no tienen NINGUNA nota de Medalia este mes
+    // (ni siquiera "no cuentan" -- directamente no hay ninguna encuesta).
+    const sinNotas = tieneZonas
+      ? CURRENT_DATA.tecnicos.filter(t=>{
+          const idU = t.id.toUpperCase();
+          const enZona = grupo.zonas.some(z=>(ZONA_DATA[idU]||'').toString().includes(z));
+          const tieneNota = MEDALIA_COORD_DATA[idU] && MEDALIA_COORD_DATA[idU].cantidad>0;
+          return enZona && !tieneNota;
+        })
+      : [];
+    const idGrupo = 'medaliaSinNotas-' + grupo.nombre.replace(/\s+/g,'');
+    const sinNotasHTML = sinNotas.length ? `
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div onclick="const e=document.getElementById('${idGrupo}');e.style.display=e.style.display==='none'?'flex':'none';" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.6rem;font-weight:700;letter-spacing:.08em;color:var(--gold3);text-transform:uppercase">Sin notas de Medalia este mes · ${sinNotas.length}</span>
+          <span style="font-size:.65rem;color:var(--muted)">▾</span>
+        </div>
+        <div id="${idGrupo}" style="display:none;margin-top:8px;flex-direction:column;gap:4px">
+          ${sinNotas.map(t=>`
+            <div style="background:var(--bg);border-radius:8px;padding:6px 10px;font-size:.72rem;color:var(--text)">
+              ${t.nombre.trim()} <span style="color:var(--muted)">· ${t.id}</span>
+            </div>`).join('')}
+        </div>
+      </div>` : '';
+
     html+=`
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;margin-top:10px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${color},transparent)"></div>
@@ -1954,6 +1979,7 @@ function renderMedialiaCoord(){
         </div>
       </div>
       ${noHTML}
+      ${sinNotasHTML}
     </div>`;
   });
 
