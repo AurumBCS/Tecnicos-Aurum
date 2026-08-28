@@ -1953,7 +1953,11 @@ function renderMedialiaCoord(){
           const idU = t.id.toUpperCase();
           const enZona = grupo.zonas.some(z=>(ZONA_DATA[idU]||'').toString().includes(z));
           const tieneNota = MEDALIA_COORD_DATA[idU] && MEDALIA_COORD_DATA[idU].cantidad>0;
-          return enZona && !tieneNota;
+          // Si no cuenta para la empresa (false, vacio, #VALUE!, etc), no
+          // tiene sentido marcarlo como "sin notas" -- aunque tuviera, esas
+          // notas tampoco contarian. Mismo criterio "===true" que el resto.
+          const cuentaEmpresa = !tieneCuenta || CUENTA_DATA[idU]?.empresa===true;
+          return enZona && !tieneNota && cuentaEmpresa;
         })
       : [];
     const idGrupo = 'medaliaSinNotas-' + grupo.nombre.replace(/\s+/g,'');
