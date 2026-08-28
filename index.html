@@ -1487,10 +1487,13 @@ function renderEquipoPanel(jeId){
     if(document.getElementById('equipoDocsContainer')) renderDocsEquipoCollapsible(jeId,'equipoDocsContainer');
   }
 
-  // Lista de técnicos — separar cuentan / no cuentan para el JE
+  // Lista de técnicos — separar cuentan / no cuentan para el JE. Cuentan
+  // solo con un "si" explicito; vacio/roto (#VALUE!, etc) cae en no cuentan
+  // -- antes con "=== false" esos casos no caian en ninguna de las dos y el
+  // tecnico desaparecia de la lista por completo.
   const tieneCuentaData = Object.keys(CUENTA_DATA).length > 0;
   const cuentan   = tieneCuentaData ? tecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je === true) : tecs;
-  const noCuentan = tieneCuentaData ? tecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je === false) : [];
+  const noCuentan = tieneCuentaData ? tecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je !== true) : [];
 
   function tecScore(t){
     let s=t.mlv*2+t.mab;
@@ -1769,7 +1772,7 @@ function renderJRPanel(){
   GRUPOS.forEach(grupo => {
     const grupoTecs = tieneZonas ? getTecsPorZona(grupo.zonas) : grupo.jeIds.flatMap(id=>getTecnicosOfJE(id));
     const cuentanEmp  = tieneCuentaEmp ? grupoTecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===true) : grupoTecs;
-    const noCuentanEmp= tieneCuentaEmp ? grupoTecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===false) : [];
+    const noCuentanEmp= tieneCuentaEmp ? grupoTecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa!==true) : [];
     const grupoAv = calcAvg(cuentanEmp);
     const gCol = grupoAv.mlv>=7?'var(--green2)':grupoAv.mlv>=6.5?'var(--orange)':'#e05a4a';
     const avNo = calcAvg(noCuentanEmp);
@@ -4063,13 +4066,15 @@ function actualizarVistaHistoricoEquipo(){
     miembros = miembros.filter(t=>t.provincia===provinciaSel.value);
   }
 
+  // "si" = solo con un si explicito; "no" = cualquier otra cosa (false,
+  // vacio, #VALUE!, etc.) -- mismo criterio que el resto de la app.
   const cuentaFiltro = document.getElementById('histCuentaFiltro').value;
-  if(cuentaFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa!==false);
-  else if(cuentaFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===false);
+  if(cuentaFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===true);
+  else if(cuentaFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa!==true);
 
   const cuentaJEFiltro = document.getElementById('histCuentaJEFiltro').value;
-  if(cuentaJEFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je!==false);
-  else if(cuentaJEFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je===false);
+  if(cuentaJEFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je===true);
+  else if(cuentaJEFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je!==true);
 
   document.getElementById('histGrupoSub').textContent = `${miembros.length} técnico${miembros.length===1?'':'s'} en el filtro actual`;
 
@@ -4100,10 +4105,11 @@ function actualizarVistaHistoricoEquipo(){
   const filas = sorted.map(m=>{
     const je = jeIds.find(je=>(JERARQUIA[je]||[]).map(x=>x.toUpperCase()).includes(m.id.toUpperCase()));
     const jeNombre = je ? (JE_NAMES[je]||je) : '—';
+    // "Sí" solo con dato explicito; vacio/roto (#VALUE!, etc) se muestra
+    // como "No", mismo criterio que el resto de la app.
     const cuenta = CUENTA_DATA[m.id.toUpperCase()]?.empresa;
     const cuentaBadge = cuenta===true ? `<span style="color:var(--green2);font-weight:700">Sí</span>`
-      : cuenta===false ? `<span style="color:#e05a4a;font-weight:700">No</span>`
-      : `<span style="color:var(--muted)">—</span>`;
+      : `<span style="color:#e05a4a;font-weight:700">No</span>`;
     return `<tr onclick="verTecnicoDesdeHistoricoEquipo('${m.id}')" style="cursor:pointer;border-bottom:1px solid var(--border)">
       <td style="padding:8px 6px;color:var(--muted)">${m.id}</td>
       <td style="padding:8px 6px;font-weight:600;color:var(--text)">${m.nombre.trim()}</td>
