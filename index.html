@@ -1919,9 +1919,12 @@ function renderMedialiaCoord(){
       : [];
     if(!mats.length) return;
 
-    // cuentan empresa: explícito true o sin dato (tienen encuestas → están activos)
-    const cuentan   = tieneCuenta ? mats.filter(m=>CUENTA_DATA[m]?.empresa!==false) : mats;
-    const noCuentan = tieneCuenta ? mats.filter(m=>CUENTA_DATA[m]?.empresa===false)  : [];
+    // cuentan empresa: solo si dice explicitamente "si" -- si esta vacio, roto
+    // (#VALUE! u otro error de formula) o cualquier otra cosa que no sea un
+    // "si" claro, se trata como que NO cuenta (antes "sin dato" contaba como
+    // que si, dejando pasar celdas rotas/vacias como si contaran).
+    const cuentan   = tieneCuenta ? mats.filter(m=>CUENTA_DATA[m]?.empresa===true) : mats;
+    const noCuentan = tieneCuenta ? mats.filter(m=>CUENTA_DATA[m]?.empresa!==true)  : [];
 
     const av  = calcMed(cuentan);
     const avNo= calcMed(noCuentan);
