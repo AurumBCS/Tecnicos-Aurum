@@ -419,6 +419,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <!-- Docs pendientes del equipo (colapsable) -->
       <div id="equipoDocsContainer"></div>
 
+      <!-- Vacaciones del equipo, solicitadas/restantes por técnico (colapsable) -->
+      <div id="equipoVacacionesEquipoContainer"></div>
+
       <!-- Lista técnicos (colapsable) -->
       <div id="tecList"></div>
 
@@ -569,7 +572,6 @@ const APP_TOKEN = "74ffa953c19c831f33d06b8b0d5e38ab1ee707ed881c3426";
 const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=csv&token=" + APP_TOKEN;
 const AUTH_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=auth&token=" + APP_TOKEN;
 const DOCS_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=docs&token=" + APP_TOKEN;
-const FLOTA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=flota&token=" + APP_TOKEN;
 const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=vacaciones&token=" + APP_TOKEN;
 const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=medalia-coord&token=" + APP_TOKEN;
 const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=cumplimiento&token=" + APP_TOKEN;
@@ -619,7 +621,7 @@ let AUTH_CUADRANTE_LOADED = false;
 let ZONA_DATA = {};
 let CUENTA_DATA = {}; // mat -> {je: bool, empresa: bool}
 let ROSTER_NOMBRES = {}; // mat -> nombre, del Cuadrante (incluye tecnicos sin datos este mes)
-let FLOTA_DATA = {};
+let ROSTER_EXTRA = {}; // mat -> {coche, vacAnuales, vacSolicitadas, vacRestantes}, del Cuadrante -- "coche" ya se usa en renderFlota()/renderFlotaJE(), el resto sigue sin usarse
 let DOCS_DATA = [];
 let VACACIONES_DATA = {};
 let MEDALIA_COORD_DATA = {};
@@ -924,6 +926,7 @@ async function loadJerarquia(){
       ZONA_DATA = {};
       CUENTA_DATA = {};
       ROSTER_NOMBRES = {};
+      ROSTER_EXTRA = {};
       rows.forEach(row=>{
         const je       = String(row['JE']||'').trim().toUpperCase();
         const mat      = String(row['Matricula']||'').trim().toUpperCase();
@@ -933,6 +936,10 @@ async function loadJerarquia(){
         const rawEmp = String(row['CuentaEmpresa']||'').trim().toLowerCase();
         const cuentaJE  = rawJE  ? rawJE.includes('si')  : null;
         const cuentaEmp = rawEmp ? rawEmp.includes('si') : null;
+        const coche          = String(row['Coche']||'').trim();
+        const vacAnuales     = String(row['VacAnuales']||'').trim();
+        const vacSolicitadas = String(row['VacSolicitadas']||'').trim();
+        const vacRestantes   = String(row['VacRestantes']||'').trim();
         if(je && mat){
           if(mat !== je){
             if(!JERARQUIA[je]) JERARQUIA[je]=[];
@@ -941,6 +948,7 @@ async function loadJerarquia(){
           if(zona) ZONA_DATA[mat] = zona;
           CUENTA_DATA[mat] = {je: cuentaJE, empresa: cuentaEmp};
           if(nombre) ROSTER_NOMBRES[mat] = nombre;
+          ROSTER_EXTRA[mat] = {coche, vacAnuales, vacSolicitadas, vacRestantes};
         }
       });
       // Actualizar la lista de JEs visible para el JR
@@ -1316,10 +1324,11 @@ function renderMain(tec, returnToEquipo=false){
     });
   }
 
-  // Flota + vacaciones: renderizar si ya cargaron, si no reintentar
+  // Coche (via jerarquia/ROSTER_EXTRA) + vacaciones: renderizar si ya
+  // cargaron, si no reintentar
   renderFlota(tec.id,'flotaMain');
-  if(!Object.keys(FLOTA_DATA).length || !Object.keys(VACACIONES_DATA).length){
-    Promise.all([loadFlota(), loadVacaciones()]).then(()=>{
+  if(!Object.keys(ROSTER_EXTRA).length || !Object.keys(VACACIONES_DATA).length){
+    Promise.all([loadJerarquia(), loadVacaciones()]).then(()=>{
       renderFlota(_tecId,'flotaMain');
     });
   }
@@ -1570,6 +1579,7 @@ function renderEquipoPanel(jeId){
   // Mostrar vehículo y vacaciones del JE
   renderFlotaJE(jeId, 'equipoFlotaJEContainer');
   renderVacacionesJE(jeId, 'equipoVacacionesJEContainer');
+  renderVacacionesEquipoCollapsible(jeId, 'equipoVacacionesEquipoContainer');
 }
 
 // ══════════════════════════════════════════════
@@ -2820,28 +2830,58 @@ function renderDocsEquipoCollapsible(jeId, containerId){
 }
 
 // ══════════════════════════════════════════════
-//  FLOTA
+//  VACACIONES DEL EQUIPO, POR TÉCNICO (DESPLEGABLE, vista JE)
 // ══════════════════════════════════════════════
-async function loadFlota(){
-  try{
-    const url = FLOTA_URL + (FLOTA_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
-    const res=await fetchConReintento(url,{cache:'no-store'});
-    if(!res.ok) return;
-    const csv=await res.text();
-    const rows=parseCSV(csv);
-    if(rows.length>0){
-      const flotaByTec={};
-      rows.forEach(row=>{
-        const mat=String(row['mat']||'').trim().toUpperCase();
-        const coche=String(row['coche']||'').trim();
-        if(mat && coche){
-          flotaByTec[mat]={mat,coche};
-        }
-      });
-      FLOTA_DATA=flotaByTec;
-      console.log('Flota cargada:',Object.keys(FLOTA_DATA).length,'técnicos');
-    }
-  }catch(e){console.log('Flota error:',e.message);}
+function renderVacacionesEquipoCollapsible(jeId, containerId){
+  const container=document.getElementById(containerId);
+  if(!container||CURRENT_USER_TYPE!=='je') return;
+
+  const ids=(JERARQUIA[jeId]||[]).map(id=>id.toUpperCase());
+  // Solo se listan los que realmente tienen algún dato de vacaciones en el
+  // Cuadrante -- si viene vacio o roto (#N/A, etc) no aporta nada mostrarlo.
+  const limpiar = v => { const s=String(v||'').trim(); return (!s || /^#/.test(s)) ? null : s; };
+  const conDatos = ids
+    .map(mat=>{
+      const ex = ROSTER_EXTRA[mat];
+      if(!ex) return null;
+      const solicitadas = limpiar(ex.vacSolicitadas);
+      const restantes    = limpiar(ex.vacRestantes);
+      if(solicitadas===null && restantes===null) return null;
+      return { mat, nombre: ROSTER_NOMBRES[mat]||mat, solicitadas: solicitadas??'—', restantes: restantes??'—' };
+    })
+    .filter(Boolean)
+    .sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+  if(!conDatos.length){ container.innerHTML=''; return; }
+
+  const rows = conDatos.map(({mat,nombre,solicitadas,restantes})=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--s1);margin-bottom:1px;border-radius:6px">
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text)">${nombre}</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${mat}</div>
+      </div>
+      <div style="display:flex;gap:16px;text-align:center">
+        <div>
+          <div style="font-size:.9rem;font-weight:800;color:#e67e22">${solicitadas}</div>
+          <div style="font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Solicitadas</div>
+        </div>
+        <div>
+          <div style="font-size:.9rem;font-weight:800;color:#27ae60">${restantes}</div>
+          <div style="font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Restantes</div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  container.innerHTML=`
+    <div style="margin-top:20px">
+      <div class="section-head" onclick="document.getElementById('vacEquipoList-${jeId}').style.display=document.getElementById('vacEquipoList-${jeId}').style.display==='none'?'block':'none';document.getElementById('vacEquipoArrow-${jeId}').style.transform=document.getElementById('vacEquipoArrow-${jeId}').style.transform==='rotate(180deg)'?'rotate(0deg)':'rotate(180deg)'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        🏖️ Vacaciones del equipo · ${conDatos.length}
+        <span id="vacEquipoArrow-${jeId}" style="display:inline-block;transition:transform .2s">→</span>
+      </div>
+      <div id="vacEquipoList-${jeId}" style="background:var(--dim);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-top:8px;display:none">
+        ${rows}
+      </div>
+    </div>`;
 }
 
 async function loadVacaciones(){
@@ -4140,12 +4180,22 @@ function escapeHtmlAttr(s){
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// Interpreta el valor crudo de "Coche_Asignado" del Cuadrante: vacio o un
+// error de formula (#N/A, #VALUE!, etc) -> sin dato (null); "PERSONAL" ->
+// el tecnico usa vehiculo propio, no hay matricula que mostrar; cualquier
+// otro texto se asume la matricula del coche de empresa asignado.
+function interpretarCoche_(raw){
+  const v = String(raw||'').trim();
+  if(!v || /^#(N\/A|VALUE!|REF!|NAME\?|DIV\/0!|NULL!|NUM!)$/i.test(v)) return null;
+  return { esPersonal: v.toUpperCase()==='PERSONAL', valor: v };
+}
+
 function renderFlota(tecId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
   const id=String(tecId).trim().toUpperCase();
-  const coche=FLOTA_DATA[id]?.coche;
-  if(!coche){ container.innerHTML=''; return; }
+  const info=interpretarCoche_(ROSTER_EXTRA[id]?.coche);
+  if(!info){ container.innerHTML=''; return; }
   const vacaciones=VACACIONES_DATA[id];
   let vacacionesHtml='';
   if(vacaciones){
@@ -4172,19 +4222,23 @@ function renderFlota(tecId, containerId){
       ${buildVacMensualHTML(vacaciones)}
     </div>`;
   }
+  const cocheLabel = info.esPersonal ? 'Asignación' : 'Matrícula asignada';
+  const cocheValor = info.esPersonal ? 'Vehículo personal' : info.valor;
+  const avisoHtml  = info.esPersonal ? '' : `
+    <div style="background:rgba(212,131,26,.08);border:1px solid #3d2800;border-radius:10px;padding:10px 14px;margin-top:8px;font-size:.72rem;color:var(--orange)">
+      ⚠️ Si este vehículo no es el tuyo, comunícalo a tu jefe de equipo.
+    </div>`;
   container.innerHTML=`
     <div class="section-head" style="margin-top:20px">🚗 Vehículo asignado</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
       <div>
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">Matrícula asignada</div>
-        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${coche}</div>
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">${cocheLabel}</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${cocheValor}</div>
       </div>
       <div style="font-size:2.5rem">🚗</div>
     </div>
-    <div style="background:rgba(212,131,26,.08);border:1px solid #3d2800;border-radius:10px;padding:10px 14px;margin-top:8px;font-size:.72rem;color:var(--orange)">
-      ⚠️ Si este vehículo no es el tuyo, comunícalo a tu jefe de equipo.
-    </div>
+    ${avisoHtml}
     ${vacacionesHtml}`;
 }
 
@@ -4223,15 +4277,17 @@ function renderFlotaJE(jeId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
   const id=String(jeId).trim().toUpperCase();
-  const coche=FLOTA_DATA[id]?.coche;
-  if(!coche){ container.innerHTML=''; return; }
+  const info=interpretarCoche_(ROSTER_EXTRA[id]?.coche);
+  if(!info){ container.innerHTML=''; return; }
+  const cocheLabel = info.esPersonal ? 'Asignación' : 'Matrícula asignada';
+  const cocheValor = info.esPersonal ? 'Vehículo personal' : info.valor;
   container.innerHTML=`
     <div class="section-head" style="margin-top:20px">🚗 Tu vehículo asignado</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
       <div>
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">Matrícula asignada</div>
-        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${coche}</div>
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">${cocheLabel}</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${cocheValor}</div>
       </div>
       <div style="font-size:2.5rem">🚗</div>
     </div>`;
@@ -4342,7 +4398,7 @@ async function doLogin(){
     if(CURRENT_TEC) renderDocsPendientes(CURRENT_TEC.id,'docsPendientesMain');
     if(CURRENT_JE_ID) renderDocsEquipo(CURRENT_JE_ID,'equipoDocsContainer');
   });
-  Promise.all([loadVacaciones(), loadFlota(), loadCumplimiento(), loadRM()]).then(()=>{
+  Promise.all([loadVacaciones(), loadCumplimiento(), loadRM()]).then(()=>{
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
   FICHAJE_FECHA_VISTA=null;
@@ -4589,7 +4645,7 @@ async function doRefreshData(){
       loadSheets(),
       loadAuth(),
       loadDocs(),
-      loadFlota(),
+      loadJerarquia(),
       loadVacaciones(),
       loadMedialiaCoord(),
       loadCumplimiento(),
