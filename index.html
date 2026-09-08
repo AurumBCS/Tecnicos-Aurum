@@ -1681,7 +1681,9 @@ function buildTecDetailHTML(tec){
       let html='';
       if(rm||cum) html+='<div class="detail-section">Dashboards de datos reales</div>';
       if(rm){
-        const rmCol=rm.pctRM>=89.5?'var(--green2)':'#e05a4a';
+        // %RM siempre el del Resumen App Claude (tec.pRM) -- el Excel de
+        // mantenimientos (rm.*) solo aporta el detalle de visitas/repeticiones.
+        const rmCol=tec.pRM>=89.5?'var(--green2)':'#e05a4a';
         html+=`<div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;padding:14px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
           <div style="position:relative;width:58px;height:58px;flex-shrink:0">
             <svg width="58" height="58" viewBox="0 0 58 58" style="transform:rotate(-90deg)">
@@ -1689,9 +1691,9 @@ function buildTecDetailHTML(tec){
               <circle fill="none" stroke="${rmCol}" stroke-width="6" stroke-linecap="round"
                 cx="29" cy="29" r="23"
                 stroke-dasharray="${(2*Math.PI*23).toFixed(1)}"
-                stroke-dashoffset="${(2*Math.PI*23*(1-rm.pctRM/100)).toFixed(1)}"/>
+                stroke-dashoffset="${(2*Math.PI*23*(1-tec.pRM/100)).toFixed(1)}"/>
             </svg>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${rmCol}">${rm.pctRM.toFixed(2)}%</div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${rmCol}">${tec.pRM.toFixed(2)}%</div>
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">🛠️ RMs</div>
@@ -1702,7 +1704,9 @@ function buildTecDetailHTML(tec){
         </div>`;
       }
       if(cum){
-        const cumCol=cum.pct>=90?'var(--green2)':'#e05a4a';
+        // %Cumplimiento siempre el del Resumen App Claude (tec.pCum) -- el
+        // Excel (cum.*) solo aporta el detalle de visitas/incumplimientos.
+        const cumCol=tec.pCum>=90?'var(--green2)':'#e05a4a';
         html+=`<div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;padding:14px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
           <div style="position:relative;width:58px;height:58px;flex-shrink:0">
             <svg width="58" height="58" viewBox="0 0 58 58" style="transform:rotate(-90deg)">
@@ -1710,9 +1714,9 @@ function buildTecDetailHTML(tec){
               <circle fill="none" stroke="${cumCol}" stroke-width="6" stroke-linecap="round"
                 cx="29" cy="29" r="23"
                 stroke-dasharray="${(2*Math.PI*23).toFixed(1)}"
-                stroke-dashoffset="${(2*Math.PI*23*(1-cum.pct/100)).toFixed(1)}"/>
+                stroke-dashoffset="${(2*Math.PI*23*(1-tec.pCum/100)).toFixed(1)}"/>
             </svg>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${cumCol}">${cum.pct.toFixed(2)}%</div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${cumCol}">${tec.pCum.toFixed(2)}%</div>
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">✅ Cumplimiento</div>
@@ -2241,7 +2245,11 @@ function _openRMDash(tecId){
     return;
   }
 
-  const pctOk = rm.pctRM >= 89.5;
+  // El %RM mostrado es siempre el del Resumen App Claude (tec.pRM), no un
+  // recalculo desde el Excel de mantenimientos -- rm.* solo aporta el
+  // detalle de visitas/repeticiones/motivos.
+  const pctResumen = tec.pRM;
+  const pctOk = pctResumen >= 89.5;
   const col = pctOk ? 'var(--green2)' : '#e05a4a';
   const totalOk = rm.total - rm.reps;
 
@@ -2276,13 +2284,13 @@ function _openRMDash(tecId){
   const maxRMmot   = rm.motivosRM  && rm.motivosRM[0]   ? rm.motivosRM[0][1]   : 1;
 
   const circ   = 2*Math.PI*28;
-  const offset = circ - (rm.pctRM/100)*circ;
+  const offset = circ - (pctResumen/100)*circ;
 
   document.getElementById('rmDashContent').innerHTML = `
     <div class="detail-hero">
       <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
-      <div class="detail-hero-val" style="color:${col}">${rm.pctRM.toFixed(2)}%</div>
-      <div class="detail-hero-sub">%RM del técnico · datos del Excel de mantenimientos</div>
+      <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
+      <div class="detail-hero-sub">%RM del técnico (Resumen App Claude) · detalle desde el Excel de mantenimientos</div>
     </div>
 
     <div style="display:flex;gap:9px;margin-bottom:16px">
@@ -2300,12 +2308,12 @@ function _openRMDash(tecId){
             cx="35" cy="35" r="28"
             stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
         </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${rm.pctRM.toFixed(2)}%</div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${pctResumen.toFixed(2)}%</div>
       </div>
       <div>
         <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
         <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-          Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(rm.pctRM-89.5).toFixed(2)} puntos`:`Faltan ${(89.5-rm.pctRM).toFixed(2)} puntos`}
+          Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(pctResumen-89.5).toFixed(2)} puntos`:`Faltan ${(89.5-pctResumen).toFixed(2)} puntos`}
         </div>
       </div>
     </div>
@@ -2528,14 +2536,18 @@ function _renderDashRanking(type, tecs){
   const ambito = _dashBackPanel==='jrPanel' ? 'de la empresa' : 'del equipo';
 
   const cfg=CFG[type];
+  // El %RM/%Cumplimiento SIEMPRE es el del Resumen App Claude (t.pRM/t.pCum,
+  // ya cargado para todos vía loadSheets) -- el Excel del correo (RM_DATA/
+  // CUM_DATA) solo aporta el detalle de mantenimientos repetidos e
+  // incumplimientos para las columnas extra, nunca recalcula el porcentaje.
   const tecsForCalc = (type==='rm' || type==='cum')
     ? tecs.map(t=>{
         if(type==='rm'){
           const rmInfo=RM_DATA[t.id.toUpperCase()];
-          return rmInfo ? {...t, palito:rmInfo.total, rm:rmInfo.reps, pRM:rmInfo.pctRM} : t;
+          return rmInfo ? {...t, palito:rmInfo.total, rm:rmInfo.reps} : t;
         }
         const cumInfo=CUM_DATA[t.id.toUpperCase()];
-        return cumInfo ? {...t, nec:cumInfo.total, palito:cumInfo.ok, incum:cumInfo.noOk, pCum:cumInfo.pct} : t;
+        return cumInfo ? {...t, nec:cumInfo.total, palito:cumInfo.ok, incum:cumInfo.noOk} : t;
       })
     : tecs;
   const sorted=[...tecsForCalc].sort((a,b)=>b[cfg.key]-a[cfg.key]);
@@ -4567,9 +4579,14 @@ function _openCumDash(tecId){
   const cum=CUM_DATA[id]||CUM_DATA[id.toUpperCase()];
   const tec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
   if(!cum){ showDetail('cum'); return; }
-  const pctOk=cum.pct>=90;
+  // El %Cumplimiento mostrado es siempre el del Resumen App Claude
+  // (tec.pCum), no un recalculo desde el Excel -- cum.* solo aporta el
+  // detalle de visitas/incumplimientos. Si por algo el técnico no aparece
+  // en el Resumen (caso raro), se usa cum.pct como único respaldo posible.
+  const pctResumen = tec ? tec.pCum : cum.pct;
+  const pctOk=pctResumen>=90;
   const col=pctOk?'var(--green2)':'#e05a4a';
-  const circ=2*Math.PI*28, offset=circ-(cum.pct/100)*circ;
+  const circ=2*Math.PI*28, offset=circ-(pctResumen/100)*circ;
   const nombre=tec?tec.nombre.trim():id;
   const maxRazon=cum.topRazones&&cum.topRazones[0]?cum.topRazones[0][1]:1;
 
@@ -4601,8 +4618,8 @@ function _openCumDash(tecId){
   document.getElementById('cumDashContent').innerHTML=`
     <div class="detail-hero">
       <div class="detail-hero-title">✅ Dashboard Cumplimiento · ${nombre}</div>
-      <div class="detail-hero-val" style="color:${col}">${cum.pct.toFixed(2)}%</div>
-      <div class="detail-hero-sub">Visitas cumplidas · objetivo ≥ 90%</div>
+      <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
+      <div class="detail-hero-sub">%Cumplimiento (Resumen App Claude) · objetivo ≥ 90%</div>
     </div>
     <div style="display:flex;gap:9px;margin-bottom:16px">
       <div class="stat-box" style="flex:1"><div class="n">${cum.total}</div><div class="l">Total<br>visitas</div></div>
@@ -4616,12 +4633,12 @@ function _openCumDash(tecId){
           <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
             cx="35" cy="35" r="28" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
         </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${cum.pct.toFixed(2)}%</div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${pctResumen.toFixed(2)}%</div>
       </div>
       <div>
         <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
         <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-          Objetivo: ≥ 90% · ${pctOk?`Margen de ${(cum.pct-90).toFixed(2)} puntos`:`Faltan ${(90-cum.pct).toFixed(2)} puntos`}
+          Objetivo: ≥ 90% · ${pctOk?`Margen de ${(pctResumen-90).toFixed(2)} puntos`:`Faltan ${(90-pctResumen).toFixed(2)} puntos`}
         </div>
       </div>
     </div>
