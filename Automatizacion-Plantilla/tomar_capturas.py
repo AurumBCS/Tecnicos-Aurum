@@ -7,8 +7,9 @@ el Excel de mantenimientos del otro usuario).
 
 Este usuario ya ve solo datos de AURUM por defecto (no hace falta aplicar
 el filtro de "Vista" como con el otro usuario). En el panel izquierdo
-aparecen los 9 equipos (jefes de equipo); hay que hacer clic en cada uno,
-en orden, y tomar una captura de pantalla completa por cada uno.
+aparecen los equipos (jefes de equipo, ver lista EQUIPOS mas abajo); hay
+que hacer clic en cada uno, en orden, y tomar una captura de pantalla
+completa por cada uno.
 
 Variables de entorno requeridas:
   ETADIRECT_USER_CAPTURAS   Usuario de la consola de despacho (para capturas)
@@ -33,13 +34,15 @@ from comun_ofs import CARPETA_BASE, LAUNCH_ARGS, ruta_sesion, leer_credenciales_
 CARPETA_CAPTURAS = CARPETA_BASE / "capturas"
 ARCHIVO_SESION = ruta_sesion("capturas")
 
-# Los 9 equipos del panel izquierdo, en el orden en que hay que capturarlos.
+# Los equipos del panel izquierdo, en el orden en que hay que capturarlos.
 # Se busca por el nombre porque es la parte estable del texto -- el codigo
 # delante (BCN-286800, MD-273371, etc) tiene formato inconsistente en
 # distintas filas.
 #
 # "Jose Luis Osorio" se renombro a "GD5381-TF - Gustavo Perez" en la
 # consola (visto en vivo el 2026-08-25) -- mismo equipo, nombre nuevo.
+# Christian Alexander Reyna y Carlos Enrique Marcano Mora se agregaron
+# como equipos nuevos (visto en vivo el 2026-09-08), al final de la lista.
 EQUIPOS = [
     "Gustavo Perez",
     "Ezequiel Pugliese",
@@ -50,12 +53,14 @@ EQUIPOS = [
     "Manuel Enrique Sequeira",
     "Maykel Ramon Gutierrez",
     "Fernando David Alves Andujar",
+    "Christian Alexander Reyna",
+    "Carlos Enrique Marcano Mora",
 ]
 
 
 def tomar_capturas(page):
     """
-    Hace clic en cada uno de los 9 equipos del panel izquierdo (en el
+    Hace clic en cada uno de los equipos del panel izquierdo (en el
     orden de EQUIPOS) y toma una captura de pantalla completa por cada
     uno, esperando a que la vista termine de cargar antes de capturar.
     """

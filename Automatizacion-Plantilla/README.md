@@ -231,8 +231,9 @@ retiraron los triggers `schedule:` de `.github/workflows/ofs-automation.yml`
 
 1. **`tomar_capturas.py`** (~7:15am, usuario capturas) — entra a la
    consola (este usuario ya ve solo AURUM por defecto, no hace falta
-   filtro), hace clic en cada uno de los 9 equipos del panel izquierdo
-   (de Ezequiel Pugliese a Jose Luis Osorio) y toma una captura de
+   filtro), hace clic en cada uno de los equipos del panel izquierdo
+   (lista `EQUIPOS` en el script — se actualiza a mano cada vez que se
+   agrega/renombra un equipo en la consola) y toma una captura de
    pantalla completa por cada uno, dejándolas guardadas en `capturas/`.
    No envía correo.
 2. **`enviar_correo_matutino.py`** (7:30am, usuario mantenimientos) — entra
