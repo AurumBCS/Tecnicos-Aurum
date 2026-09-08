@@ -58,6 +58,27 @@ EQUIPOS = [
 ]
 
 
+def _hacer_scroll_hasta_visible(page, locator, intentos=15):
+    """
+    Simula scroll con la rueda del mouse dentro del panel de equipos hasta
+    que `locator` sea visible, en vez de un salto directo de scroll. La
+    lista es larga/virtualizada (crece con el tiempo, mas equipos), y un
+    salto directo (locator.scroll_into_view_if_needed()) no siempre
+    alcanza a renderizar filas lejanas -- confirmado en vivo, tambien
+    agotaba su propio timeout de 30s. (200, 400) cae dentro del panel
+    izquierdo en el viewport de 1920x1080 que usa este script.
+    """
+    for _ in range(intentos):
+        if locator.count() > 0 and locator.first.is_visible():
+            return
+        page.mouse.move(200, 400)
+        page.mouse.wheel(0, 300)
+        page.wait_for_timeout(300)
+
+    # Ultimo intento con el metodo normal de Playwright, por si acaso.
+    locator.first.scroll_into_view_if_needed(timeout=5000)
+
+
 def tomar_capturas(page):
     """
     Hace clic en cada uno de los equipos del panel izquierdo (en el
@@ -74,9 +95,13 @@ def tomar_capturas(page):
     rutas = []
     for numero, nombre in enumerate(EQUIPOS, start=1):
         equipo = page.get_by_text(nombre, exact=False).first
-        # Por si el equipo cae fuera del area visible del panel (la lista
-        # puede crecer/reordenarse con el tiempo).
-        equipo.scroll_into_view_if_needed()
+        # La lista del panel izquierdo crece con el tiempo (mas equipos) y
+        # es larga/virtualizada -- un salto directo de scroll
+        # (scroll_into_view_if_needed) no siempre alcanza a renderizar
+        # filas lejanas (confirmado en vivo: tambien agotaba su propio
+        # timeout de 30s con "element is not visible"). Se simula scroll
+        # de rueda del mouse, mas parecido a como lo haria una persona.
+        _hacer_scroll_hasta_visible(page, equipo)
         equipo.click()
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(1500)
