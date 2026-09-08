@@ -58,44 +58,50 @@ EQUIPOS = [
 ]
 
 
-def _hacer_scroll_hasta_visible(page, locator, nombre, intentos=15):
+def _encontrar_equipo_visible(page, nombre, intentos=15):
     """
-    Simula scroll con la rueda del mouse dentro del panel de equipos hasta
-    que `locator` sea visible, en vez de un salto directo de scroll. La
-    lista es larga/virtualizada (crece con el tiempo, mas equipos), y un
-    salto directo (locator.scroll_into_view_if_needed()) no siempre
-    alcanza a renderizar filas lejanas -- confirmado en vivo, tambien
-    agotaba su propio timeout de 30s. (200, 400) cae dentro del panel
-    izquierdo en el viewport de 1920x1080 que usa este script.
+    Busca `nombre` en la pagina y devuelve la coincidencia que esta
+    VISIBLE -- no la primera del DOM sin mas.
+
+    Confirmado en vivo (2026-09-08): ademas de la entrada real y visible
+    del panel izquierdo, puede haber varias copias OCULTAS del mismo
+    nombre en otras partes de la pagina -- filas "JEE-..." (Jefe de
+    Equipo) en el panel de tecnicos de la derecha, mientras que la entrada
+    real del panel izquierdo es la que empieza con "JR9426-..." (o
+    "GD5381-TF - ..." para el caso especial de Gustavo Perez). Tomar
+    simplemente el primer resultado del DOM (`.first`) agarra cualquiera
+    de esas copias ocultas segun el orden en que aparezcan, no
+    necesariamente la real -- por eso se recorren TODAS las coincidencias
+    buscando una visible, con scroll de rueda de mouse entre intento e
+    intento por si la real esta mas abajo en una lista larga.
     """
+    candidatos = page.get_by_text(nombre, exact=False)
     for _ in range(intentos):
-        if locator.count() > 0 and locator.first.is_visible():
-            return
+        for i in range(candidatos.count()):
+            candidato = candidatos.nth(i)
+            if candidato.is_visible():
+                return candidato
         page.mouse.move(200, 400)
         page.mouse.wheel(0, 300)
         page.wait_for_timeout(300)
 
-    # Ni el scroll de mouse ni el reintento normal alcanzaron -- antes de
-    # fallar, diagnostico de TODAS las coincidencias del nombre en la
-    # pagina (podria haber mas de una, como paso con "Jose Luis Osorio":
-    # una fila vieja/oculta en otro lado que .first agarraba en vez de la
-    # entrada real del panel).
+    # Ninguna coincidencia se volvio visible -- diagnostico antes de
+    # devolver la primera igual, para que el error normal de Playwright
+    # (al intentar clickearla) tenga contexto util en el log.
     try:
-        todas = page.get_by_text(nombre, exact=False)
-        n = todas.count()
+        n = candidatos.count()
         print(f"[diagnostico] Coincidencias de '{nombre}' en la pagina: {n}")
         for i in range(min(n, 5)):
             try:
-                visible = todas.nth(i).is_visible()
-                html = todas.nth(i).evaluate("el => el.outerHTML")
+                visible = candidatos.nth(i).is_visible()
+                html = candidatos.nth(i).evaluate("el => el.outerHTML")
                 print(f"[diagnostico] match #{i} (visible={visible}): {html!r}")
             except Exception as e_diag:
                 print(f"[diagnostico] Error leyendo match #{i}: {e_diag}")
     except Exception as e_diag:
         print(f"[diagnostico] Error buscando coincidencias de '{nombre}': {e_diag}")
 
-    # Ultimo intento con el metodo normal de Playwright, por si acaso.
-    locator.first.scroll_into_view_if_needed(timeout=5000)
+    return candidatos.first
 
 
 def tomar_capturas(page):
@@ -113,14 +119,7 @@ def tomar_capturas(page):
 
     rutas = []
     for numero, nombre in enumerate(EQUIPOS, start=1):
-        equipo = page.get_by_text(nombre, exact=False).first
-        # La lista del panel izquierdo crece con el tiempo (mas equipos) y
-        # es larga/virtualizada -- un salto directo de scroll
-        # (scroll_into_view_if_needed) no siempre alcanza a renderizar
-        # filas lejanas (confirmado en vivo: tambien agotaba su propio
-        # timeout de 30s con "element is not visible"). Se simula scroll
-        # de rueda del mouse, mas parecido a como lo haria una persona.
-        _hacer_scroll_hasta_visible(page, equipo, nombre)
+        equipo = _encontrar_equipo_visible(page, nombre)
         equipo.click()
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(1500)
