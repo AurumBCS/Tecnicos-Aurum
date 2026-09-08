@@ -58,7 +58,7 @@ EQUIPOS = [
 ]
 
 
-def _hacer_scroll_hasta_visible(page, locator, intentos=15):
+def _hacer_scroll_hasta_visible(page, locator, nombre, intentos=15):
     """
     Simula scroll con la rueda del mouse dentro del panel de equipos hasta
     que `locator` sea visible, en vez de un salto directo de scroll. La
@@ -74,6 +74,25 @@ def _hacer_scroll_hasta_visible(page, locator, intentos=15):
         page.mouse.move(200, 400)
         page.mouse.wheel(0, 300)
         page.wait_for_timeout(300)
+
+    # Ni el scroll de mouse ni el reintento normal alcanzaron -- antes de
+    # fallar, diagnostico de TODAS las coincidencias del nombre en la
+    # pagina (podria haber mas de una, como paso con "Jose Luis Osorio":
+    # una fila vieja/oculta en otro lado que .first agarraba en vez de la
+    # entrada real del panel).
+    try:
+        todas = page.get_by_text(nombre, exact=False)
+        n = todas.count()
+        print(f"[diagnostico] Coincidencias de '{nombre}' en la pagina: {n}")
+        for i in range(min(n, 5)):
+            try:
+                visible = todas.nth(i).is_visible()
+                html = todas.nth(i).evaluate("el => el.outerHTML")
+                print(f"[diagnostico] match #{i} (visible={visible}): {html!r}")
+            except Exception as e_diag:
+                print(f"[diagnostico] Error leyendo match #{i}: {e_diag}")
+    except Exception as e_diag:
+        print(f"[diagnostico] Error buscando coincidencias de '{nombre}': {e_diag}")
 
     # Ultimo intento con el metodo normal de Playwright, por si acaso.
     locator.first.scroll_into_view_if_needed(timeout=5000)
@@ -101,7 +120,7 @@ def tomar_capturas(page):
         # filas lejanas (confirmado en vivo: tambien agotaba su propio
         # timeout de 30s con "element is not visible"). Se simula scroll
         # de rueda del mouse, mas parecido a como lo haria una persona.
-        _hacer_scroll_hasta_visible(page, equipo)
+        _hacer_scroll_hasta_visible(page, equipo, nombre)
         equipo.click()
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(1500)
