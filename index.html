@@ -2233,13 +2233,8 @@ function toggleMantenimientosMotivo(rowId){
 
 function _openRMDash(tecId){
   const id = String(tecId).trim();
-  const rm = RM_DATA[id] || RM_DATA[id.toUpperCase()];
   // Buscar técnico siempre por id, no depender de CURRENT_TEC
   const tec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
-  if(!rm){
-    alert('No hay datos de RMs disponibles para este técnico (' + id + ').');
-    return;
-  }
   if(!tec){
     alert('Técnico no encontrado: ' + id);
     return;
@@ -2251,6 +2246,62 @@ function _openRMDash(tecId){
   const pctResumen = tec.pRM;
   const pctOk = pctResumen >= 89.5;
   const col = pctOk ? 'var(--green2)' : '#e05a4a';
+  const circPreview = 2*Math.PI*28;
+  const offsetPreview = circPreview - (pctResumen/100)*circPreview;
+
+  // RM_DATA es SIEMPRE una foto del último Excel de "Repeated Maintenance
+  // Aurum" procesado -- nunca un histórico por mes. Si se está viendo un
+  // mes pasado (selector de mes), mostrar ese detalle mezclaría el %RM del
+  // mes pasado con visitas de HOY (confirmado en vivo: un técnico con 13
+  // repetidas en un mes pasado, según el Resumen, mostraba "0 repetidas"
+  // aquí porque ese detalle es de la tanda actual, no de ese mes). En su
+  // lugar se muestra la cantidad de mantenimientos repetidos tal cual la
+  // columna "RM" del Resumen App Claude para ese mes (tec.rm) -- el mes
+  // actual sigue mostrando el detalle real del Excel mas abajo, sin tocar.
+  // OJO: MES_SELECCIONADO no es null en el mes actual -- loadSheets() lo
+  // deja con el NOMBRE del mes actual tras cada login normal, por eso hay
+  // que comparar contra mesActualNombre() y no solo revisar si esta seteado.
+  const viendoMesPasado = MES_SELECCIONADO && MES_SELECCIONADO !== mesActualNombre();
+  if(viendoMesPasado){
+    document.getElementById('rmDashContent').innerHTML = `
+      <div class="detail-hero">
+        <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
+        <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
+        <div class="detail-hero-sub">%RM de ${MES_SELECCIONADO} (Resumen App Claude)</div>
+      </div>
+      <div style="display:flex;gap:9px;margin-bottom:16px">
+        <div class="stat-box" style="flex:1"><div class="n" style="color:${tec.rm===0?'var(--green2)':'#e05a4a'}">${tec.rm}</div><div class="l">Mantenimientos<br>repetidos</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
+        <div style="position:relative;width:70px;height:70px;flex-shrink:0">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="transform:rotate(-90deg)">
+            <circle fill="none" stroke="var(--dim)" stroke-width="8" cx="35" cy="35" r="28"/>
+            <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
+              cx="35" cy="35" r="28"
+              stroke-dasharray="${circPreview.toFixed(1)}" stroke-dashoffset="${offsetPreview.toFixed(1)}"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${pctResumen.toFixed(2)}%</div>
+        </div>
+        <div>
+          <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
+            Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(pctResumen-89.5).toFixed(2)} puntos`:`Faltan ${(89.5-pctResumen).toFixed(2)} puntos`}
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:.72rem;color:var(--muted);line-height:1.6">
+        ℹ️ El detalle de motivos y causa raíz solo está disponible para el mes en curso — el Excel de mantenimientos no guarda un histórico por mes anterior.
+      </div>`;
+    showPanel('rmDashPanel');
+    window.scrollTo(0,0);
+    return;
+  }
+
+  const rm = RM_DATA[id] || RM_DATA[id.toUpperCase()];
+  if(!rm){
+    alert('No hay datos de RMs disponibles para este técnico (' + id + ').');
+    return;
+  }
   const totalOk = rm.total - rm.reps;
 
   function barras(arr, maxVal, color, tecId, tipo){
@@ -4600,7 +4651,7 @@ function _openCumDash(tecId){
   const id=String(tecId).trim();
   const cum=CUM_DATA[id]||CUM_DATA[id.toUpperCase()];
   const tec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
-  if(!cum){ showDetail('cum'); return; }
+  if(!cum && !tec){ showDetail('cum'); return; }
   // El %Cumplimiento mostrado es siempre el del Resumen App Claude
   // (tec.pCum), no un recalculo desde el Excel -- cum.* solo aporta el
   // detalle de visitas/incumplimientos. Si por algo el técnico no aparece
@@ -4610,6 +4661,46 @@ function _openCumDash(tecId){
   const col=pctOk?'var(--green2)':'#e05a4a';
   const circ=2*Math.PI*28, offset=circ-(pctResumen/100)*circ;
   const nombre=tec?tec.nombre.trim():id;
+
+  // CUM_DATA es SIEMPRE una foto del último Excel de cumplimiento
+  // procesado, nunca un histórico por mes -- mismo motivo que en
+  // _openRMDash(). Si se está viendo un mes pasado (selector de mes), no
+  // mezclar ese detalle con el %Cumplimiento del mes que se está viendo.
+  // OJO: MES_SELECCIONADO no es null en el mes actual -- loadSheets() lo
+  // deja con el NOMBRE del mes actual tras cada login normal, por eso hay
+  // que comparar contra mesActualNombre() y no solo revisar si esta seteado.
+  const viendoMesPasado = MES_SELECCIONADO && MES_SELECCIONADO !== mesActualNombre();
+  if(viendoMesPasado){
+    document.getElementById('cumDashContent').innerHTML=`
+      <div class="detail-hero">
+        <div class="detail-hero-title">✅ Dashboard Cumplimiento · ${nombre}</div>
+        <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
+        <div class="detail-hero-sub">%Cumplimiento de ${MES_SELECCIONADO} (Resumen App Claude)</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
+        <div style="position:relative;width:70px;height:70px;flex-shrink:0">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="transform:rotate(-90deg)">
+            <circle fill="none" stroke="var(--dim)" stroke-width="8" cx="35" cy="35" r="28"/>
+            <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
+              cx="35" cy="35" r="28" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${pctResumen.toFixed(2)}%</div>
+        </div>
+        <div>
+          <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
+            Objetivo: ≥ 90% · ${pctOk?`Margen de ${(pctResumen-90).toFixed(2)} puntos`:`Faltan ${(90-pctResumen).toFixed(2)} puntos`}
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:.72rem;color:var(--muted);line-height:1.6">
+        ℹ️ El detalle de visitas e incumplimientos solo está disponible para el mes en curso — el Excel de cumplimiento no guarda un histórico por mes anterior.
+      </div>`;
+    showPanel('cumDashPanel'); window.scrollTo(0,0);
+    return;
+  }
+
+  if(!cum){ showDetail('cum'); return; }
   const maxRazon=cum.topRazones&&cum.topRazones[0]?cum.topRazones[0][1]:1;
 
   function barras(arr,maxV,color,tecId,tipo){
