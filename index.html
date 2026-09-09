@@ -3825,6 +3825,13 @@ const HISTORICO_KPIS = [
   {key:'nps',  label:'NPS',  pass:v=>v>9.4,   fmt:v=>v.toFixed(1)},
 ];
 
+// Nombre del mes actual (Español), para excluir ese mes de la columna
+// "Repetidos" del histórico -- el mes en curso es el que sigue recibiendo
+// correos con el Excel de mantenimientos durante el dia, asi que su
+// columna "RM" en el Resumen App Claude todavia no es un dato cerrado.
+const NOMBRES_MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function mesActualNombre(){ return NOMBRES_MESES_ES[new Date().getMonth()]; }
+
 async function loadHistorico(){
   if(HISTORICO_DATA) return;
   if(HISTORICO_LOADING) return HISTORICO_LOADING;
@@ -3913,20 +3920,35 @@ async function showHistoricoTecnico(tecId, back){
 
   const chipsHtml = resumen.map((k,i)=>kpiChipHtml(k.label, k.okMeses, k.failMeses, `histChip-${i}`)).join('');
 
+  const mesActual = mesActualNombre();
+  const dashCell = `<td style="padding:8px 6px;text-align:center;color:var(--muted)">—</td>`;
+
   const compareRows = filas.map(f=>{
     if(!f.t){
-      return `<tr style="opacity:.4"><td style="padding:8px 6px;font-weight:700">${f.mes}</td>${HISTORICO_KPIS.map(()=>'<td style="padding:8px 6px;text-align:center">—</td>').join('')}</tr>`;
+      return `<tr style="opacity:.4"><td style="padding:8px 6px;font-weight:700">${f.mes}</td>${HISTORICO_KPIS.map(k=>k.key==='pRM'?dashCell+dashCell:dashCell).join('')}</tr>`;
     }
     const cells = HISTORICO_KPIS.map(k=>{
-      if(k.sinDatosKey && f.t[k.sinDatosKey]) return `<td style="padding:8px 6px;text-align:center;color:var(--muted)">—</td>`;
+      if(k.sinDatosKey && f.t[k.sinDatosKey]) return k.key==='pRM' ? dashCell+dashCell : dashCell;
       const val = f.t[k.key];
       const ok = k.pass(val);
-      return `<td style="padding:8px 6px;text-align:center;color:${ok?'var(--green2)':'#e05a4a'};font-weight:700">${k.fmt(val)}</td>`;
+      const celda = `<td style="padding:8px 6px;text-align:center;color:${ok?'var(--green2)':'#e05a4a'};font-weight:700">${k.fmt(val)}</td>`;
+      if(k.key!=='pRM') return celda;
+      // "Repetidos": cantidad de mantenimientos repetidos (columna "RM" del
+      // Resumen App Claude), aparte del %RM -- no se muestra para el mes
+      // actual porque ese dato todavia se sigue completando con los
+      // correos del dia, no es un cierre definitivo como los meses pasados.
+      const repetidosCell = f.mes===mesActual
+        ? dashCell
+        : `<td style="padding:8px 6px;text-align:center;color:var(--muted);font-weight:700">${f.t.rm}</td>`;
+      return celda + repetidosCell;
     }).join('');
     return `<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px;font-weight:700;color:var(--gold2)">${f.mes}</td>${cells}</tr>`;
   }).join('');
 
-  const headerCells = HISTORICO_KPIS.map(k=>`<th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">${k.label}</th>`).join('');
+  const headerCells = HISTORICO_KPIS.map(k=>{
+    const th = `<th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">${k.label}</th>`;
+    return k.key==='pRM' ? th+`<th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Repetidos</th>` : th;
+  }).join('');
 
   document.getElementById('historicoContent').innerHTML = `
     <div class="detail-hero">
