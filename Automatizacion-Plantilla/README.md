@@ -9,6 +9,20 @@ de Oracle Field Service (`https://securitasdirect.etadirect.com/`), usando
 - **Usuario "capturas"** (`ETADIRECT_USER_CAPTURAS` / `ETADIRECT_PASS_CAPTURAS`):
   uno distinto, solo para tomar las capturas de pantalla.
 
+> **Estado 10/09/2026 — modo degradado (sin acceso a "mantenimientos").**
+> Temporalmente no hay acceso al usuario de mantenimientos, así que:
+> - El **correo matutino va solo con las capturas** (sin el Excel de
+>   mantenimientos) — `enviar_correo_matutino.py` lo detecta solo si
+>   `ETADIRECT_USER`/`ETADIRECT_PASS` no están configuradas.
+> - **La ruta de mediodía/tarde no se descarga ni se sube** —
+>   `descargar_ruta_y_subir.py` sale limpio sin hacer nada en ese caso.
+>   Conviene además **pausar los schedules `ofs-mediodia` y `ofs-tarde`**
+>   en EventBridge Scheduler mientras dure esto.
+>
+> Para volver al comportamiento completo: re-agregar
+> `ETADIRECT_USER`/`ETADIRECT_PASS` en las variables de entorno de la
+> Lambda y re-activar los dos schedules. No hay que tocar código.
+
 ## Modo de ejecución: AWS Lambda (las 3 tareas) — GitHub Actions y PC local quedan como respaldo
 
 Estos mismos 3 scripts corrieron primero desde una PC local, después desde GitHub Actions, y **desde el 03/08/2026 la tarea de la mañana (capturas + correo a Mercedes) corre en AWS Lambda + EventBridge Scheduler** (ver sección "Migración a AWS Lambda" más abajo) — GitHub Actions no garantizaba hora exacta (retrasos de hasta 2h+), Lambda sí. **Desde el 25/08/2026, `mediodia` y `tarde` también corren exclusivamente en Lambda** — confirmado estable, se retiraron sus horarios de GitHub Actions para no duplicar la subida del Excel de ruta.

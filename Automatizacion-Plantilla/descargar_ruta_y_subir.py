@@ -14,12 +14,18 @@ Variables de entorno requeridas:
   ETADIRECT_USER   Usuario de la consola de despacho (Oracle Field Service)
   ETADIRECT_PASS   Contraseña de la consola de despacho
 
+Si ETADIRECT_USER / ETADIRECT_PASS no estan configuradas, el script no
+hace nada y sale con exito (codigo 0) -- respaldo mientras no haya acceso
+a esa cuenta, para no ensuciar los logs con errores todos los dias. Para
+volver a activarlo basta con re-agregar esas variables.
+
 Uso manual (para probar):
   python descargar_ruta_y_subir.py
 
 Programacion diaria: ver README.md (Task Scheduler), a las 17:30.
 """
 
+import os
 import sys
 from datetime import date, timedelta
 
@@ -105,6 +111,16 @@ def subir_excel(ruta_excel):
 
 
 def main():
+    # Sin credenciales de la consola no hay forma de bajar la ruta -- se
+    # sale limpio (codigo 0) para no ensuciar los logs con un error diario
+    # mientras no haya acceso a esa cuenta.
+    if not os.environ.get("ETADIRECT_USER") or not os.environ.get("ETADIRECT_PASS"):
+        print(
+            "ETADIRECT_USER / ETADIRECT_PASS no configuradas -- no se descarga "
+            "ni se sube la ruta. Re-agrega esas variables para reactivar."
+        )
+        return
+
     usuario, clave = leer_credenciales_ofs()
     fecha_objetivo = calcular_fecha_objetivo()
 

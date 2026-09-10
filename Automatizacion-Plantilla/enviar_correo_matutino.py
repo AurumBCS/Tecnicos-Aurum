@@ -4,6 +4,13 @@ Correo matutino (7:30am): exporta el Excel de mantenimientos del dia
 capturas de pantalla que ya dejo guardadas tomar_capturas.py (con OTRO
 usuario, corrido un poco antes), y envia todo por correo a Mercedes.
 
+MODO SOLO-CAPTURAS: si ETADIRECT_USER / ETADIRECT_PASS no estan
+configuradas, el script NO entra a la consola ni exporta el Excel --
+manda el correo solo con las capturas. Sirve como respaldo mientras no
+haya acceso a la cuenta de mantenimientos; para volver al comportamiento
+completo basta con re-agregar esas dos variables (no hay que tocar
+codigo).
+
 Este script NO toma capturas -- eso lo hace tomar_capturas.py por separado,
 porque usa un usuario distinto de la consola. Programa tomar_capturas.py
 unos minutos antes que este (ver README.md) para que las capturas de HOY ya
@@ -12,11 +19,11 @@ esten listas cuando este script las busque.
 Credenciales: se leen SIEMPRE de variables de entorno, nunca estan escritas
 en este archivo.
 
-Variables de entorno requeridas:
-  ETADIRECT_USER       Usuario de la consola de despacho (mantenimientos)
-  ETADIRECT_PASS       Contraseña de la consola de despacho
+Variables de entorno:
+  ETADIRECT_USER       Usuario de la consola de despacho (mantenimientos) -- opcional: sin ella, modo solo-capturas
+  ETADIRECT_PASS       Contraseña de la consola de despacho -- opcional: idem
   GMAIL_USER            gustavo.perez@aurumbcs.com
-  GMAIL_APP_PASSWORD    Contraseña de aplicacion de Gmail (NO la contraseña normal)
+  GMAIL_APP_PASSWORD    Contraseña de aplicacion de Gmail (NO la contraseña normal) -- obligatoria
 
 Uso manual (para probar):
   python enviar_correo_matutino.py
@@ -39,7 +46,6 @@ from comun_ofs import (
     CARPETA_BASE,
     LAUNCH_ARGS,
     ruta_sesion,
-    leer_credenciales_ofs,
     abrir_sesion_ofs,
     aplicar_filtro_aurum,
     exportar_excel,
@@ -57,7 +63,10 @@ REMITENTE = "gustavo.perez@aurumbcs.com"
 
 
 def leer_credenciales_correo():
-    usuario, clave = leer_credenciales_ofs()
+    # ETADIRECT_USER / ETADIRECT_PASS son opcionales: si faltan, se va a
+    # modo solo-capturas (sin exportar el Excel de mantenimientos).
+    usuario = os.environ.get("ETADIRECT_USER")
+    clave = os.environ.get("ETADIRECT_PASS")
     gmail_user = os.environ.get("GMAIL_USER", REMITENTE)
     gmail_pass = os.environ.get("GMAIL_APP_PASSWORD")
 
@@ -80,17 +89,22 @@ def buscar_capturas_de_hoy():
     return capturas
 
 
-def enviar_correo(gmail_user, gmail_pass, capturas, excel):
+def enviar_correo(gmail_user, gmail_pass, capturas, excel=None):
     fecha_legible = datetime.now().strftime("%d/%m/%Y")
     msg = MIMEMultipart()
     msg["From"] = gmail_user
     msg["To"] = DESTINATARIO
     msg["Cc"] = COPIA
     msg["Subject"] = f"Plantilla de técnicos · {fecha_legible}"
-    msg.attach(MIMEText(
-        f"Adjunto la plantilla de técnicos y el Excel de mantenimientos del {fecha_legible}.",
-        "plain",
-    ))
+
+    if excel:
+        cuerpo = f"Adjunto la plantilla de técnicos y el Excel de mantenimientos del {fecha_legible}."
+    else:
+        cuerpo = (
+            f"Adjunto la plantilla de técnicos del {fecha_legible}. "
+            "El Excel de mantenimientos no va por ahora (sin acceso temporal a esa cuenta de la consola)."
+        )
+    msg.attach(MIMEText(cuerpo, "plain"))
 
     for ruta in capturas:
         with open(ruta, "rb") as f:
@@ -98,10 +112,11 @@ def enviar_correo(gmail_user, gmail_pass, capturas, excel):
         img["Content-Disposition"] = f'attachment; filename="{ruta.name}"'
         msg.attach(img)
 
-    with open(excel, "rb") as f:
-        adjunto_excel = MIMEApplication(f.read(), name=excel.name)
-    adjunto_excel["Content-Disposition"] = f'attachment; filename="{excel.name}"'
-    msg.attach(adjunto_excel)
+    if excel:
+        with open(excel, "rb") as f:
+            adjunto_excel = MIMEApplication(f.read(), name=excel.name)
+        adjunto_excel["Content-Disposition"] = f'attachment; filename="{excel.name}"'
+        msg.attach(adjunto_excel)
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.starttls()
@@ -113,32 +128,39 @@ def main():
     usuario, clave, gmail_user, gmail_pass = leer_credenciales_correo()
     capturas = buscar_capturas_de_hoy()
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
+    ruta_excel = None
+    if usuario and clave:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
 
-        if ARCHIVO_SESION.exists():
-            context = browser.new_context(storage_state=str(ARCHIVO_SESION))
-        else:
-            context = browser.new_context()
+            if ARCHIVO_SESION.exists():
+                context = browser.new_context(storage_state=str(ARCHIVO_SESION))
+            else:
+                context = browser.new_context()
 
-        page = context.new_page()
+            page = context.new_page()
 
-        try:
-            abrir_sesion_ofs(context, page, usuario, clave, ARCHIVO_SESION)
-            aplicar_filtro_aurum(page)
+            try:
+                abrir_sesion_ofs(context, page, usuario, clave, ARCHIVO_SESION)
+                aplicar_filtro_aurum(page)
 
-            CARPETA_DESCARGAS.mkdir(exist_ok=True)
-            fecha = datetime.now().strftime("%Y-%m-%d")
-            ruta_excel = exportar_excel(
-                page, CARPETA_DESCARGAS / f"mantenimientos_{fecha}.xlsx"
-            )
-        except PlaywrightTimeoutError as e:
-            registrar_error("enviar_correo_matutino", f"la pagina tardo demasiado o no encontro un elemento esperado: {e}")
-            CARPETA_DESCARGAS.mkdir(exist_ok=True)
-            page.screenshot(path=str(CARPETA_DESCARGAS / "error_debug.png"))
-            sys.exit(1)
-        finally:
-            browser.close()
+                CARPETA_DESCARGAS.mkdir(exist_ok=True)
+                fecha = datetime.now().strftime("%Y-%m-%d")
+                ruta_excel = exportar_excel(
+                    page, CARPETA_DESCARGAS / f"mantenimientos_{fecha}.xlsx"
+                )
+            except PlaywrightTimeoutError as e:
+                registrar_error("enviar_correo_matutino", f"la pagina tardo demasiado o no encontro un elemento esperado: {e}")
+                CARPETA_DESCARGAS.mkdir(exist_ok=True)
+                page.screenshot(path=str(CARPETA_DESCARGAS / "error_debug.png"))
+                sys.exit(1)
+            finally:
+                browser.close()
+    else:
+        print(
+            "ETADIRECT_USER / ETADIRECT_PASS no configuradas -- modo solo-capturas: "
+            "se envia el correo sin el Excel de mantenimientos."
+        )
 
     try:
         enviar_correo(gmail_user, gmail_pass, capturas, ruta_excel)
@@ -146,7 +168,10 @@ def main():
         registrar_error("enviar_correo_matutino", f"fallo al enviar el correo por SMTP: {e}")
         sys.exit(1)
 
-    print(f"Listo: {len(capturas)} capturas y Excel de mantenimientos enviados a {DESTINATARIO}")
+    if ruta_excel:
+        print(f"Listo: {len(capturas)} capturas y Excel de mantenimientos enviados a {DESTINATARIO}")
+    else:
+        print(f"Listo: {len(capturas)} capturas enviadas a {DESTINATARIO} (modo solo-capturas, sin Excel)")
 
 
 if __name__ == "__main__":
