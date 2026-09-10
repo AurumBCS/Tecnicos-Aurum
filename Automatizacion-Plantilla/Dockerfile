@@ -24,7 +24,11 @@ WORKDIR /var/task
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY comun_ofs.py tomar_capturas.py enviar_correo_matutino.py descargar_ruta_y_subir.py lambda_handler.py ./
+# Todos los scripts de la automatizacion (comun_ofs, tomar_capturas,
+# enviar_correo_matutino, descargar_ruta_y_subir, lambda_handler,
+# listar_buckets, ...). Se copian con *.py para no tener que actualizar
+# esta linea cada vez que se agrega un script nuevo.
+COPY *.py ./
 
 ENTRYPOINT ["python", "-m", "awslambdaric"]
 CMD ["lambda_handler.handler"]
