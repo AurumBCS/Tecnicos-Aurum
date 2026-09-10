@@ -1678,6 +1678,10 @@ function buildTecDetailHTML(tec){
     ${(()=>{
       const rm=RM_DATA[tec.id]||RM_DATA[tec.id.toUpperCase()];
       const cum=CUM_DATA[tec.id]||CUM_DATA[tec.id.toUpperCase()];
+      // Si se está viendo un mes pasado, rm.*/cum.* son de la tanda de HOY,
+      // no de ese mes -- en su lugar se usa el conteo del Resumen App Claude
+      // (tec.rm / tec.incum). Ver comentario largo en _openRMDash().
+      const viendoMesPasado = MES_SELECCIONADO && MES_SELECCIONADO !== mesActualNombre();
       let html='';
       if(rm||cum) html+='<div class="detail-section">Dashboards de datos reales</div>';
       if(rm){
@@ -1697,8 +1701,10 @@ function buildTecDetailHTML(tec){
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">🛠️ RMs</div>
-            <div style="font-size:.75rem;color:var(--text)">${rm.total} visitas · <span style="color:#e05a4a">${rm.reps} repetidas</span></div>
-            ${rm.topPost&&rm.topPost.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Causa raíz: <strong style="color:var(--orange)">${rm.topPost[0][0]}</strong></div>`:''}
+            ${viendoMesPasado
+              ? `<div style="font-size:.75rem;color:var(--text)"><span style="color:${tec.rm===0?'var(--green2)':'#e05a4a'}">${tec.rm} mantenimientos repetidos</span> · ${MES_SELECCIONADO}</div>`
+              : `<div style="font-size:.75rem;color:var(--text)">${rm.total} visitas · <span style="color:#e05a4a">${rm.reps} repetidas</span></div>
+            ${rm.topPost&&rm.topPost.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Causa raíz: <strong style="color:var(--orange)">${rm.topPost[0][0]}</strong></div>`:''}`}
           </div>
           <button onclick="showRMDashFromTec('${tec.id}')" style="flex-shrink:0;padding:8px 12px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.65rem;font-weight:700;cursor:pointer;text-transform:uppercase">Ver →</button>
         </div>`;
@@ -1720,8 +1726,10 @@ function buildTecDetailHTML(tec){
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">✅ Cumplimiento</div>
-            <div style="font-size:.75rem;color:var(--text)">${cum.total} visitas · <span style="color:#e05a4a">${cum.noOk} no cumplidas</span></div>
-            ${cum.topRazones&&cum.topRazones.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Razón: <strong style="color:#e05a4a">${cum.topRazones[0][0]}</strong></div>`:'<div style="font-size:.62rem;color:var(--green2);margin-top:2px">Sin incumplimientos ✓</div>'}
+            ${viendoMesPasado
+              ? `<div style="font-size:.75rem;color:var(--text)"><span style="color:${tec.incum===0?'var(--green2)':'#e05a4a'}">${tec.incum} incumplimientos</span> · ${MES_SELECCIONADO}</div>`
+              : `<div style="font-size:.75rem;color:var(--text)">${cum.total} visitas · <span style="color:#e05a4a">${cum.noOk} no cumplidas</span></div>
+            ${cum.topRazones&&cum.topRazones.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Razón: <strong style="color:#e05a4a">${cum.topRazones[0][0]}</strong></div>`:'<div style="font-size:.62rem;color:var(--green2);margin-top:2px">Sin incumplimientos ✓</div>'}`}
           </div>
           <button onclick="showCumDashFromTec('${tec.id}')" style="flex-shrink:0;padding:8px 12px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.65rem;font-weight:700;cursor:pointer;text-transform:uppercase">Ver →</button>
         </div>`;
@@ -4671,12 +4679,16 @@ function _openCumDash(tecId){
   // que comparar contra mesActualNombre() y no solo revisar si esta seteado.
   const viendoMesPasado = MES_SELECCIONADO && MES_SELECCIONADO !== mesActualNombre();
   if(viendoMesPasado){
+    const incum = tec ? tec.incum : null;
     document.getElementById('cumDashContent').innerHTML=`
       <div class="detail-hero">
         <div class="detail-hero-title">✅ Dashboard Cumplimiento · ${nombre}</div>
         <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
         <div class="detail-hero-sub">%Cumplimiento de ${MES_SELECCIONADO} (Resumen App Claude)</div>
       </div>
+      ${incum===null ? '' : `<div style="display:flex;gap:9px;margin-bottom:16px">
+        <div class="stat-box" style="flex:1"><div class="n" style="color:${incum===0?'var(--green2)':'#e05a4a'}">${incum}</div><div class="l">Incumplimientos</div></div>
+      </div>`}
       <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
         <div style="position:relative;width:70px;height:70px;flex-shrink:0">
           <svg width="70" height="70" viewBox="0 0 70 70" style="transform:rotate(-90deg)">
@@ -4694,7 +4706,7 @@ function _openCumDash(tecId){
         </div>
       </div>
       <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:.72rem;color:var(--muted);line-height:1.6">
-        ℹ️ El detalle de visitas e incumplimientos solo está disponible para el mes en curso — el Excel de cumplimiento no guarda un histórico por mes anterior.
+        ℹ️ El detalle de razones de incumplimiento solo está disponible para el mes en curso — el Excel de cumplimiento no guarda un histórico por mes anterior.
       </div>`;
     showPanel('cumDashPanel'); window.scrollTo(0,0);
     return;
