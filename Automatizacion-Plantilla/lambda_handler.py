@@ -45,8 +45,10 @@ def _correr(fn, nombre):
 
 def handler(event, context):
     tarea = (event or {}).get("tarea")
-    if tarea not in ("manana", "mediodia", "tarde"):
-        raise ValueError(f"Evento invalido, falta 'tarea' (manana/mediodia/tarde): {event}")
+    if tarea not in ("manana", "mediodia", "tarde", "listar_buckets"):
+        raise ValueError(
+            f"Evento invalido, falta 'tarea' (manana/mediodia/tarde/listar_buckets): {event}"
+        )
 
     if tarea == "manana":
         import tomar_capturas
@@ -54,6 +56,11 @@ def handler(event, context):
 
         _correr(tomar_capturas.main, "tomar_capturas")
         _correr(enviar_correo_matutino.main, "enviar_correo_matutino")
+    elif tarea == "listar_buckets":
+        # Diagnostico de una sola vez -- ver listar_buckets.py.
+        import listar_buckets
+
+        _correr(listar_buckets.main, "listar_buckets")
     else:
         import descargar_ruta_y_subir
 
