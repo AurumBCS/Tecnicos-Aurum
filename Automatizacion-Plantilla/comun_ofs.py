@@ -14,7 +14,9 @@ si. Credenciales: SIEMPRE desde variables de entorno, nunca en el codigo.
 """
 
 import os
+import re
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -402,6 +404,79 @@ def _encontrar_visible_en_panel(page, texto, intentos=15):
     return None
 
 
+# Cuantas veces mas hay que volcar el HTML del dialogo de descarga al log
+# (diagnostico, solo las primeras). Lista de un elemento para poder
+# mutarla desde dentro de la funcion.
+_DIAG_DIALOGO_RESTANTES = [3]
+
+
+def _cerrar_dialogos(page):
+    """
+    Cierra cualquier dialogo/overlay de Oracle JET que haya quedado
+    abierto (el de descarga sobre todo) -- si no, su capa transparente
+    tapa el panel y todos los clics siguientes fallan con
+    "subtree intercepts pointer events" (visto en vivo 2026-09-10).
+    """
+    for _ in range(3):
+        try:
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(150)
+        except Exception:
+            break
+    try:
+        cerrar = page.locator(".oj-dialog-close-icon:visible, button[title='Cerrar']:visible")
+        for i in range(cerrar.count()):
+            try:
+                cerrar.nth(i).click()
+                page.wait_for_timeout(150)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def _bajar_desde_dialogo(page, ruta_destino):
+    """
+    Tras clickear "Exportar", OFS abre un dialogo de descarga
+    (id contiene 'download-file-dialog'). Hay que apretar algo adentro
+    (un link o un boton) para que el archivo baje de verdad. Como no
+    tenemos confirmado el selector exacto, se vuelca el HTML del dialogo
+    al log las primeras veces y se prueban varios candidatos.
+    Devuelve True si logro guardar el archivo.
+    """
+    dialogo = page.locator(
+        "[id*='download-file-dialog'], .oj-dialog:visible"
+    ).first
+    try:
+        dialogo.wait_for(state="visible", timeout=8000)
+    except Exception:
+        return False  # no aparecio dialogo -> quizas fue descarga directa
+
+    if _DIAG_DIALOGO_RESTANTES[0] > 0:
+        _DIAG_DIALOGO_RESTANTES[0] -= 1
+        try:
+            print(f"[buckets][diag] HTML del dialogo de descarga: {dialogo.evaluate('el => el.outerHTML')!r}")
+        except Exception as e:
+            print(f"[buckets][diag] no se pudo leer el HTML del dialogo: {e}")
+
+    candidatos = [
+        dialogo.locator("a[href]"),
+        dialogo.get_by_role("button", name=re.compile("descargar|download|guardar|aceptar|ok", re.I)),
+        dialogo.locator("button:visible, .oj-button:visible"),
+    ]
+    for cand in candidatos:
+        try:
+            if cand.count() == 0:
+                continue
+            with page.expect_download(timeout=60000) as info:
+                cand.first.click()
+            info.value.save_as(str(ruta_destino))
+            return True
+        except Exception:
+            continue
+    return False
+
+
 def _exportar_un_bucket(page, nombre, ruta_destino):
     """
     Selecciona el bucket `nombre` y, si ofrece Acciones -> Exportar (o
@@ -410,14 +485,16 @@ def _exportar_un_bucket(page, nombre, ruta_destino):
     fallo (se registra el error pero NO se corta el recorrido -- un
     bucket roto no debe tumbar los otros 60).
     """
+    _cerrar_dialogos(page)
+
     entrada = _encontrar_visible_en_panel(page, nombre)
     if entrada is None:
         registrar_error("exportar_buckets", f"no aparece el bucket '{nombre}' en el panel")
         return None
 
     try:
-        entrada.click()
-        page.wait_for_timeout(1500)
+        entrada.click(force=True)
+        page.wait_for_timeout(1200)
 
         acciones = page.get_by_text("Acciones", exact=True)
         if acciones.count() == 0 or not acciones.first.is_visible():
@@ -427,15 +504,31 @@ def _exportar_un_bucket(page, nombre, ruta_destino):
         page.wait_for_timeout(400)
         exportar = page.get_by_text("Exportar", exact=True)
         if exportar.count() == 0 or not exportar.first.is_visible():
-            page.keyboard.press("Escape")
+            _cerrar_dialogos(page)
             return None
 
-        with page.expect_download(timeout=60000) as info:
-            exportar.first.click()
-        info.value.save_as(str(ruta_destino))
-        return ruta_destino
+        # "Exportar" puede bajar el archivo directo O abrir un dialogo.
+        # Se prueba primero descarga directa (timeout corto); si no,
+        # se maneja el dialogo.
+        try:
+            with page.expect_download(timeout=4000) as info:
+                exportar.first.click()
+            info.value.save_as(str(ruta_destino))
+            _cerrar_dialogos(page)
+            return ruta_destino
+        except Exception:
+            pass
+
+        if _bajar_desde_dialogo(page, ruta_destino):
+            _cerrar_dialogos(page)
+            return ruta_destino
+
+        registrar_error("exportar_buckets", f"'{nombre}': se clickeo Exportar pero no bajo el archivo")
+        _cerrar_dialogos(page)
+        return None
     except Exception as e:
         registrar_error("exportar_buckets", f"fallo exportando '{nombre}': {e}")
+        _cerrar_dialogos(page)
         return None
 
 
@@ -469,13 +562,23 @@ def exportar_todos_los_buckets(page, carpeta_tmp, ruta_final):
     Lanza RuntimeError solo si NINGUN bucket exporto (senal de que algo
     esta mal de fondo: acceso, selectores, etc).
     """
-    from pathlib import Path
-
     carpeta_tmp = Path(carpeta_tmp)
     carpeta_tmp.mkdir(parents=True, exist_ok=True)
 
+    # Un clic bloqueado no debe costar los 30s por defecto -- con ~79
+    # buckets eso revienta el presupuesto de tiempo.
+    page.set_default_timeout(15000)
+
+    # Presupuesto de tiempo: la Lambda corta a los 15 min. Se deja ~12 min
+    # para el recorrido y ~3 para pegar + mandar el correo. Si se acaba,
+    # se arma el Excel con lo que se haya podido bajar.
+    limite = time.monotonic() + 12 * 60
+
     exportados = []
     for i, nombre in enumerate(BUCKETS):
+        if time.monotonic() > limite:
+            print(f"[buckets] se acabo el tiempo en el bucket {i + 1}/{len(BUCKETS)} -- se sigue con lo que hay")
+            break
         destino = carpeta_tmp / f"bucket_{i:03d}.xlsx"
         if _exportar_un_bucket(page, nombre, destino):
             exportados.append(destino)
