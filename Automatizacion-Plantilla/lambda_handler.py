@@ -45,9 +45,9 @@ def _correr(fn, nombre):
 
 def handler(event, context):
     tarea = (event or {}).get("tarea")
-    if tarea not in ("manana", "mediodia", "tarde", "listar_buckets"):
+    if tarea not in ("manana", "mediodia", "tarde", "listar_buckets", "correo"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (manana/mediodia/tarde/listar_buckets): {event}"
+            f"Evento invalido, falta 'tarea' (manana/mediodia/tarde/listar_buckets/correo): {event}"
         )
 
     if tarea == "manana":
@@ -55,6 +55,12 @@ def handler(event, context):
         import enviar_correo_matutino
 
         _correr(tomar_capturas.main, "tomar_capturas")
+        _correr(enviar_correo_matutino.main, "enviar_correo_matutino")
+    elif tarea == "correo":
+        # Solo el correo (sin volver a tomar capturas) -- para probar la
+        # exportacion por buckets sin esperar los ~2 min de capturas.
+        import enviar_correo_matutino
+
         _correr(enviar_correo_matutino.main, "enviar_correo_matutino")
     elif tarea == "listar_buckets":
         # Diagnostico de una sola vez -- ver listar_buckets.py.

@@ -66,6 +66,98 @@ def ruta_sesion(perfil):
     return CARPETA_BASE / f"sesion_ofs_{perfil}.json"
 
 
+# Buckets/zonas del panel izquierdo a exportar uno por uno con el usuario
+# de CAPTURAS (que puede exportar, pero solo bucket por bucket -- ver
+# README, "modo degradado"). Sacada con `{"tarea": "listar_buckets"}` el
+# 2026-09-10. Para regenerarla cuando cambien las zonas: correr esa tarea
+# y pegar la seccion "sugerencia" del log aca.
+#
+# La lista tiene ~79 nombres pero solo ~61 tienen tecnicos -- los vacios
+# no ofrecen el boton Exportar y `exportar_todos_los_buckets` los saltea
+# solo, asi que sobra con dejarlos aca.
+BUCKETS = [
+    "Alicante Benidorm Aurum",
+    "Alicante Centro Aurum",
+    "Alicante Denia Aurum",
+    "Bcn Baix LLobregat Aurum",
+    "BCN Berga Aurum",
+    "BCN Castelldefels Aurum",
+    "Bcn Ciudad Centro Aurum",
+    "BCN Ciudad Norte Aurum",
+    "Bcn Ciudad Sur Aurum",
+    "BCN Igualada Aurum",
+    "BCN Maresme Centro Aurum",
+    "BCN Maresme Sur Aurum",
+    "BCN Mollet Aurum",
+    "BCN Sabadell Aurum",
+    "BCN San Cugat Aurum",
+    "BCN Sitges Aurum",
+    "BCN Terrassa Aurum",
+    "Bolsa GTI Alzira",
+    "Bolsa GTI Segovia",
+    "Castellon Sur Aurum",
+    "Girona Centro Aurum",
+    "Girona Figueras Aurum",
+    "Girona Vidreres Aurum",
+    "GTI Bolsa Amposta",
+    "GTI Bolsa Reus",
+    "GTI Bolsa Tarragona Interior",
+    "GTI Bolsa Vendrell",
+    "GTI Segovia Espinar",
+    "GTI Segovia Riaza",
+    "Huelva Aurum",
+    "LLeida Aurum",
+    "LLeida Mollerusa Aurum",
+    "Madrid A3 Aurum",
+    "Madrid A42 Aurum",
+    "Madrid A5 Aurum",
+    "Madrid Alcala Meco Aurum",
+    "Madrid Alcobendas Aurum",
+    "Madrid Algete Aurum",
+    "Madrid Bravo Murillo Aurum",
+    "Madrid Carabanchel Aurum",
+    "Madrid Centro Aurum",
+    "Madrid Chamberi Aurum",
+    "Madrid Colmenar Aurum",
+    "Madrid El Escorial Aurum",
+    "Madrid Las Rozas Aurum",
+    "Madrid las Tablas Aurum",
+    "Madrid Leganes Aurum",
+    "Madrid M501 Aurum",
+    "Madrid Pozuelo Aurum",
+    "Madrid San Blas Aurum",
+    "Madrid Sol Aurum",
+    "Madrid Sur Aurum",
+    "Madrid Torrejon Aurum",
+    "Madrid Vicalvaro Aurum",
+    "Madrid Villalba Aurum",
+    "Malaga Aurum",
+    "Malaga Mijas Aurum",
+    "Mallorca Manacor Aurum",
+    "Mallorca Palma Aurum",
+    "MD Boadilla Villaviciosa Aurum",
+    "Murcia Aguilas Aurum",
+    "Murcia Centro Aurum",
+    "Murcia Molina Aurum",
+    "Murcia San Javier Aurum",
+    "Segovia Aurum",
+    "Sevilla Aljarafe Aurum",
+    "Sevilla Centro Aurum",
+    "Sevilla Lebrija Aurum",
+    "Tarragona Reus Aurum",
+    "Tarragona Vendrell Aurum",
+    "Tenerife Capital Aurum",
+    "Tenerife Granadilla Aurum",
+    "Tenerife La Laguna Aurum",
+    "Valencia Alzira Aurum",
+    "Valencia capital Aurum",
+    "Valencia Cullera Aurum",
+    "Valencia Eliana Aurum",
+    "Valencia norte Aurum",
+    "Valencia Torrente Aurum",
+]
+
+
 def leer_credenciales_ofs(sufijo=""):
     """
     sufijo="" lee ETADIRECT_USER / ETADIRECT_PASS (usuario de mantenimientos).
@@ -279,3 +371,125 @@ def exportar_excel(page, ruta_destino):
     descarga = descarga_info.value
     descarga.save_as(str(ruta_destino))
     return ruta_destino
+
+
+# ── Exportacion por buckets (modo degradado, usuario de CAPTURAS) ───────────
+#
+# El usuario de mantenimientos podia exportar TODO de una con el filtro
+# AURUM. El de capturas no: hay que entrar bucket por bucket y exportar
+# cada uno. Estas funciones recorren BUCKETS, exportan los que tienen
+# tecnicos, y pegan todos los .xlsx en uno solo (mismo formato/columnas
+# que traia el export original -- confirmado con Gustavo).
+
+
+def _encontrar_visible_en_panel(page, texto, intentos=15):
+    """
+    Devuelve la coincidencia VISIBLE de `texto` en el panel izquierdo,
+    haciendo scroll de rueda de mouse si hace falta. Igual que en
+    tomar_capturas: un mismo nombre puede aparecer varias veces en el DOM
+    (copias ocultas), hay que quedarse con la que este visible, no con la
+    primera. Devuelve None si no aparece ninguna visible tras los intentos.
+    """
+    candidatos = page.get_by_text(texto, exact=False)
+    for _ in range(intentos):
+        for i in range(candidatos.count()):
+            c = candidatos.nth(i)
+            if c.is_visible():
+                return c
+        page.mouse.move(200, 400)
+        page.mouse.wheel(0, 400)
+        page.wait_for_timeout(300)
+    return None
+
+
+def _exportar_un_bucket(page, nombre, ruta_destino):
+    """
+    Selecciona el bucket `nombre` y, si ofrece Acciones -> Exportar (o
+    sea, tiene tecnicos), baja su Excel a `ruta_destino`. Devuelve
+    ruta_destino si exporto, None si el bucket no tiene tecnicos o algo
+    fallo (se registra el error pero NO se corta el recorrido -- un
+    bucket roto no debe tumbar los otros 60).
+    """
+    entrada = _encontrar_visible_en_panel(page, nombre)
+    if entrada is None:
+        registrar_error("exportar_buckets", f"no aparece el bucket '{nombre}' en el panel")
+        return None
+
+    try:
+        entrada.click()
+        page.wait_for_timeout(1500)
+
+        acciones = page.get_by_text("Acciones", exact=True)
+        if acciones.count() == 0 or not acciones.first.is_visible():
+            return None  # bucket sin tecnicos -> no hay menu de acciones
+
+        acciones.first.click()
+        page.wait_for_timeout(400)
+        exportar = page.get_by_text("Exportar", exact=True)
+        if exportar.count() == 0 or not exportar.first.is_visible():
+            page.keyboard.press("Escape")
+            return None
+
+        with page.expect_download(timeout=60000) as info:
+            exportar.first.click()
+        info.value.save_as(str(ruta_destino))
+        return ruta_destino
+    except Exception as e:
+        registrar_error("exportar_buckets", f"fallo exportando '{nombre}': {e}")
+        return None
+
+
+def _pegar_excels(rutas, ruta_final):
+    """
+    Pega varios .xlsx en uno. Toma el primero como base (conserva su
+    encabezado y formato) y le agrega solo las filas de datos de los
+    demas (salteando la fila de encabezado repetida de cada uno).
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(str(rutas[0]))
+    ws = wb.active
+    for ruta in rutas[1:]:
+        wb_extra = load_workbook(str(ruta), read_only=True)
+        ws_extra = wb_extra.active
+        for j, fila in enumerate(ws_extra.iter_rows(values_only=True)):
+            if j == 0:
+                continue  # encabezado repetido
+            ws.append(list(fila))
+        wb_extra.close()
+    wb.save(str(ruta_final))
+    return ruta_final
+
+
+def exportar_todos_los_buckets(page, carpeta_tmp, ruta_final):
+    """
+    Recorre BUCKETS, exporta cada uno que tenga tecnicos a un archivo
+    temporal en `carpeta_tmp`, y los pega todos en `ruta_final`.
+    Devuelve (ruta_final, cantidad_exportada, cantidad_salteada).
+    Lanza RuntimeError solo si NINGUN bucket exporto (senal de que algo
+    esta mal de fondo: acceso, selectores, etc).
+    """
+    from pathlib import Path
+
+    carpeta_tmp = Path(carpeta_tmp)
+    carpeta_tmp.mkdir(parents=True, exist_ok=True)
+
+    exportados = []
+    for i, nombre in enumerate(BUCKETS):
+        destino = carpeta_tmp / f"bucket_{i:03d}.xlsx"
+        if _exportar_un_bucket(page, nombre, destino):
+            exportados.append(destino)
+            print(f"[buckets] {i + 1}/{len(BUCKETS)} exportado: {nombre}")
+        else:
+            print(f"[buckets] {i + 1}/{len(BUCKETS)} salteado (sin tecnicos/error): {nombre}")
+
+    if not exportados:
+        raise RuntimeError(
+            "Ningun bucket exporto -- revisar acceso del usuario de capturas "
+            "y los selectores de Acciones/Exportar en exportar_buckets."
+        )
+
+    _pegar_excels(exportados, ruta_final)
+    salteados = len(BUCKETS) - len(exportados)
+    print(f"[buckets] === {len(exportados)} exportados, {salteados} salteados -> {ruta_final}")
+    return ruta_final, len(exportados), salteados
