@@ -500,7 +500,12 @@ def _exportar_un_bucket(page, nombre, ruta_destino):
         if acciones.count() == 0 or not acciones.first.is_visible():
             return None  # bucket sin tecnicos -> no hay menu de acciones
 
-        acciones.first.click()
+        # force=True: un dialogo residual de una exportacion anterior
+        # puede quedar tapando la pantalla un instante (transparente pero
+        # intercepta clics) -- visto en vivo, tumbaba estos dos clics con
+        # "subtree intercepts pointer events" en buckets que SI tenian
+        # tecnicos, marcandolos mal como "sin tecnicos".
+        acciones.first.click(force=True)
         page.wait_for_timeout(400)
         exportar = page.get_by_text("Exportar", exact=True)
         if exportar.count() == 0 or not exportar.first.is_visible():
@@ -512,7 +517,7 @@ def _exportar_un_bucket(page, nombre, ruta_destino):
         # se maneja el dialogo.
         try:
             with page.expect_download(timeout=4000) as info:
-                exportar.first.click()
+                exportar.first.click(force=True)
             info.value.save_as(str(ruta_destino))
             _cerrar_dialogos(page)
             return ruta_destino
@@ -534,23 +539,41 @@ def _exportar_un_bucket(page, nombre, ruta_destino):
 
 def _pegar_excels(rutas, ruta_final):
     """
-    Pega varios .xlsx en uno. Toma el primero como base (conserva su
-    encabezado y formato) y le agrega solo las filas de datos de los
-    demas (salteando la fila de encabezado repetida de cada uno).
-    """
-    from openpyxl import load_workbook
+    Pega varios .xlsx en uno solo, con los valores (sin formato -- no
+    hace falta, es para adjuntar en un correo). Arma un libro NUEVO desde
+    cero en vez de reusar el primer archivo como base: abrir un .xlsx de
+    Oracle en modo escritura completa dispara un bug conocido de openpyxl
+    ("list index out of range" al parsear su hoja de estilos, visto en
+    vivo 2026-09-14) -- leer siempre con read_only=True lo evita.
 
-    wb = load_workbook(str(rutas[0]))
-    ws = wb.active
-    for ruta in rutas[1:]:
-        wb_extra = load_workbook(str(ruta), read_only=True)
-        ws_extra = wb_extra.active
-        for j, fila in enumerate(ws_extra.iter_rows(values_only=True)):
-            if j == 0:
-                continue  # encabezado repetido
-            ws.append(list(fila))
-        wb_extra.close()
-    wb.save(str(ruta_final))
+    Un archivo individual roto no tumba el resto: se registra y se
+    saltea, se sigue con los demas.
+    """
+    from openpyxl import Workbook, load_workbook
+
+    wb_final = Workbook()
+    ws_final = wb_final.active
+    encabezado_puesto = False
+
+    for ruta in rutas:
+        try:
+            wb = load_workbook(str(ruta), read_only=True, data_only=True)
+            ws = wb.active
+            for j, fila in enumerate(ws.iter_rows(values_only=True)):
+                if j == 0:
+                    if encabezado_puesto:
+                        continue  # encabezado repetido de este archivo
+                    encabezado_puesto = True
+                ws_final.append(list(fila))
+            wb.close()
+        except Exception as e:
+            registrar_error("exportar_buckets", f"no se pudo leer '{ruta}' para pegar: {e}")
+            continue
+
+    if not encabezado_puesto:
+        raise RuntimeError("Ningun archivo de bucket se pudo leer para armar el Excel final")
+
+    wb_final.save(str(ruta_final))
     return ruta_final
 
 
