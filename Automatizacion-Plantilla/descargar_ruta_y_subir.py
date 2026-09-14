@@ -1,7 +1,13 @@
 """
-Descarga diaria de la ruta (Excel de actividades) desde Oracle Field Service
-y carga automatica en la app Aurum (confirmaciones-sms) para que salgan las
-citas a confirmar.
+Descarga diaria de la ruta (Excel de actividades) del dia siguiente desde
+Oracle Field Service y la sube a la app Aurum (confirmaciones-sms) para
+que salgan las citas a confirmar.
+
+El Excel se arma exportando bucket por bucket con el usuario de CAPTURAS
+(ETADIRECT_USER_CAPTURAS) y pegando todos los .xlsx en uno solo -- ver
+`exportar_todos_los_buckets` en comun_ofs.py y la seccion "modo
+degradado" del README. (Antes se exportaba de una sola vez con el
+usuario de mantenimientos, al que ya no tenemos acceso.)
 
 Regla de fecha: SIEMPRE se descarga la ruta del dia SIGUIENTE a hoy, excepto
 que ese dia siguiente caiga domingo, en cuyo caso se salta al lunes. Esto se
@@ -11,33 +17,35 @@ adelante), nunca escribiendo la fecha a mano.
 Credenciales: se leen SIEMPRE de variables de entorno (ver README.md).
 
 Variables de entorno requeridas:
-  ETADIRECT_USER   Usuario de la consola de despacho (Oracle Field Service)
-  ETADIRECT_PASS   Contraseña de la consola de despacho
-
-Si ETADIRECT_USER / ETADIRECT_PASS no estan configuradas, el script no
-hace nada y sale con exito (codigo 0) -- respaldo mientras no haya acceso
-a esa cuenta, para no ensuciar los logs con errores todos los dias. Para
-volver a activarlo basta con re-agregar esas variables.
+  ETADIRECT_USER_CAPTURAS   Usuario de la consola (capturas)
+  ETADIRECT_PASS_CAPTURAS   Su contraseña
 
 Uso manual (para probar):
   python descargar_ruta_y_subir.py
 
-Programacion diaria: ver README.md (Task Scheduler), a las 17:30.
+Programacion diaria: ver README.md (EventBridge Scheduler).
 """
 
-import os
 import sys
 from datetime import date, timedelta
 
 import requests
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 
-from comun_ofs import CARPETA_BASE, LAUNCH_ARGS, ruta_sesion, leer_credenciales_ofs, abrir_sesion_ofs, aplicar_filtro_aurum, exportar_excel, registrar_error
+from comun_ofs import (
+    CARPETA_BASE,
+    LAUNCH_ARGS,
+    ruta_sesion,
+    leer_credenciales_ofs,
+    abrir_sesion_ofs,
+    exportar_todos_los_buckets,
+    registrar_error,
+)
 
 # ── Configuracion ──────────────────────────────────────────────────────────
 
 CARPETA_DESCARGAS = CARPETA_BASE / "descargas"
-ARCHIVO_SESION = ruta_sesion("mantenimientos")  # mismo usuario que el correo matutino
+ARCHIVO_SESION = ruta_sesion("capturas")  # mismo usuario que capturas/correo matutino
 URL_SUBIDA = "https://tecnicos-aurum.onrender.com/upload"
 MATRICULA_SUBIDA = "GD5381"  # uploader autorizado sin filtro (Gustavo Perez)
 
@@ -111,40 +119,45 @@ def subir_excel(ruta_excel):
 
 
 def main():
-    # Sin credenciales de la consola no hay forma de bajar la ruta -- se
-    # sale limpio (codigo 0) para no ensuciar los logs con un error diario
-    # mientras no haya acceso a esa cuenta.
-    if not os.environ.get("ETADIRECT_USER") or not os.environ.get("ETADIRECT_PASS"):
-        print(
-            "ETADIRECT_USER / ETADIRECT_PASS no configuradas -- no se descarga "
-            "ni se sube la ruta. Re-agrega esas variables para reactivar."
-        )
-        return
-
-    usuario, clave = leer_credenciales_ofs()
+    usuario, clave = leer_credenciales_ofs("_CAPTURAS")
     fecha_objetivo = calcular_fecha_objetivo()
+    CARPETA_DESCARGAS.mkdir(exist_ok=True)
+    ruta_excel = CARPETA_DESCARGAS / f"ruta_{fecha_objetivo.isoformat()}.xlsx"
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
         context = (
-            browser.new_context(storage_state=str(ARCHIVO_SESION))
+            browser.new_context(
+                storage_state=str(ARCHIVO_SESION),
+                viewport={"width": 1920, "height": 1080},
+            )
             if ARCHIVO_SESION.exists()
-            else browser.new_context()
+            else browser.new_context(viewport={"width": 1920, "height": 1080})
         )
         page = context.new_page()
 
         try:
             abrir_sesion_ofs(context, page, usuario, clave, ARCHIVO_SESION)
-            aplicar_filtro_aurum(page)
+            page.wait_for_selector(".toaGantt-provTree", timeout=60000)
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(2000)
+
             navegar_a_fecha_objetivo(page, fecha_objetivo)
-            CARPETA_DESCARGAS.mkdir(exist_ok=True)
-            ruta_excel = exportar_excel(
-                page, CARPETA_DESCARGAS / f"ruta_{fecha_objetivo.isoformat()}.xlsx"
+
+            exportar_todos_los_buckets(
+                page, CARPETA_DESCARGAS / "buckets_ruta", ruta_excel
             )
-        except PlaywrightTimeoutError as e:
-            registrar_error("descargar_ruta_y_subir", f"la pagina tardo demasiado o no encontro un elemento esperado: {e}")
-            CARPETA_DESCARGAS.mkdir(exist_ok=True)
-            page.screenshot(path=str(CARPETA_DESCARGAS / "error_debug.png"))
+        except Exception as e:
+            registrar_error("descargar_ruta_y_subir", f"la pagina tardo demasiado o algo fallo: {e}")
+            try:
+                page.screenshot(path=str(CARPETA_DESCARGAS / "error_debug.png"))
+            except Exception:
+                pass
+            try:
+                print(f"[diagnostico] URL al momento del error: {page.url}")
+                print(f"[diagnostico] Texto visible (primeros 1000 caracteres): {page.locator('body').inner_text()[:1000]!r}")
+            except Exception as e_diag:
+                print(f"[diagnostico] No se pudo leer URL/texto de la pagina: {e_diag}")
             sys.exit(1)
         finally:
             browser.close()
