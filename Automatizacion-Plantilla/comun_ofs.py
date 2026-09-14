@@ -201,17 +201,20 @@ def _completar_formulario_login(page, usuario, clave):
     # #sign-in; .check() es el metodo de Playwright pensado para
     # checkboxes y dispara los eventos internos de forma mas fiel.
     #
-    # Con muchas corridas de prueba seguidas puede haber acumulado MAS DE
-    # UNA sesion de sobra (visto en vivo 2026-09-14: una sola vuelta no
-    # alcanzo, el aviso volvio a aparecer) -- por eso se repite el ciclo
-    # completo (marcar + confirmar) hasta que el aviso deje de aparecer,
-    # en vez de asumir que una vez alcanza.
-    for intento in range(6):
+    # Con muchas corridas de prueba seguidas puede haber acumulado MUCHAS
+    # sesiones de sobra, no solo una o dos -- cada vuelta de este ciclo
+    # borra la mas vieja nomas (visto en vivo 2026-09-14: 6 vueltas no
+    # alcanzaron, el aviso seguia ahi). Se sube el limite bastante mas;
+    # cada vuelta tarda ~2.3s, 40 vueltas son ~90s como peor caso.
+    MAX_VUELTAS_SESIONES = 40
+    for intento in range(MAX_VUELTAS_SESIONES):
         aviso_sesiones = page.get_by_text("Delete the oldest user session and login")
         if aviso_sesiones.count() == 0 or not aviso_sesiones.first.is_visible():
+            if intento > 0:
+                print(f"[diagnostico] aviso de sesiones liberado despues de {intento} vuelta(s)")
             break
 
-        print(f"[diagnostico] aviso de sesiones excedidas (vuelta {intento + 1}/6) -- marcando y confirmando")
+        print(f"[diagnostico] aviso de sesiones excedidas (vuelta {intento + 1}/{MAX_VUELTAS_SESIONES}) -- marcando y confirmando")
         checkbox_borrar_sesion = page.locator("#delsession")
         try:
             checkbox_borrar_sesion.check(force=True)
@@ -222,7 +225,7 @@ def _completar_formulario_login(page, usuario, clave):
         page.locator("#sign-in").click(force=True)
         page.wait_for_timeout(1500)
     else:
-        print("[diagnostico] se agotaron las 6 vueltas liberando sesiones -- puede seguir trabado")
+        print(f"[diagnostico] se agotaron las {MAX_VUELTAS_SESIONES} vueltas liberando sesiones -- puede seguir trabado")
 
     # Esperar a que cargue la consola de despacho (la tabla de tecnicos).
     page.wait_for_selector(".toaGantt-provTree", timeout=60000)
