@@ -56,7 +56,7 @@ CARPETA_CAPTURAS = CARPETA_BASE / "capturas"
 CARPETA_DESCARGAS = CARPETA_BASE / "descargas"
 ARCHIVO_SESION = ruta_sesion("capturas")  # mismo usuario que tomar_capturas.py
 DESTINATARIO = "mercedes.savarino@aurumbcs.com"
-COPIA = "gustavo.perez@aurumbcs.com"
+COPIA = ["gustavo.perez@aurumbcs.com", "cesar.trujillo@aurumbcs.com"]
 REMITENTE = "gustavo.perez@aurumbcs.com"
 
 
@@ -145,7 +145,7 @@ def enviar_correo(gmail_user, gmail_pass, capturas, excel=None):
     msg = MIMEMultipart()
     msg["From"] = gmail_user
     msg["To"] = DESTINATARIO
-    msg["Cc"] = COPIA
+    msg["Cc"] = ", ".join(COPIA)
     msg["Subject"] = f"Plantilla de técnicos · {fecha_legible}"
 
     if excel:
@@ -172,7 +172,7 @@ def enviar_correo(gmail_user, gmail_pass, capturas, excel=None):
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.starttls()
         server.login(gmail_user, gmail_pass)
-        server.sendmail(gmail_user, [DESTINATARIO, COPIA], msg.as_string())
+        server.sendmail(gmail_user, [DESTINATARIO] + COPIA, msg.as_string())
 
 
 def main():
