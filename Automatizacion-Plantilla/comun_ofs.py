@@ -200,24 +200,29 @@ def _completar_formulario_login(page, usuario, clave):
     # normal -- incluso con force=True -- no alcanzaba a habilitar
     # #sign-in; .check() es el metodo de Playwright pensado para
     # checkboxes y dispara los eventos internos de forma mas fiel.
-    aviso_sesiones = page.get_by_text("Delete the oldest user session and login")
-    if aviso_sesiones.count() > 0 and aviso_sesiones.first.is_visible():
+    #
+    # Con muchas corridas de prueba seguidas puede haber acumulado MAS DE
+    # UNA sesion de sobra (visto en vivo 2026-09-14: una sola vuelta no
+    # alcanzo, el aviso volvio a aparecer) -- por eso se repite el ciclo
+    # completo (marcar + confirmar) hasta que el aviso deje de aparecer,
+    # en vez de asumir que una vez alcanza.
+    for intento in range(6):
+        aviso_sesiones = page.get_by_text("Delete the oldest user session and login")
+        if aviso_sesiones.count() == 0 or not aviso_sesiones.first.is_visible():
+            break
+
+        print(f"[diagnostico] aviso de sesiones excedidas (vuelta {intento + 1}/6) -- marcando y confirmando")
         checkbox_borrar_sesion = page.locator("#delsession")
         try:
             checkbox_borrar_sesion.check(force=True)
-            print(f"[diagnostico] #delsession marcado tras check(): {checkbox_borrar_sesion.is_checked()!r}")
         except Exception as e_diag:
             print(f"[diagnostico] Error al marcar #delsession: {e_diag}")
         page.wait_for_timeout(800)
 
-        boton_signin = page.locator("#sign-in")
-        try:
-            print(f"[diagnostico] #sign-in disabled tras marcar la opcion: {boton_signin.get_attribute('disabled')!r}")
-        except Exception as e_diag:
-            print(f"[diagnostico] No se pudo leer el atributo disabled de #sign-in: {e_diag}")
-
-        boton_signin.click(force=True)
+        page.locator("#sign-in").click(force=True)
         page.wait_for_timeout(1500)
+    else:
+        print("[diagnostico] se agotaron las 6 vueltas liberando sesiones -- puede seguir trabado")
 
     # Esperar a que cargue la consola de despacho (la tabla de tecnicos).
     page.wait_for_selector(".toaGantt-provTree", timeout=60000)
