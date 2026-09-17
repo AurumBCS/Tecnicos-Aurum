@@ -3333,16 +3333,28 @@ function pintarBotonFichaje(){
   const st=estadoFichajeBtn(FICHAJE_ID);
 
   if(FICHAJE_COOLDOWN_TIMER){ clearTimeout(FICHAJE_COOLDOWN_TIMER); FICHAJE_COOLDOWN_TIMER=null; }
+  // Durante los minutos de protección contra doble toque no se muestra una cuenta atrás
+  // (se leía como un bloqueo/error) sino el estado real: si ya se fichó entrada, que
+  // quede claro que la jornada está en curso; solo se sigue avisando de un bloqueo real
+  // si el toque todavía no se ha confirmado (server aún no devolvió estado 'abierto').
   const restante = st.estado==='cerrado' ? 0 : msRestantesCooldownFichaje(FICHAJE_ID);
   if(restante > 0){
-    const minRestantes = Math.ceil(restante/60000);
     btn.disabled=true;
-    btn.style.opacity='.6';
-    btn.style.color='var(--muted)'; btn.style.borderColor='var(--border2)';
-    btn.textContent = '🔒 Espera '+minRestantes+' min';
+    if(st.estado==='abierto'){
+      btn.style.opacity='1';
+      btn.style.color='var(--green2)'; btn.style.borderColor='#1a3d2a';
+      btn.textContent='🟢 Trabajando desde '+st.entrada;
+      btn.title='Podrás finalizar la jornada en unos minutos';
+    } else {
+      btn.style.opacity='.6';
+      btn.style.color='var(--muted)'; btn.style.borderColor='var(--border2)';
+      btn.textContent='⏳ Sincronizando…';
+      btn.title='';
+    }
     FICHAJE_COOLDOWN_TIMER = setTimeout(pintarBotonFichaje, restante+1000);
     return;
   }
+  btn.title='';
 
   btn.disabled=false;
   if(st.estado==='sinFichar'){
@@ -3557,13 +3569,23 @@ function onFichajeBtnClick(){
   const st=estadoFichajeBtn(FICHAJE_ID);
   if(st.estado!=='sinFichar' && st.estado!=='abierto') return;
   if(fichajeEnCooldown(FICHAJE_ID)) return; // el boton ya deberia estar bloqueado, doble seguro
-  // Feedback inmediato (antes de esperar geolocalización/red) — deshabilita, cambia texto
-  // y atenúa el botón para que se note al instante que el toque se registró.
+  // Feedback inmediato: se pinta directamente el estado final (no un "Fichando…"
+  // intermedio que se queda esperando red) para que se note al instante que el toque
+  // se registró. La hora exacta que cuenta legalmente es la que pone el servidor;
+  // esta es solo una vista optimista que loadFichajeHoy() confirma/corrige enseguida.
   const btn=document.getElementById('fichajeBtn');
+  const horaAhora=new Date().toTimeString().slice(0,5);
   if(btn){
     btn.disabled=true;
-    btn.style.opacity='.6';
-    btn.textContent='⏳ Fichando…';
+    if(st.estado==='sinFichar'){
+      btn.style.opacity='1';
+      btn.style.color='var(--green2)'; btn.style.borderColor='#1a3d2a';
+      btn.textContent='🟢 Trabajando desde '+horaAhora;
+    } else {
+      btn.style.opacity='.6';
+      btn.style.color='var(--muted)'; btn.style.borderColor='var(--border2)';
+      btn.textContent='⏳ Cerrando jornada…';
+    }
   }
   // Se marca ANTES de que responda el servidor (fetch es no-cors, no hay
   // forma fiable de confirmar éxito) para bloquear cualquier segundo toque
