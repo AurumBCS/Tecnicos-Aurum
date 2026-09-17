@@ -419,6 +419,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <!-- Docs pendientes del equipo (colapsable) -->
       <div id="equipoDocsContainer"></div>
 
+      <!-- Vacaciones del equipo, solicitadas/restantes por técnico (colapsable) -->
+      <div id="equipoVacacionesEquipoContainer"></div>
+
       <!-- Lista técnicos (colapsable) -->
       <div id="tecList"></div>
 
@@ -439,6 +442,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         <option value="">Cargando meses…</option>
       </select>
       <button onclick="showHistoricoEquipo(null,'jrPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico de todos los técnicos</button>
+      <button id="btnEquipoTF" onclick="showEquipoTF()" style="display:none;width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📍 Equipo TF</button>
       <div class="section-head">Resumen global</div>
       <div class="equipo-kpis" id="jrResumen" style="margin-bottom:14px"></div>
       <div class="section-head">Rankings de la empresa</div>
@@ -475,6 +479,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="sync-dot"></div>
       Conexiones registradas por matrícula
     </div>
+    <select id="mesSelectorUsage" onchange="renderUsagePanel(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+      <option value="">Total (todo el histórico)</option>
+    </select>
     <div id="usageContent"><div style="text-align:center;color:var(--text2);padding:40px 0">Cargando datos de uso…</div></div>
   </div>
 
@@ -565,7 +572,6 @@ const APP_TOKEN = "74ffa953c19c831f33d06b8b0d5e38ab1ee707ed881c3426";
 const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=csv&token=" + APP_TOKEN;
 const AUTH_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=auth&token=" + APP_TOKEN;
 const DOCS_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=docs&token=" + APP_TOKEN;
-const FLOTA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=flota&token=" + APP_TOKEN;
 const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=vacaciones&token=" + APP_TOKEN;
 const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=medalia-coord&token=" + APP_TOKEN;
 const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=cumplimiento&token=" + APP_TOKEN;
@@ -615,7 +621,7 @@ let AUTH_CUADRANTE_LOADED = false;
 let ZONA_DATA = {};
 let CUENTA_DATA = {}; // mat -> {je: bool, empresa: bool}
 let ROSTER_NOMBRES = {}; // mat -> nombre, del Cuadrante (incluye tecnicos sin datos este mes)
-let FLOTA_DATA = {};
+let ROSTER_EXTRA = {}; // mat -> {coche, vacAnuales, vacSolicitadas, vacRestantes}, del Cuadrante -- "coche" ya se usa en renderFlota()/renderFlotaJE(), el resto sigue sin usarse
 let DOCS_DATA = [];
 let VACACIONES_DATA = {};
 let MEDALIA_COORD_DATA = {};
@@ -707,13 +713,12 @@ function statusLabel(s){
   return s==='ok'?'✓ Objetivo cumplido':s==='warn'?'⚠ Cerca':'✗ Por debajo';
 }
 function buildKpiAlertBadges(t){
-  const pRM=t.pRM||0, pCum=t.pCum||0, conv=t.conv||0, ppa=t.ppa||0;
+  const pRM=t.pRM||0, pCum=t.pCum||0, conv=t.conv||0;
   const badges=[];
   if(!t.pRMSinDatos) badges.push({label:`RM ${pRM.toFixed(1)}%`, bad:pRM<89.5});
   badges.push(
     {label:`Cumpl. ${pCum.toFixed(1)}%`, bad:pCum<90},
     {label:`Conv ${conv.toFixed(1)}%`, bad:conv<15},
-    {label:`PPA ${ppa.toFixed(1)}%`, bad:ppa<10},
   );
   if((t.falt||0)>0) badges.push({label:`Falt. ${t.falt}`, bad:true});
   const exced = (t.ab||0)-(t.nec||0);
@@ -921,6 +926,7 @@ async function loadJerarquia(){
       ZONA_DATA = {};
       CUENTA_DATA = {};
       ROSTER_NOMBRES = {};
+      ROSTER_EXTRA = {};
       rows.forEach(row=>{
         const je       = String(row['JE']||'').trim().toUpperCase();
         const mat      = String(row['Matricula']||'').trim().toUpperCase();
@@ -930,6 +936,10 @@ async function loadJerarquia(){
         const rawEmp = String(row['CuentaEmpresa']||'').trim().toLowerCase();
         const cuentaJE  = rawJE  ? rawJE.includes('si')  : null;
         const cuentaEmp = rawEmp ? rawEmp.includes('si') : null;
+        const coche          = String(row['Coche']||'').trim();
+        const vacAnuales     = String(row['VacAnuales']||'').trim();
+        const vacSolicitadas = String(row['VacSolicitadas']||'').trim();
+        const vacRestantes   = String(row['VacRestantes']||'').trim();
         if(je && mat){
           if(mat !== je){
             if(!JERARQUIA[je]) JERARQUIA[je]=[];
@@ -938,6 +948,7 @@ async function loadJerarquia(){
           if(zona) ZONA_DATA[mat] = zona;
           CUENTA_DATA[mat] = {je: cuentaJE, empresa: cuentaEmp};
           if(nombre) ROSTER_NOMBRES[mat] = nombre;
+          ROSTER_EXTRA[mat] = {coche, vacAnuales, vacSolicitadas, vacRestantes};
         }
       });
       // Actualizar la lista de JEs visible para el JR
@@ -1313,10 +1324,11 @@ function renderMain(tec, returnToEquipo=false){
     });
   }
 
-  // Flota + vacaciones: renderizar si ya cargaron, si no reintentar
+  // Coche (via jerarquia/ROSTER_EXTRA) + vacaciones: renderizar si ya
+  // cargaron, si no reintentar
   renderFlota(tec.id,'flotaMain');
-  if(!Object.keys(FLOTA_DATA).length || !Object.keys(VACACIONES_DATA).length){
-    Promise.all([loadFlota(), loadVacaciones()]).then(()=>{
+  if(!Object.keys(ROSTER_EXTRA).length || !Object.keys(VACACIONES_DATA).length){
+    Promise.all([loadJerarquia(), loadVacaciones()]).then(()=>{
       renderFlota(_tecId,'flotaMain');
     });
   }
@@ -1484,10 +1496,13 @@ function renderEquipoPanel(jeId){
     if(document.getElementById('equipoDocsContainer')) renderDocsEquipoCollapsible(jeId,'equipoDocsContainer');
   }
 
-  // Lista de técnicos — separar cuentan / no cuentan para el JE
+  // Lista de técnicos — separar cuentan / no cuentan para el JE. Cuentan
+  // solo con un "si" explicito; vacio/roto (#VALUE!, etc) cae en no cuentan
+  // -- antes con "=== false" esos casos no caian en ninguna de las dos y el
+  // tecnico desaparecia de la lista por completo.
   const tieneCuentaData = Object.keys(CUENTA_DATA).length > 0;
   const cuentan   = tieneCuentaData ? tecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je === true) : tecs;
-  const noCuentan = tieneCuentaData ? tecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je === false) : [];
+  const noCuentan = tieneCuentaData ? tecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je !== true) : [];
 
   function tecScore(t){
     let s=t.mlv*2+t.mab;
@@ -1564,6 +1579,7 @@ function renderEquipoPanel(jeId){
   // Mostrar vehículo y vacaciones del JE
   renderFlotaJE(jeId, 'equipoFlotaJEContainer');
   renderVacacionesJE(jeId, 'equipoVacacionesJEContainer');
+  renderVacacionesEquipoCollapsible(jeId, 'equipoVacacionesEquipoContainer');
 }
 
 // ══════════════════════════════════════════════
@@ -1662,10 +1678,16 @@ function buildTecDetailHTML(tec){
     ${(()=>{
       const rm=RM_DATA[tec.id]||RM_DATA[tec.id.toUpperCase()];
       const cum=CUM_DATA[tec.id]||CUM_DATA[tec.id.toUpperCase()];
+      // Si se está viendo un mes pasado, rm.*/cum.* son de la tanda de HOY,
+      // no de ese mes -- en su lugar se usa el conteo del Resumen App Claude
+      // (tec.rm / tec.incum). Ver comentario largo en _openRMDash().
+      const viendoMesPasado = MES_SELECCIONADO && MES_SELECCIONADO !== mesActualNombre();
       let html='';
       if(rm||cum) html+='<div class="detail-section">Dashboards de datos reales</div>';
       if(rm){
-        const rmCol=rm.pctRM>=89.5?'var(--green2)':'#e05a4a';
+        // %RM siempre el del Resumen App Claude (tec.pRM) -- el Excel de
+        // mantenimientos (rm.*) solo aporta el detalle de visitas/repeticiones.
+        const rmCol=tec.pRM>=89.5?'var(--green2)':'#e05a4a';
         html+=`<div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;padding:14px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
           <div style="position:relative;width:58px;height:58px;flex-shrink:0">
             <svg width="58" height="58" viewBox="0 0 58 58" style="transform:rotate(-90deg)">
@@ -1673,20 +1695,24 @@ function buildTecDetailHTML(tec){
               <circle fill="none" stroke="${rmCol}" stroke-width="6" stroke-linecap="round"
                 cx="29" cy="29" r="23"
                 stroke-dasharray="${(2*Math.PI*23).toFixed(1)}"
-                stroke-dashoffset="${(2*Math.PI*23*(1-rm.pctRM/100)).toFixed(1)}"/>
+                stroke-dashoffset="${(2*Math.PI*23*(1-tec.pRM/100)).toFixed(1)}"/>
             </svg>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${rmCol}">${rm.pctRM.toFixed(2)}%</div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${rmCol}">${tec.pRM.toFixed(2)}%</div>
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">🛠️ RMs</div>
-            <div style="font-size:.75rem;color:var(--text)">${rm.total} visitas · <span style="color:#e05a4a">${rm.reps} repetidas</span></div>
-            ${rm.topPost&&rm.topPost.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Causa raíz: <strong style="color:var(--orange)">${rm.topPost[0][0]}</strong></div>`:''}
+            ${viendoMesPasado
+              ? `<div style="font-size:.75rem;color:var(--text)"><span style="color:${tec.rm===0?'var(--green2)':'#e05a4a'}">${tec.rm} mantenimientos repetidos</span> · ${MES_SELECCIONADO}</div>`
+              : `<div style="font-size:.75rem;color:var(--text)">${rm.total} visitas · <span style="color:#e05a4a">${rm.reps} repetidas</span></div>
+            ${rm.topPost&&rm.topPost.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Causa raíz: <strong style="color:var(--orange)">${rm.topPost[0][0]}</strong></div>`:''}`}
           </div>
           <button onclick="showRMDashFromTec('${tec.id}')" style="flex-shrink:0;padding:8px 12px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.65rem;font-weight:700;cursor:pointer;text-transform:uppercase">Ver →</button>
         </div>`;
       }
       if(cum){
-        const cumCol=cum.pct>=90?'var(--green2)':'#e05a4a';
+        // %Cumplimiento siempre el del Resumen App Claude (tec.pCum) -- el
+        // Excel (cum.*) solo aporta el detalle de visitas/incumplimientos.
+        const cumCol=tec.pCum>=90?'var(--green2)':'#e05a4a';
         html+=`<div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;padding:14px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
           <div style="position:relative;width:58px;height:58px;flex-shrink:0">
             <svg width="58" height="58" viewBox="0 0 58 58" style="transform:rotate(-90deg)">
@@ -1694,14 +1720,16 @@ function buildTecDetailHTML(tec){
               <circle fill="none" stroke="${cumCol}" stroke-width="6" stroke-linecap="round"
                 cx="29" cy="29" r="23"
                 stroke-dasharray="${(2*Math.PI*23).toFixed(1)}"
-                stroke-dashoffset="${(2*Math.PI*23*(1-cum.pct/100)).toFixed(1)}"/>
+                stroke-dashoffset="${(2*Math.PI*23*(1-tec.pCum/100)).toFixed(1)}"/>
             </svg>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${cumCol}">${cum.pct.toFixed(2)}%</div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.82rem;font-weight:700;color:${cumCol}">${tec.pCum.toFixed(2)}%</div>
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.7rem;font-weight:700;color:var(--gold2);margin-bottom:2px">✅ Cumplimiento</div>
-            <div style="font-size:.75rem;color:var(--text)">${cum.total} visitas · <span style="color:#e05a4a">${cum.noOk} no cumplidas</span></div>
-            ${cum.topRazones&&cum.topRazones.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Razón: <strong style="color:#e05a4a">${cum.topRazones[0][0]}</strong></div>`:'<div style="font-size:.62rem;color:var(--green2);margin-top:2px">Sin incumplimientos ✓</div>'}
+            ${viendoMesPasado
+              ? `<div style="font-size:.75rem;color:var(--text)"><span style="color:${tec.incum===0?'var(--green2)':'#e05a4a'}">${tec.incum} incumplimientos</span> · ${MES_SELECCIONADO}</div>`
+              : `<div style="font-size:.75rem;color:var(--text)">${cum.total} visitas · <span style="color:#e05a4a">${cum.noOk} no cumplidas</span></div>
+            ${cum.topRazones&&cum.topRazones.length?`<div style="font-size:.62rem;color:var(--muted);margin-top:2px">Razón: <strong style="color:#e05a4a">${cum.topRazones[0][0]}</strong></div>`:'<div style="font-size:.62rem;color:var(--green2);margin-top:2px">Sin incumplimientos ✓</div>'}`}
           </div>
           <button onclick="showCumDashFromTec('${tec.id}')" style="flex-shrink:0;padding:8px 12px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.65rem;font-weight:700;cursor:pointer;text-transform:uppercase">Ver →</button>
         </div>`;
@@ -1766,7 +1794,7 @@ function renderJRPanel(){
   GRUPOS.forEach(grupo => {
     const grupoTecs = tieneZonas ? getTecsPorZona(grupo.zonas) : grupo.jeIds.flatMap(id=>getTecnicosOfJE(id));
     const cuentanEmp  = tieneCuentaEmp ? grupoTecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===true) : grupoTecs;
-    const noCuentanEmp= tieneCuentaEmp ? grupoTecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===false) : [];
+    const noCuentanEmp= tieneCuentaEmp ? grupoTecs.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa!==true) : [];
     const grupoAv = calcAvg(cuentanEmp);
     const gCol = grupoAv.mlv>=7?'var(--green2)':grupoAv.mlv>=6.5?'var(--orange)':'#e05a4a';
     const avNo = calcAvg(noCuentanEmp);
@@ -1916,9 +1944,12 @@ function renderMedialiaCoord(){
       : [];
     if(!mats.length) return;
 
-    // cuentan empresa: explícito true o sin dato (tienen encuestas → están activos)
-    const cuentan   = tieneCuenta ? mats.filter(m=>CUENTA_DATA[m]?.empresa!==false) : mats;
-    const noCuentan = tieneCuenta ? mats.filter(m=>CUENTA_DATA[m]?.empresa===false)  : [];
+    // cuentan empresa: solo si dice explicitamente "si" -- si esta vacio, roto
+    // (#VALUE! u otro error de formula) o cualquier otra cosa que no sea un
+    // "si" claro, se trata como que NO cuenta (antes "sin dato" contaba como
+    // que si, dejando pasar celdas rotas/vacias como si contaran).
+    const cuentan   = tieneCuenta ? mats.filter(m=>CUENTA_DATA[m]?.empresa===true) : mats;
+    const noCuentan = tieneCuenta ? mats.filter(m=>CUENTA_DATA[m]?.empresa!==true)  : [];
 
     const av  = calcMed(cuentan);
     const avNo= calcMed(noCuentan);
@@ -1937,6 +1968,35 @@ function renderMedialiaCoord(){
         </div>
       </div>` : '';
 
+    // Técnicos de esta zona que no tienen NINGUNA nota de Medalia este mes
+    // (ni siquiera "no cuentan" -- directamente no hay ninguna encuesta).
+    const sinNotas = tieneZonas
+      ? CURRENT_DATA.tecnicos.filter(t=>{
+          const idU = t.id.toUpperCase();
+          const enZona = grupo.zonas.some(z=>(ZONA_DATA[idU]||'').toString().includes(z));
+          const tieneNota = MEDALIA_COORD_DATA[idU] && MEDALIA_COORD_DATA[idU].cantidad>0;
+          // Si no cuenta para la empresa (false, vacio, #VALUE!, etc), no
+          // tiene sentido marcarlo como "sin notas" -- aunque tuviera, esas
+          // notas tampoco contarian. Mismo criterio "===true" que el resto.
+          const cuentaEmpresa = !tieneCuenta || CUENTA_DATA[idU]?.empresa===true;
+          return enZona && !tieneNota && cuentaEmpresa;
+        })
+      : [];
+    const idGrupo = 'medaliaSinNotas-' + grupo.nombre.replace(/\s+/g,'');
+    const sinNotasHTML = sinNotas.length ? `
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div onclick="const e=document.getElementById('${idGrupo}');e.style.display=e.style.display==='none'?'flex':'none';" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.6rem;font-weight:700;letter-spacing:.08em;color:var(--gold3);text-transform:uppercase">Sin notas de Medalia este mes · ${sinNotas.length}</span>
+          <span style="font-size:.65rem;color:var(--muted)">▾</span>
+        </div>
+        <div id="${idGrupo}" style="display:none;margin-top:8px;flex-direction:column;gap:4px">
+          ${sinNotas.map(t=>`
+            <div style="background:var(--bg);border-radius:8px;padding:6px 10px;font-size:.72rem;color:var(--text)">
+              ${t.nombre.trim()} <span style="color:var(--muted)">· ${t.id}</span>
+            </div>`).join('')}
+        </div>
+      </div>` : '';
+
     html+=`
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;margin-top:10px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${color},transparent)"></div>
@@ -1951,6 +2011,7 @@ function renderMedialiaCoord(){
         </div>
       </div>
       ${noHTML}
+      ${sinNotasHTML}
     </div>`;
   });
 
@@ -2051,6 +2112,72 @@ function showTecDetailFromJR(tecId){
   window.scrollTo(0,0);
 }
 
+// Vista especial solo para GD5381: los tecnicos de provincia TF (Tenerife),
+// con el mismo detalle completo por tecnico que ve un JE de su propio
+// equipo (no es un JE real en la JERARQUIA, se filtra directo por provincia).
+function showEquipoTF(){
+  const tecs = CURRENT_DATA.tecnicos.filter(t=>(t.provincia||'').toUpperCase()==='TF');
+  const av = calcAvg(tecs);
+  const sorted = [...tecs].sort((a,b)=>b.mlv-a.mlv);
+  const mlvG=getGrade(av.mlv||0), mabG=getGrade(av.mab||0);
+
+  document.getElementById('jrDetailContent').innerHTML=`
+    <div class="detail-hero">
+      <div class="detail-hero-title">📍 Equipo TF</div>
+      <div class="detail-hero-val" style="font-size:1.3rem;color:var(--gold2)">Tenerife</div>
+      <div class="detail-hero-sub">${tecs.length} técnicos</div>
+    </div>
+
+    <div class="detail-section">Promedios del equipo</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="hero-card g-${mlvG}">
+        <div class="hero-label">ML-V promedio</div>
+        <div class="hero-val g-${mlvG}">${(av.mlv||0).toFixed(2)}</div>
+        <span class="hero-badge g-${mlvG}">${gradeLabel(mlvG)}</span>
+      </div>
+      <div class="hero-card g-${mabG}">
+        <div class="hero-label">MA+B promedio</div>
+        <div class="hero-val g-${mabG}">${(av.mab||0).toFixed(2)}</div>
+        <span class="hero-badge g-${mabG}">${gradeLabel(mabG)}</span>
+      </div>
+    </div>
+
+    <div class="equipo-kpis" style="margin-bottom:14px">
+      <div class="equipo-kpi"><div class="equipo-kpi-name">%RM</div>
+        <div class="equipo-kpi-val" style="color:${(av.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(av.pRM||0).toFixed(1)}%</div></div>
+      <div class="equipo-kpi"><div class="equipo-kpi-name">%Cum</div>
+        <div class="equipo-kpi-val" style="color:${(av.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(av.pCum||0).toFixed(1)}%</div></div>
+      <div class="equipo-kpi"><div class="equipo-kpi-name">Conv</div>
+        <div class="equipo-kpi-val" style="color:${(av.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(av.conv||0).toFixed(1)}%</div></div>
+    </div>
+
+    <div class="detail-section">Técnicos</div>
+    <div class="tec-list">
+    ${sorted.map((t,i)=>{
+      const g2=getGrade(t.mlv);
+      const col2=gradeColor(g2);
+      return`<div class="tec-row g-${g2}" onclick="showTecDetailFromJR('${t.id}')">
+        <div class="tec-rank">${i+1}</div>
+        <div class="tec-info">
+          <div class="tec-name">${t.nombre.trim()}</div>
+          <div class="tec-sub">${t.id} · ${t.provincia} · ${t.lab} lab.</div>
+          ${buildKpiAlertBadges(t)}
+        </div>
+        <div class="tec-vals">
+          <div>
+            <div class="tec-mlv" style="color:${col2}">${t.mlv.toFixed(2)}</div>
+            <div class="tec-mab">MA+B ${t.mab.toFixed(2)}</div>
+          </div>
+          <div class="tec-arrow">›</div>
+        </div>
+      </div>`;
+    }).join('')}
+    </div>`;
+
+  showPanel('jrDetailPanel');
+  window.scrollTo(0,0);
+}
+
 
 // Panel al que "← Volver" debe regresar desde equipoDashPanel (equipoPanel o jrPanel)
 let _dashBackPanel = 'equipoPanel';
@@ -2086,22 +2213,27 @@ function toggleMantenimientosMotivo(rowId){
   if(!listEl) return;
   if(listEl.style.display !== 'none'){ listEl.style.display='none'; return; }
 
-  let nMants = [];
+  let pares = []; // [{n, nuevo}]
   if(info.tipo==='cum'){
     const cum = CUM_DATA[info.tecId] || CUM_DATA[info.tecId.toUpperCase()];
-    nMants = (cum && cum.visitas || []).filter(v => !v.ok && v.razon===info.motivo).map(v=>v.nMant);
+    pares = (cum && cum.visitas || []).filter(v => !v.ok && v.razon===info.motivo).map(v=>({n:v.nMant, nuevo:false}));
   } else if(info.tipo==='rm'){
     const rm = RM_DATA[info.tecId] || RM_DATA[info.tecId.toUpperCase()];
-    nMants = (rm && rm.visitas || []).filter(v => v.repetido && v.motivo===info.motivo).map(v=>v.nMant);
+    pares = (rm && rm.visitas || []).filter(v => v.repetido && v.motivo===info.motivo).map(v=>({n:v.nMant, nuevo:!!v.nuevo}));
   } else {
     const rm = RM_DATA[info.tecId] || RM_DATA[info.tecId.toUpperCase()];
-    nMants = (rm && rm.visitas || []).filter(v => v.motivo_post===info.motivo).map(v=>v.nMantPost||v.nMant);
+    pares = (rm && rm.visitas || []).filter(v => v.motivo_post===info.motivo).map(v=>({n:v.nMantPost||v.nMant, nuevo:!!v.nuevo}));
   }
-  nMants = [...new Set(nMants.filter(n=>n))];
+  // Deduplicar por numero de mantenimiento, quedandose con "nuevo" si algun
+  // duplicado lo era.
+  const porNumero = new Map();
+  pares.filter(p=>p.n).forEach(p=>{
+    porNumero.set(p.n, porNumero.get(p.n) || p.nuevo);
+  });
 
-  listEl.innerHTML = nMants.length
-    ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${nMants.map(n=>
-        `<span style="background:var(--dim);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;font-size:.66rem;color:var(--gold2);font-weight:600;user-select:text;cursor:text">#${n}</span>`
+  listEl.innerHTML = porNumero.size
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${[...porNumero.entries()].map(([n,nuevo])=>
+        `<span style="background:${nuevo?'rgba(232,201,106,.15)':'var(--dim)'};border:1px solid ${nuevo?'#3d3300':'var(--border2)'};border-radius:6px;padding:3px 8px;font-size:.66rem;color:var(--gold2);font-weight:600;user-select:text;cursor:text">#${n}${nuevo?' 🆕':''}</span>`
       ).join('')}</div>`
     : '<div style="color:var(--muted);font-size:.68rem">Sin mantenimientos encontrados</div>';
   listEl.style.display='block';
@@ -2109,20 +2241,75 @@ function toggleMantenimientosMotivo(rowId){
 
 function _openRMDash(tecId){
   const id = String(tecId).trim();
-  const rm = RM_DATA[id] || RM_DATA[id.toUpperCase()];
   // Buscar técnico siempre por id, no depender de CURRENT_TEC
   const tec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
-  if(!rm){
-    alert('No hay datos de RMs disponibles para este técnico (' + id + ').');
-    return;
-  }
   if(!tec){
     alert('Técnico no encontrado: ' + id);
     return;
   }
 
-  const pctOk = rm.pctRM >= 89.5;
+  // El %RM mostrado es siempre el del Resumen App Claude (tec.pRM), no un
+  // recalculo desde el Excel de mantenimientos -- rm.* solo aporta el
+  // detalle de visitas/repeticiones/motivos.
+  const pctResumen = tec.pRM;
+  const pctOk = pctResumen >= 89.5;
   const col = pctOk ? 'var(--green2)' : '#e05a4a';
+  const circPreview = 2*Math.PI*28;
+  const offsetPreview = circPreview - (pctResumen/100)*circPreview;
+
+  // RM_DATA es SIEMPRE una foto del último Excel de "Repeated Maintenance
+  // Aurum" procesado -- nunca un histórico por mes. Si se está viendo un
+  // mes pasado (selector de mes), mostrar ese detalle mezclaría el %RM del
+  // mes pasado con visitas de HOY (confirmado en vivo: un técnico con 13
+  // repetidas en un mes pasado, según el Resumen, mostraba "0 repetidas"
+  // aquí porque ese detalle es de la tanda actual, no de ese mes). En su
+  // lugar se muestra la cantidad de mantenimientos repetidos tal cual la
+  // columna "RM" del Resumen App Claude para ese mes (tec.rm) -- el mes
+  // actual sigue mostrando el detalle real del Excel mas abajo, sin tocar.
+  // OJO: MES_SELECCIONADO no es null en el mes actual -- loadSheets() lo
+  // deja con el NOMBRE del mes actual tras cada login normal, por eso hay
+  // que comparar contra mesActualNombre() y no solo revisar si esta seteado.
+  const viendoMesPasado = MES_SELECCIONADO && MES_SELECCIONADO !== mesActualNombre();
+  if(viendoMesPasado){
+    document.getElementById('rmDashContent').innerHTML = `
+      <div class="detail-hero">
+        <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
+        <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
+        <div class="detail-hero-sub">%RM de ${MES_SELECCIONADO} (Resumen App Claude)</div>
+      </div>
+      <div style="display:flex;gap:9px;margin-bottom:16px">
+        <div class="stat-box" style="flex:1"><div class="n" style="color:${tec.rm===0?'var(--green2)':'#e05a4a'}">${tec.rm}</div><div class="l">Mantenimientos<br>repetidos</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
+        <div style="position:relative;width:70px;height:70px;flex-shrink:0">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="transform:rotate(-90deg)">
+            <circle fill="none" stroke="var(--dim)" stroke-width="8" cx="35" cy="35" r="28"/>
+            <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
+              cx="35" cy="35" r="28"
+              stroke-dasharray="${circPreview.toFixed(1)}" stroke-dashoffset="${offsetPreview.toFixed(1)}"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${pctResumen.toFixed(2)}%</div>
+        </div>
+        <div>
+          <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
+            Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(pctResumen-89.5).toFixed(2)} puntos`:`Faltan ${(89.5-pctResumen).toFixed(2)} puntos`}
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:.72rem;color:var(--muted);line-height:1.6">
+        ℹ️ El detalle de motivos y causa raíz solo está disponible para el mes en curso — el Excel de mantenimientos no guarda un histórico por mes anterior.
+      </div>`;
+    showPanel('rmDashPanel');
+    window.scrollTo(0,0);
+    return;
+  }
+
+  const rm = RM_DATA[id] || RM_DATA[id.toUpperCase()];
+  if(!rm){
+    alert('No hay datos de RMs disponibles para este técnico (' + id + ').');
+    return;
+  }
   const totalOk = rm.total - rm.reps;
 
   function barras(arr, maxVal, color, tecId, tipo){
@@ -2156,19 +2343,20 @@ function _openRMDash(tecId){
   const maxRMmot   = rm.motivosRM  && rm.motivosRM[0]   ? rm.motivosRM[0][1]   : 1;
 
   const circ   = 2*Math.PI*28;
-  const offset = circ - (rm.pctRM/100)*circ;
+  const offset = circ - (pctResumen/100)*circ;
 
   document.getElementById('rmDashContent').innerHTML = `
     <div class="detail-hero">
       <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
-      <div class="detail-hero-val" style="color:${col}">${rm.pctRM.toFixed(2)}%</div>
-      <div class="detail-hero-sub">%RM del técnico · datos del Excel de mantenimientos</div>
+      <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
+      <div class="detail-hero-sub">%RM del técnico (Resumen App Claude) · detalle desde el Excel de mantenimientos</div>
     </div>
 
     <div style="display:flex;gap:9px;margin-bottom:16px">
       <div class="stat-box" style="flex:1"><div class="n">${rm.total}</div><div class="l">Total<br>visitas</div></div>
       <div class="stat-box" style="flex:1"><div class="n" style="color:#e05a4a">${rm.reps}</div><div class="l">Visitas<br>repetidas</div></div>
       <div class="stat-box" style="flex:1"><div class="n" style="color:var(--green2)">${totalOk}</div><div class="l">Resueltas<br>1ª visita</div></div>
+      <div class="stat-box" style="flex:1"><div class="n" style="color:${(rm.nuevos||0)>0?'var(--gold2)':'var(--muted)'}">${rm.nuevos||0}</div><div class="l">Nuevas<br>esta tanda</div></div>
     </div>
 
     <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
@@ -2179,12 +2367,12 @@ function _openRMDash(tecId){
             cx="35" cy="35" r="28"
             stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
         </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${rm.pctRM.toFixed(2)}%</div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${pctResumen.toFixed(2)}%</div>
       </div>
       <div>
         <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
         <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-          Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(rm.pctRM-89.5).toFixed(2)} puntos`:`Faltan ${(89.5-rm.pctRM).toFixed(2)} puntos`}
+          Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(pctResumen-89.5).toFixed(2)} puntos`:`Faltan ${(89.5-pctResumen).toFixed(2)} puntos`}
         </div>
       </div>
     </div>
@@ -2407,14 +2595,18 @@ function _renderDashRanking(type, tecs){
   const ambito = _dashBackPanel==='jrPanel' ? 'de la empresa' : 'del equipo';
 
   const cfg=CFG[type];
+  // El %RM/%Cumplimiento SIEMPRE es el del Resumen App Claude (t.pRM/t.pCum,
+  // ya cargado para todos vía loadSheets) -- el Excel del correo (RM_DATA/
+  // CUM_DATA) solo aporta el detalle de mantenimientos repetidos e
+  // incumplimientos para las columnas extra, nunca recalcula el porcentaje.
   const tecsForCalc = (type==='rm' || type==='cum')
     ? tecs.map(t=>{
         if(type==='rm'){
           const rmInfo=RM_DATA[t.id.toUpperCase()];
-          return rmInfo ? {...t, palito:rmInfo.total, rm:rmInfo.reps, pRM:rmInfo.pctRM} : t;
+          return rmInfo ? {...t, palito:rmInfo.total, rm:rmInfo.reps} : t;
         }
         const cumInfo=CUM_DATA[t.id.toUpperCase()];
-        return cumInfo ? {...t, nec:cumInfo.total, palito:cumInfo.ok, incum:cumInfo.noOk, pCum:cumInfo.pct} : t;
+        return cumInfo ? {...t, nec:cumInfo.total, palito:cumInfo.ok, incum:cumInfo.noOk} : t;
       })
     : tecs;
   const sorted=[...tecsForCalc].sort((a,b)=>b[cfg.key]-a[cfg.key]);
@@ -2709,28 +2901,58 @@ function renderDocsEquipoCollapsible(jeId, containerId){
 }
 
 // ══════════════════════════════════════════════
-//  FLOTA
+//  VACACIONES DEL EQUIPO, POR TÉCNICO (DESPLEGABLE, vista JE)
 // ══════════════════════════════════════════════
-async function loadFlota(){
-  try{
-    const url = FLOTA_URL + (FLOTA_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
-    const res=await fetchConReintento(url,{cache:'no-store'});
-    if(!res.ok) return;
-    const csv=await res.text();
-    const rows=parseCSV(csv);
-    if(rows.length>0){
-      const flotaByTec={};
-      rows.forEach(row=>{
-        const mat=String(row['mat']||'').trim().toUpperCase();
-        const coche=String(row['coche']||'').trim();
-        if(mat && coche){
-          flotaByTec[mat]={mat,coche};
-        }
-      });
-      FLOTA_DATA=flotaByTec;
-      console.log('Flota cargada:',Object.keys(FLOTA_DATA).length,'técnicos');
-    }
-  }catch(e){console.log('Flota error:',e.message);}
+function renderVacacionesEquipoCollapsible(jeId, containerId){
+  const container=document.getElementById(containerId);
+  if(!container||CURRENT_USER_TYPE!=='je') return;
+
+  const ids=(JERARQUIA[jeId]||[]).map(id=>id.toUpperCase());
+  // Solo se listan los que realmente tienen algún dato de vacaciones en el
+  // Cuadrante -- si viene vacio o roto (#N/A, etc) no aporta nada mostrarlo.
+  const limpiar = v => { const s=String(v||'').trim(); return (!s || /^#/.test(s)) ? null : s; };
+  const conDatos = ids
+    .map(mat=>{
+      const ex = ROSTER_EXTRA[mat];
+      if(!ex) return null;
+      const solicitadas = limpiar(ex.vacSolicitadas);
+      const restantes    = limpiar(ex.vacRestantes);
+      if(solicitadas===null && restantes===null) return null;
+      return { mat, nombre: ROSTER_NOMBRES[mat]||mat, solicitadas: solicitadas??'—', restantes: restantes??'—' };
+    })
+    .filter(Boolean)
+    .sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+  if(!conDatos.length){ container.innerHTML=''; return; }
+
+  const rows = conDatos.map(({mat,nombre,solicitadas,restantes})=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--s1);margin-bottom:1px;border-radius:6px">
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text)">${nombre}</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${mat}</div>
+      </div>
+      <div style="display:flex;gap:16px;text-align:center">
+        <div>
+          <div style="font-size:.9rem;font-weight:800;color:#e67e22">${solicitadas}</div>
+          <div style="font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Solicitadas</div>
+        </div>
+        <div>
+          <div style="font-size:.9rem;font-weight:800;color:#27ae60">${restantes}</div>
+          <div style="font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Restantes</div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  container.innerHTML=`
+    <div style="margin-top:20px">
+      <div class="section-head" onclick="document.getElementById('vacEquipoList-${jeId}').style.display=document.getElementById('vacEquipoList-${jeId}').style.display==='none'?'block':'none';document.getElementById('vacEquipoArrow-${jeId}').style.transform=document.getElementById('vacEquipoArrow-${jeId}').style.transform==='rotate(180deg)'?'rotate(0deg)':'rotate(180deg)'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        🏖️ Vacaciones del equipo · ${conDatos.length}
+        <span id="vacEquipoArrow-${jeId}" style="display:inline-block;transition:transform .2s">→</span>
+      </div>
+      <div id="vacEquipoList-${jeId}" style="background:var(--dim);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-top:8px;display:none">
+        ${rows}
+      </div>
+    </div>`;
 }
 
 async function loadVacaciones(){
@@ -2830,33 +3052,70 @@ async function loadCumplimiento(){
 // ════════════════════════════════════════════════════════
 let USAGE_DATA = null;
 
+let USAGE_MESES_DISPONIBLES = []; // ["2026-08","2026-07",...] mas reciente primero
+
 async function loadUsage(){
   try{
     const res = await fetchConReintento(USAGE_URL + '&t=' + Date.now(), {cache:'no-store'});
     if(!res.ok) return;
     const text = await res.text();
     const rows = parseCSV(text);
-    USAGE_DATA = rows.filter(r => r['Matricula']).map(r => ({
-      mat:    String(r['Matricula']||'').trim().toUpperCase(),
-      total:  parseInt(r['Total']||0),
-      ultimo: String(r['UltimoAcceso']||'—')
-    })).sort((a,b) => b.total - a.total);
+    const clavesMes = rows.length ? Object.keys(rows[0]).filter(k=>/^\d{4}-\d{2}$/.test(k)) : [];
+    USAGE_MESES_DISPONIBLES = clavesMes.slice().sort().reverse();
+    USAGE_DATA = rows.filter(r => r['Matricula']).map(r => {
+      const porMes = {};
+      clavesMes.forEach(c => porMes[c] = parseInt(r[c]||0));
+      return {
+        mat:    String(r['Matricula']||'').trim().toUpperCase(),
+        total:  parseInt(r['Total']||0),
+        ultimo: String(r['UltimoAcceso']||'—'),
+        porMes
+      };
+    }).sort((a,b) => b.total - a.total);
   }catch(e){ console.log('Usage error:', e.message); }
 }
 
-function renderUsagePanel(){
+// Nombre legible del mes ("2026-08" -> "Agosto 2026") para el selector
+function nombreMesUsage(clave){
+  const nombresMeses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const [anio, mes] = clave.split('-');
+  return nombresMeses[parseInt(mes,10)-1] + ' ' + anio;
+}
+
+function renderUsagePanel(mesSeleccionado){
   const el = document.getElementById('usageContent');
   if(!USAGE_DATA){
     el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px 0">Cargando…</div>';
-    loadUsage().then(()=> renderUsagePanel());
+    loadUsage().then(()=> renderUsagePanel(mesSeleccionado));
     return;
   }
   if(!USAGE_DATA.length){
     el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px 0">Sin datos de acceso aún. Los accesos se registran al hacer login.</div>';
     return;
   }
-  const totalConexiones = USAGE_DATA.reduce((s,r)=>s+r.total,0);
-  const totalUsuarios   = USAGE_DATA.length;
+
+  // Poblar el selector de mes una sola vez (si todavia no tiene opciones de mes)
+  const selector = document.getElementById('mesSelectorUsage');
+  if(selector && selector.options.length===1 && USAGE_MESES_DISPONIBLES.length){
+    USAGE_MESES_DISPONIBLES.forEach(clave=>{
+      const opt = document.createElement('option');
+      opt.value = clave;
+      opt.textContent = nombreMesUsage(clave);
+      selector.appendChild(opt);
+    });
+  }
+  if(selector) selector.value = mesSeleccionado || '';
+
+  // Con mes elegido: usar el conteo de ese mes y ocultar a quien no conecto ese mes.
+  // Sin mes (Total): usar el historico completo, como antes.
+  const conMes = mesSeleccionado && USAGE_MESES_DISPONIBLES.includes(mesSeleccionado);
+  const datosVista = (conMes
+    ? USAGE_DATA.map(r=>({...r, totalVista: r.porMes[mesSeleccionado]||0})).filter(r=>r.totalVista>0)
+    : USAGE_DATA.map(r=>({...r, totalVista: r.total}))
+  ).sort((a,b)=>b.totalVista-a.totalVista);
+
+  const totalConexiones = datosVista.reduce((s,r)=>s+r.totalVista,0);
+  const totalUsuarios   = datosVista.length;
 
   // Buscar nombre del técnico/JE por matrícula
   const getNombre = mat => {
@@ -2865,11 +3124,11 @@ function renderUsagePanel(){
     return tec ? tec.nombre : '—';
   };
 
-  const filas = USAGE_DATA.map((r,i) => `
+  const filas = datosVista.map((r,i) => `
     <tr style="background:${i%2===0?'var(--s1)':'var(--s2)'}">
       <td style="padding:8px 10px;font-weight:600;color:var(--gold2)">${r.mat}</td>
       <td style="padding:8px 10px;color:var(--text1);font-size:.85rem">${getNombre(r.mat)}</td>
-      <td style="padding:8px 10px;text-align:center;font-weight:700;color:var(--green)">${r.total}</td>
+      <td style="padding:8px 10px;text-align:center;font-weight:700;color:var(--green)">${r.totalVista}</td>
       <td style="padding:8px 10px;color:var(--text2);font-size:.8rem">${r.ultimo}</td>
     </tr>`).join('');
 
@@ -2877,7 +3136,7 @@ function renderUsagePanel(){
     <div style="display:flex;gap:10px;margin-bottom:14px">
       <div style="flex:1;background:var(--s1);border-radius:12px;padding:12px 14px;border:1px solid var(--border2);text-align:center">
         <div style="font-size:1.6rem;font-weight:800;color:var(--gold2)">${totalConexiones}</div>
-        <div style="font-size:.78rem;color:var(--text2)">Conexiones totales</div>
+        <div style="font-size:.78rem;color:var(--text2)">Conexiones ${conMes?'del mes':'totales'}</div>
       </div>
       <div style="flex:1;background:var(--s1);border-radius:12px;padding:12px 14px;border:1px solid var(--border2);text-align:center">
         <div style="font-size:1.6rem;font-weight:800;color:var(--green)">${totalUsuarios}</div>
@@ -2897,7 +3156,7 @@ function renderUsagePanel(){
         <tbody>${filas}</tbody>
       </table>
     </div>
-    <button onclick="USAGE_DATA=null;renderUsagePanel()" style="margin-top:12px;width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.85rem;cursor:pointer">↻ Actualizar datos</button>`;
+    <button onclick="USAGE_DATA=null;renderUsagePanel(document.getElementById('mesSelectorUsage').value)" style="margin-top:12px;width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.85rem;cursor:pointer">↻ Actualizar datos</button>`;
 }
 
 // ════════════════════════════════════════════════════════
@@ -2926,11 +3185,13 @@ async function loadRM(){
         const repetido=String(row['repetido']||'').trim().toUpperCase();
         const motivo_post=String(row['motivo_post']||'').trim();
         const nMantPost=String(row['nMantPost']||'').trim();
+        const esNuevo=String(row['nuevo']||'').trim().toUpperCase()==='SI';
 
         if(mat && nMant){
-          if(!rmByTec[mat]) rmByTec[mat]={visitas:[],reps:0,postMap:{},rmMap:{},rmOnlyMap:{}};
+          if(!rmByTec[mat]) rmByTec[mat]={visitas:[],reps:0,postMap:{},rmMap:{},rmOnlyMap:{},nuevos:0};
           const isRep = repetido==='SI' || repetido==='SÍ' || repetido==='1' || repetido==='TRUE';
-          rmByTec[mat].visitas.push({nMant,motivo,motivo_post,nMantPost,repetido:isRep});
+          rmByTec[mat].visitas.push({nMant,motivo,motivo_post,nMantPost,repetido:isRep,nuevo:esNuevo});
+          if(esNuevo) rmByTec[mat].nuevos++;
           if(isRep) rmByTec[mat].reps++;
           if(motivo_post) rmByTec[mat].postMap[motivo_post]=(rmByTec[mat].postMap[motivo_post]||0)+1;
           if(motivo) rmByTec[mat].rmMap[motivo]=(rmByTec[mat].rmMap[motivo]||0)+1;
@@ -2950,7 +3211,8 @@ async function loadRM(){
         RM_DATA[mat]={
           visitas: data.visitas,
           total, reps, pctRM,
-          topPost, motivosRM, topMotivos
+          topPost, motivosRM, topMotivos,
+          nuevos: data.nuevos
         };
       });
 
@@ -3071,16 +3333,28 @@ function pintarBotonFichaje(){
   const st=estadoFichajeBtn(FICHAJE_ID);
 
   if(FICHAJE_COOLDOWN_TIMER){ clearTimeout(FICHAJE_COOLDOWN_TIMER); FICHAJE_COOLDOWN_TIMER=null; }
+  // Durante los minutos de protección contra doble toque no se muestra una cuenta atrás
+  // (se leía como un bloqueo/error) sino el estado real: si ya se fichó entrada, que
+  // quede claro que la jornada está en curso; solo se sigue avisando de un bloqueo real
+  // si el toque todavía no se ha confirmado (server aún no devolvió estado 'abierto').
   const restante = st.estado==='cerrado' ? 0 : msRestantesCooldownFichaje(FICHAJE_ID);
   if(restante > 0){
-    const minRestantes = Math.ceil(restante/60000);
     btn.disabled=true;
-    btn.style.opacity='.6';
-    btn.style.color='var(--muted)'; btn.style.borderColor='var(--border2)';
-    btn.textContent = '🔒 Espera '+minRestantes+' min';
+    if(st.estado==='abierto'){
+      btn.style.opacity='1';
+      btn.style.color='var(--green2)'; btn.style.borderColor='#1a3d2a';
+      btn.textContent='🟢 Trabajando desde '+st.entrada;
+      btn.title='Podrás finalizar la jornada en unos minutos';
+    } else {
+      btn.style.opacity='.6';
+      btn.style.color='var(--muted)'; btn.style.borderColor='var(--border2)';
+      btn.textContent='⏳ Sincronizando…';
+      btn.title='';
+    }
     FICHAJE_COOLDOWN_TIMER = setTimeout(pintarBotonFichaje, restante+1000);
     return;
   }
+  btn.title='';
 
   btn.disabled=false;
   if(st.estado==='sinFichar'){
@@ -3295,13 +3569,23 @@ function onFichajeBtnClick(){
   const st=estadoFichajeBtn(FICHAJE_ID);
   if(st.estado!=='sinFichar' && st.estado!=='abierto') return;
   if(fichajeEnCooldown(FICHAJE_ID)) return; // el boton ya deberia estar bloqueado, doble seguro
-  // Feedback inmediato (antes de esperar geolocalización/red) — deshabilita, cambia texto
-  // y atenúa el botón para que se note al instante que el toque se registró.
+  // Feedback inmediato: se pinta directamente el estado final (no un "Fichando…"
+  // intermedio que se queda esperando red) para que se note al instante que el toque
+  // se registró. La hora exacta que cuenta legalmente es la que pone el servidor;
+  // esta es solo una vista optimista que loadFichajeHoy() confirma/corrige enseguida.
   const btn=document.getElementById('fichajeBtn');
+  const horaAhora=new Date().toTimeString().slice(0,5);
   if(btn){
     btn.disabled=true;
-    btn.style.opacity='.6';
-    btn.textContent='⏳ Fichando…';
+    if(st.estado==='sinFichar'){
+      btn.style.opacity='1';
+      btn.style.color='var(--green2)'; btn.style.borderColor='#1a3d2a';
+      btn.textContent='🟢 Trabajando desde '+horaAhora;
+    } else {
+      btn.style.opacity='.6';
+      btn.style.color='var(--muted)'; btn.style.borderColor='var(--border2)';
+      btn.textContent='⏳ Cerrando jornada…';
+    }
   }
   // Se marca ANTES de que responda el servidor (fetch es no-cors, no hay
   // forma fiable de confirmar éxito) para bloquear cualquier segundo toque
@@ -3622,6 +3906,13 @@ const HISTORICO_KPIS = [
   {key:'nps',  label:'NPS',  pass:v=>v>9.4,   fmt:v=>v.toFixed(1)},
 ];
 
+// Nombre del mes actual (Español), para excluir ese mes de la columna
+// "Repetidos" del histórico -- el mes en curso es el que sigue recibiendo
+// correos con el Excel de mantenimientos durante el dia, asi que su
+// columna "RM" en el Resumen App Claude todavia no es un dato cerrado.
+const NOMBRES_MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function mesActualNombre(){ return NOMBRES_MESES_ES[new Date().getMonth()]; }
+
 async function loadHistorico(){
   if(HISTORICO_DATA) return;
   if(HISTORICO_LOADING) return HISTORICO_LOADING;
@@ -3710,20 +4001,35 @@ async function showHistoricoTecnico(tecId, back){
 
   const chipsHtml = resumen.map((k,i)=>kpiChipHtml(k.label, k.okMeses, k.failMeses, `histChip-${i}`)).join('');
 
+  const mesActual = mesActualNombre();
+  const dashCell = `<td style="padding:8px 6px;text-align:center;color:var(--muted)">—</td>`;
+
   const compareRows = filas.map(f=>{
     if(!f.t){
-      return `<tr style="opacity:.4"><td style="padding:8px 6px;font-weight:700">${f.mes}</td>${HISTORICO_KPIS.map(()=>'<td style="padding:8px 6px;text-align:center">—</td>').join('')}</tr>`;
+      return `<tr style="opacity:.4"><td style="padding:8px 6px;font-weight:700">${f.mes}</td>${HISTORICO_KPIS.map(k=>k.key==='pRM'?dashCell+dashCell:dashCell).join('')}</tr>`;
     }
     const cells = HISTORICO_KPIS.map(k=>{
-      if(k.sinDatosKey && f.t[k.sinDatosKey]) return `<td style="padding:8px 6px;text-align:center;color:var(--muted)">—</td>`;
+      if(k.sinDatosKey && f.t[k.sinDatosKey]) return k.key==='pRM' ? dashCell+dashCell : dashCell;
       const val = f.t[k.key];
       const ok = k.pass(val);
-      return `<td style="padding:8px 6px;text-align:center;color:${ok?'var(--green2)':'#e05a4a'};font-weight:700">${k.fmt(val)}</td>`;
+      const celda = `<td style="padding:8px 6px;text-align:center;color:${ok?'var(--green2)':'#e05a4a'};font-weight:700">${k.fmt(val)}</td>`;
+      if(k.key!=='pRM') return celda;
+      // "Repetidos": cantidad de mantenimientos repetidos (columna "RM" del
+      // Resumen App Claude), aparte del %RM -- no se muestra para el mes
+      // actual porque ese dato todavia se sigue completando con los
+      // correos del dia, no es un cierre definitivo como los meses pasados.
+      const repetidosCell = f.mes===mesActual
+        ? dashCell
+        : `<td style="padding:8px 6px;text-align:center;color:var(--muted);font-weight:700">${f.t.rm}</td>`;
+      return celda + repetidosCell;
     }).join('');
     return `<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px;font-weight:700;color:var(--gold2)">${f.mes}</td>${cells}</tr>`;
   }).join('');
 
-  const headerCells = HISTORICO_KPIS.map(k=>`<th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">${k.label}</th>`).join('');
+  const headerCells = HISTORICO_KPIS.map(k=>{
+    const th = `<th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">${k.label}</th>`;
+    return k.key==='pRM' ? th+`<th style="padding:6px;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Repetidos</th>` : th;
+  }).join('');
 
   document.getElementById('historicoContent').innerHTML = `
     <div class="detail-hero">
@@ -3919,13 +4225,15 @@ function actualizarVistaHistoricoEquipo(){
     miembros = miembros.filter(t=>t.provincia===provinciaSel.value);
   }
 
+  // "si" = solo con un si explicito; "no" = cualquier otra cosa (false,
+  // vacio, #VALUE!, etc.) -- mismo criterio que el resto de la app.
   const cuentaFiltro = document.getElementById('histCuentaFiltro').value;
-  if(cuentaFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa!==false);
-  else if(cuentaFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===false);
+  if(cuentaFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa===true);
+  else if(cuentaFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.empresa!==true);
 
   const cuentaJEFiltro = document.getElementById('histCuentaJEFiltro').value;
-  if(cuentaJEFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je!==false);
-  else if(cuentaJEFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je===false);
+  if(cuentaJEFiltro==='si') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je===true);
+  else if(cuentaJEFiltro==='no') miembros = miembros.filter(t=>CUENTA_DATA[t.id.toUpperCase()]?.je!==true);
 
   document.getElementById('histGrupoSub').textContent = `${miembros.length} técnico${miembros.length===1?'':'s'} en el filtro actual`;
 
@@ -3956,10 +4264,11 @@ function actualizarVistaHistoricoEquipo(){
   const filas = sorted.map(m=>{
     const je = jeIds.find(je=>(JERARQUIA[je]||[]).map(x=>x.toUpperCase()).includes(m.id.toUpperCase()));
     const jeNombre = je ? (JE_NAMES[je]||je) : '—';
+    // "Sí" solo con dato explicito; vacio/roto (#VALUE!, etc) se muestra
+    // como "No", mismo criterio que el resto de la app.
     const cuenta = CUENTA_DATA[m.id.toUpperCase()]?.empresa;
     const cuentaBadge = cuenta===true ? `<span style="color:var(--green2);font-weight:700">Sí</span>`
-      : cuenta===false ? `<span style="color:#e05a4a;font-weight:700">No</span>`
-      : `<span style="color:var(--muted)">—</span>`;
+      : `<span style="color:#e05a4a;font-weight:700">No</span>`;
     return `<tr onclick="verTecnicoDesdeHistoricoEquipo('${m.id}')" style="cursor:pointer;border-bottom:1px solid var(--border)">
       <td style="padding:8px 6px;color:var(--muted)">${m.id}</td>
       <td style="padding:8px 6px;font-weight:600;color:var(--text)">${m.nombre.trim()}</td>
@@ -3986,12 +4295,22 @@ function escapeHtmlAttr(s){
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// Interpreta el valor crudo de "Coche_Asignado" del Cuadrante: vacio o un
+// error de formula (#N/A, #VALUE!, etc) -> sin dato (null); "PERSONAL" ->
+// el tecnico usa vehiculo propio, no hay matricula que mostrar; cualquier
+// otro texto se asume la matricula del coche de empresa asignado.
+function interpretarCoche_(raw){
+  const v = String(raw||'').trim();
+  if(!v || /^#(N\/A|VALUE!|REF!|NAME\?|DIV\/0!|NULL!|NUM!)$/i.test(v)) return null;
+  return { esPersonal: v.toUpperCase()==='PERSONAL', valor: v };
+}
+
 function renderFlota(tecId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
   const id=String(tecId).trim().toUpperCase();
-  const coche=FLOTA_DATA[id]?.coche;
-  if(!coche){ container.innerHTML=''; return; }
+  const info=interpretarCoche_(ROSTER_EXTRA[id]?.coche);
+  if(!info){ container.innerHTML=''; return; }
   const vacaciones=VACACIONES_DATA[id];
   let vacacionesHtml='';
   if(vacaciones){
@@ -4018,19 +4337,23 @@ function renderFlota(tecId, containerId){
       ${buildVacMensualHTML(vacaciones)}
     </div>`;
   }
+  const cocheLabel = info.esPersonal ? 'Asignación' : 'Matrícula asignada';
+  const cocheValor = info.esPersonal ? 'Vehículo personal' : info.valor;
+  const avisoHtml  = info.esPersonal ? '' : `
+    <div style="background:rgba(212,131,26,.08);border:1px solid #3d2800;border-radius:10px;padding:10px 14px;margin-top:8px;font-size:.72rem;color:var(--orange)">
+      ⚠️ Si este vehículo no es el tuyo, comunícalo a tu jefe de equipo.
+    </div>`;
   container.innerHTML=`
     <div class="section-head" style="margin-top:20px">🚗 Vehículo asignado</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
       <div>
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">Matrícula asignada</div>
-        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${coche}</div>
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">${cocheLabel}</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${cocheValor}</div>
       </div>
       <div style="font-size:2.5rem">🚗</div>
     </div>
-    <div style="background:rgba(212,131,26,.08);border:1px solid #3d2800;border-radius:10px;padding:10px 14px;margin-top:8px;font-size:.72rem;color:var(--orange)">
-      ⚠️ Si este vehículo no es el tuyo, comunícalo a tu jefe de equipo.
-    </div>
+    ${avisoHtml}
     ${vacacionesHtml}`;
 }
 
@@ -4069,15 +4392,17 @@ function renderFlotaJE(jeId, containerId){
   const container=document.getElementById(containerId);
   if(!container) return;
   const id=String(jeId).trim().toUpperCase();
-  const coche=FLOTA_DATA[id]?.coche;
-  if(!coche){ container.innerHTML=''; return; }
+  const info=interpretarCoche_(ROSTER_EXTRA[id]?.coche);
+  if(!info){ container.innerHTML=''; return; }
+  const cocheLabel = info.esPersonal ? 'Asignación' : 'Matrícula asignada';
+  const cocheValor = info.esPersonal ? 'Vehículo personal' : info.valor;
   container.innerHTML=`
     <div class="section-head" style="margin-top:20px">🚗 Tu vehículo asignado</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;display:flex;align-items:center;justify-content:space-between;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
       <div>
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">Matrícula asignada</div>
-        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${coche}</div>
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">${cocheLabel}</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--gold2);letter-spacing:.08em">${cocheValor}</div>
       </div>
       <div style="font-size:2.5rem">🚗</div>
     </div>`;
@@ -4188,7 +4513,7 @@ async function doLogin(){
     if(CURRENT_TEC) renderDocsPendientes(CURRENT_TEC.id,'docsPendientesMain');
     if(CURRENT_JE_ID) renderDocsEquipo(CURRENT_JE_ID,'equipoDocsContainer');
   });
-  Promise.all([loadVacaciones(), loadFlota(), loadCumplimiento(), loadRM()]).then(()=>{
+  Promise.all([loadVacaciones(), loadCumplimiento(), loadRM()]).then(()=>{
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
   FICHAJE_FECHA_VISTA=null;
@@ -4266,6 +4591,7 @@ async function doLogin(){
     document.getElementById('scorePill').innerHTML='<span style="color:var(--gold2);font-weight:700">Vista global</span>';
     document.getElementById('tabsBarJR').style.display='flex';
     document.getElementById('tabsBar').style.display='none';
+    document.getElementById('btnEquipoTF').style.display = found.id==='GD5381' ? 'block' : 'none';
     renderJRPanel();
     loadMedialiaCoord().then(()=>renderMedialiaCoord());
     showPanel('jrPanel');
@@ -4355,11 +4681,60 @@ function _openCumDash(tecId){
   const id=String(tecId).trim();
   const cum=CUM_DATA[id]||CUM_DATA[id.toUpperCase()];
   const tec=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
-  if(!cum){ showDetail('cum'); return; }
-  const pctOk=cum.pct>=90;
+  if(!cum && !tec){ showDetail('cum'); return; }
+  // El %Cumplimiento mostrado es siempre el del Resumen App Claude
+  // (tec.pCum), no un recalculo desde el Excel -- cum.* solo aporta el
+  // detalle de visitas/incumplimientos. Si por algo el técnico no aparece
+  // en el Resumen (caso raro), se usa cum.pct como único respaldo posible.
+  const pctResumen = tec ? tec.pCum : cum.pct;
+  const pctOk=pctResumen>=90;
   const col=pctOk?'var(--green2)':'#e05a4a';
-  const circ=2*Math.PI*28, offset=circ-(cum.pct/100)*circ;
+  const circ=2*Math.PI*28, offset=circ-(pctResumen/100)*circ;
   const nombre=tec?tec.nombre.trim():id;
+
+  // CUM_DATA es SIEMPRE una foto del último Excel de cumplimiento
+  // procesado, nunca un histórico por mes -- mismo motivo que en
+  // _openRMDash(). Si se está viendo un mes pasado (selector de mes), no
+  // mezclar ese detalle con el %Cumplimiento del mes que se está viendo.
+  // OJO: MES_SELECCIONADO no es null en el mes actual -- loadSheets() lo
+  // deja con el NOMBRE del mes actual tras cada login normal, por eso hay
+  // que comparar contra mesActualNombre() y no solo revisar si esta seteado.
+  const viendoMesPasado = MES_SELECCIONADO && MES_SELECCIONADO !== mesActualNombre();
+  if(viendoMesPasado){
+    const incum = tec ? tec.incum : null;
+    document.getElementById('cumDashContent').innerHTML=`
+      <div class="detail-hero">
+        <div class="detail-hero-title">✅ Dashboard Cumplimiento · ${nombre}</div>
+        <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
+        <div class="detail-hero-sub">%Cumplimiento de ${MES_SELECCIONADO} (Resumen App Claude)</div>
+      </div>
+      ${incum===null ? '' : `<div style="display:flex;gap:9px;margin-bottom:16px">
+        <div class="stat-box" style="flex:1"><div class="n" style="color:${incum===0?'var(--green2)':'#e05a4a'}">${incum}</div><div class="l">Incumplimientos</div></div>
+      </div>`}
+      <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
+        <div style="position:relative;width:70px;height:70px;flex-shrink:0">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="transform:rotate(-90deg)">
+            <circle fill="none" stroke="var(--dim)" stroke-width="8" cx="35" cy="35" r="28"/>
+            <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
+              cx="35" cy="35" r="28" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${pctResumen.toFixed(2)}%</div>
+        </div>
+        <div>
+          <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
+            Objetivo: ≥ 90% · ${pctOk?`Margen de ${(pctResumen-90).toFixed(2)} puntos`:`Faltan ${(90-pctResumen).toFixed(2)} puntos`}
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:.72rem;color:var(--muted);line-height:1.6">
+        ℹ️ El detalle de razones de incumplimiento solo está disponible para el mes en curso — el Excel de cumplimiento no guarda un histórico por mes anterior.
+      </div>`;
+    showPanel('cumDashPanel'); window.scrollTo(0,0);
+    return;
+  }
+
+  if(!cum){ showDetail('cum'); return; }
   const maxRazon=cum.topRazones&&cum.topRazones[0]?cum.topRazones[0][1]:1;
 
   function barras(arr,maxV,color,tecId,tipo){
@@ -4390,8 +4765,8 @@ function _openCumDash(tecId){
   document.getElementById('cumDashContent').innerHTML=`
     <div class="detail-hero">
       <div class="detail-hero-title">✅ Dashboard Cumplimiento · ${nombre}</div>
-      <div class="detail-hero-val" style="color:${col}">${cum.pct.toFixed(2)}%</div>
-      <div class="detail-hero-sub">Visitas cumplidas · objetivo ≥ 90%</div>
+      <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
+      <div class="detail-hero-sub">%Cumplimiento (Resumen App Claude) · objetivo ≥ 90%</div>
     </div>
     <div style="display:flex;gap:9px;margin-bottom:16px">
       <div class="stat-box" style="flex:1"><div class="n">${cum.total}</div><div class="l">Total<br>visitas</div></div>
@@ -4405,12 +4780,12 @@ function _openCumDash(tecId){
           <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
             cx="35" cy="35" r="28" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
         </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${cum.pct.toFixed(2)}%</div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${pctResumen.toFixed(2)}%</div>
       </div>
       <div>
         <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
         <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-          Objetivo: ≥ 90% · ${pctOk?`Margen de ${(cum.pct-90).toFixed(2)} puntos`:`Faltan ${(90-cum.pct).toFixed(2)} puntos`}
+          Objetivo: ≥ 90% · ${pctOk?`Margen de ${(pctResumen-90).toFixed(2)} puntos`:`Faltan ${(90-pctResumen).toFixed(2)} puntos`}
         </div>
       </div>
     </div>
@@ -4434,7 +4809,7 @@ async function doRefreshData(){
       loadSheets(),
       loadAuth(),
       loadDocs(),
-      loadFlota(),
+      loadJerarquia(),
       loadVacaciones(),
       loadMedialiaCoord(),
       loadCumplimiento(),
