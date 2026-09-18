@@ -574,6 +574,7 @@ const AUTH_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt
 const DOCS_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=docs&token=" + APP_TOKEN;
 const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=vacaciones&token=" + APP_TOKEN;
 const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=medalia-coord&token=" + APP_TOKEN;
+const MEDALIA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=medalia&token=" + APP_TOKEN;
 const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=cumplimiento&token=" + APP_TOKEN;
 const RM_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=rm&token=" + APP_TOKEN;
 const TRACK_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=track&token=" + APP_TOKEN;
@@ -625,6 +626,8 @@ let ROSTER_EXTRA = {}; // mat -> {coche, vacAnuales, vacSolicitadas, vacRestante
 let DOCS_DATA = [];
 let VACACIONES_DATA = {};
 let MEDALIA_COORD_DATA = {};
+let MEDALIA_DETALLE_DATA = {}; // mat -> [{mant, fecha, nota, comentario}], una entrada por encuesta
+let MEDALIA_MES_ACTUAL = ''; // "AAAA-MM" del mes mas reciente con encuestas, calculado del propio detalle
 let CUM_DATA = {};
 let RM_DATA = {};
 let _datosActualizados = false;
@@ -2016,15 +2019,19 @@ function renderMedialiaCoord(){
         <div id="${idNotas}" style="display:none;margin-top:8px;flex-direction:column;gap:4px">
           ${conNotas.map(n=>{
             const colN = n.promedio<5?'#e05a4a':n.promedio<8?'var(--orange)':'var(--green2)';
-            return `<div style="background:var(--bg);border-radius:8px;padding:6px 10px;display:flex;justify-content:space-between;align-items:center;${n.promedio<5?'border:1px solid #3d1a1a':''}">
-              <div>
-                <div style="font-size:.72rem;color:var(--text)">${n.nombre} <span style="color:var(--muted)">· ${n.mat}</span></div>
-                <div style="font-size:.6rem;color:var(--muted)">${n.cantidad} encuesta${n.cantidad===1?'':'s'}</div>
+            const rowId = idNotas + '-' + n.mat;
+            return `<div>
+              <div onclick="toggleNotasMedalia('${n.mat}','${rowId}')" style="cursor:pointer;background:var(--bg);border-radius:8px;padding:6px 10px;display:flex;justify-content:space-between;align-items:center;${n.promedio<5?'border:1px solid #3d1a1a':''}">
+                <div>
+                  <div style="font-size:.72rem;color:var(--text)">${n.nombre} <span style="color:var(--muted)">· ${n.mat}</span></div>
+                  <div style="font-size:.6rem;color:var(--muted)">${n.cantidad} encuesta${n.cantidad===1?'':'s'} · toca para ver el detalle</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:.95rem;font-weight:800;color:${colN}">${n.promedio.toFixed(2)}</div>
+                  ${n.promedio<5?'<div style="font-size:.55rem;color:#e05a4a;font-weight:700">⚠️ Mejorar</div>':''}
+                </div>
               </div>
-              <div style="text-align:right">
-                <div style="font-size:.95rem;font-weight:800;color:${colN}">${n.promedio.toFixed(2)}</div>
-                ${n.promedio<5?'<div style="font-size:.55rem;color:#e05a4a;font-weight:700">⚠️ Mejorar</div>':''}
-              </div>
+              <div id="${rowId}-list" style="display:none;margin-top:4px;padding-left:8px;border-left:2px solid var(--border2)"></div>
             </div>`;
           }).join('')}
         </div>
@@ -2050,6 +2057,29 @@ function renderMedialiaCoord(){
   });
 
   container.innerHTML=html;
+}
+
+// Desplegable con el detalle de encuestas de un técnico (mantenimiento +
+// comentario del cliente), dentro de "Notas de técnicos". Solo muestra las
+// del mes más reciente con encuestas (MEDALIA_MES_ACTUAL), para que
+// coincida con la cantidad/promedio ya mostrados arriba.
+function toggleNotasMedalia(mat, rowId){
+  const el = document.getElementById(rowId + '-list');
+  if(!el) return;
+  if(el.style.display !== 'none'){ el.style.display='none'; return; }
+  const todas = MEDALIA_DETALLE_DATA[mat] || [];
+  const notas = MEDALIA_MES_ACTUAL ? todas.filter(n=>n.fecha.startsWith(MEDALIA_MES_ACTUAL)) : todas;
+  el.innerHTML = notas.length
+    ? notas.map(n=>`
+      <div style="background:var(--dim);border-radius:8px;padding:8px 10px;margin-top:4px;font-size:.68rem">
+        <div style="display:flex;justify-content:space-between;color:var(--muted);margin-bottom:3px">
+          <span>Mantenimiento #${n.mant}</span>
+          <span>${n.fecha}${n.nota?' · Nota '+n.nota:''}</span>
+        </div>
+        <div style="color:var(--text)">${n.comentario ? escapeHtmlAttr(n.comentario) : '<span style="color:var(--muted)">Sin comentario</span>'}</div>
+      </div>`).join('')
+    : '<div style="font-size:.68rem;color:var(--muted);padding:6px 0">Sin detalle disponible para este mes.</div>';
+  el.style.display='block';
 }
 
 // ══════════════════════════════════════════════
@@ -3040,6 +3070,37 @@ async function loadMedialiaCoord(){
       console.log('Medalia cargada:',Object.keys(MEDALIA_COORD_DATA).length,'técnicos');
     }
   }catch(e){console.log('Medalia error:',e.message);}
+}
+
+// Detalle de encuestas de Medalia (una fila por encuesta, con mantenimiento
+// y comentario del cliente) -- alimenta el desplegable al hacer clic en un
+// técnico dentro de "Notas de técnicos".
+async function loadMedaliaDetalle(){
+  try{
+    const res=await fetchConReintento(MEDALIA_URL+'&t='+Date.now(),{cache:'no-store'});
+    if(!res.ok) return;
+    const csv=await res.text();
+    const rows=parseCSV(csv);
+    if(rows.length>0){
+      const byMat={};
+      let mesMasReciente='';
+      rows.forEach(row=>{
+        const mat=String(row['mat']||'').trim().toUpperCase();
+        const mant=String(row['mantenimiento']||'').trim();
+        const fecha=String(row['fecha']||'').trim();
+        const nota=String(row['nota']||'').trim();
+        const comentario=String(row['comentario']||'').trim();
+        if(!mat || !mant) return;
+        if(!byMat[mat]) byMat[mat]=[];
+        byMat[mat].push({mant,fecha,nota,comentario});
+        const clave=fecha.slice(0,7); // "AAAA-MM"
+        if(clave.length===7 && clave>mesMasReciente) mesMasReciente=clave;
+      });
+      MEDALIA_DETALLE_DATA=byMat;
+      MEDALIA_MES_ACTUAL=mesMasReciente;
+      console.log('Medalia detalle cargado:',Object.keys(MEDALIA_DETALLE_DATA).length,'técnicos · mes:',MEDALIA_MES_ACTUAL);
+    }
+  }catch(e){console.log('Medalia detalle error:',e.message);}
 }
 
 // ════════════════════════════════════════════════════════
@@ -4631,7 +4692,7 @@ async function doLogin(){
     document.getElementById('tabsBar').style.display='none';
     document.getElementById('btnEquipoTF').style.display = found.id==='GD5381' ? 'block' : 'none';
     renderJRPanel();
-    loadMedialiaCoord().then(()=>renderMedialiaCoord());
+    Promise.all([loadMedialiaCoord(), loadMedaliaDetalle()]).then(()=>renderMedialiaCoord());
     showPanel('jrPanel');
 
   } else if(found.type==='je'){
@@ -4850,6 +4911,7 @@ async function doRefreshData(){
       loadJerarquia(),
       loadVacaciones(),
       loadMedialiaCoord(),
+      loadMedaliaDetalle(),
       loadCumplimiento(),
       loadRM(),
       loadFichajeHoy(),
