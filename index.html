@@ -1997,6 +1997,39 @@ function renderMedialiaCoord(){
         </div>
       </div>` : '';
 
+    // Notas individuales de cada técnico del grupo (los que cuentan), para
+    // que el JR/coordinador vea el desglose completo y priorice a quienes
+    // tienen nota por debajo de 5 -- son los que más necesitan mejorar para
+    // subir la media del grupo. Ordenados de peor a mejor nota.
+    const conNotas = cuentan
+      .filter(m=>MEDALIA_COORD_DATA[m] && MEDALIA_COORD_DATA[m].cantidad>0)
+      .map(m=>({mat:m, nombre:ROSTER_NOMBRES[m]||m, ...MEDALIA_COORD_DATA[m]}))
+      .sort((a,b)=>a.promedio-b.promedio);
+    const bajas = conNotas.filter(n=>n.promedio<5).length;
+    const idNotas = 'medaliaNotas-' + grupo.nombre.replace(/\s+/g,'');
+    const notasHTML = conNotas.length ? `
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div onclick="const e=document.getElementById('${idNotas}');e.style.display=e.style.display==='none'?'flex':'none';" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.6rem;font-weight:700;letter-spacing:.08em;color:var(--gold3);text-transform:uppercase">Notas de técnicos · ${conNotas.length}${bajas?` · <span style="color:#e05a4a">${bajas} por debajo de 5</span>`:''}</span>
+          <span style="font-size:.65rem;color:var(--muted)">▾</span>
+        </div>
+        <div id="${idNotas}" style="display:none;margin-top:8px;flex-direction:column;gap:4px">
+          ${conNotas.map(n=>{
+            const colN = n.promedio<5?'#e05a4a':n.promedio<8?'var(--orange)':'var(--green2)';
+            return `<div style="background:var(--bg);border-radius:8px;padding:6px 10px;display:flex;justify-content:space-between;align-items:center;${n.promedio<5?'border:1px solid #3d1a1a':''}">
+              <div>
+                <div style="font-size:.72rem;color:var(--text)">${n.nombre} <span style="color:var(--muted)">· ${n.mat}</span></div>
+                <div style="font-size:.6rem;color:var(--muted)">${n.cantidad} encuesta${n.cantidad===1?'':'s'}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:.95rem;font-weight:800;color:${colN}">${n.promedio.toFixed(2)}</div>
+                ${n.promedio<5?'<div style="font-size:.55rem;color:#e05a4a;font-weight:700">⚠️ Mejorar</div>':''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : '';
+
     html+=`
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;margin-top:10px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${color},transparent)"></div>
@@ -2011,6 +2044,7 @@ function renderMedialiaCoord(){
         </div>
       </div>
       ${noHTML}
+      ${notasHTML}
       ${sinNotasHTML}
     </div>`;
   });
