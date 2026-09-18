@@ -1941,6 +1941,33 @@ function renderMedialiaCoord(){
 
   let html=`<div class="section-head" style="margin-top:20px">🏆 Medalia - CFL Interacción</div>`;
 
+  // Objetivo de CFL por zona (solo para GD5381): el promedio de los tecnicos
+  // que cuentan de CADA zona tiene que estar en >= 9.4, por separado. Si no
+  // llega, se calcula cuantas notas de 10 mas harian falta en esa zona.
+  // Las notas son enteros, asi que la suma exacta es round(promedio*cantidad)
+  // por tecnico (el promedio viene redondeado a 2 decimales, el error nunca
+  // llega a 0.5) -- y con enteros el calculo es exacto:
+  //   (S + 10k) / (N + k) >= 9.4  ->  k >= (94N - 10S) / 6
+  const OBJETIVO_CFL = 9.4;
+  const objetivoCFLHTML = cuentanMats=>{
+    if(FICHAJE_ID!=='GD5381') return '';
+    let S=0, N=0;
+    cuentanMats.forEach(m=>{ const d=MEDALIA_COORD_DATA[m]; if(d){ S+=Math.round(d.promedio*d.cantidad); N+=d.cantidad; } });
+    if(!N) return '';
+    const cumple = 94*N - 10*S <= 0;
+    const faltan = cumple ? 0 : Math.ceil((94*N - 10*S)/6);
+    const col = cumple ? 'var(--green2)' : '#e05a4a';
+    return `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div style="font-size:.72rem;color:var(--muted)">Objetivo: ≥ ${OBJETIVO_CFL.toFixed(1)}</div>
+        <div style="font-size:.74rem;color:${col};font-weight:700;text-align:right">
+          ${cumple
+            ? '✓ Objetivo cumplido'
+            : `✗ Faltan ${faltan} nota${faltan===1?'':'s'} de 10 para llegar a ${OBJETIVO_CFL.toFixed(1)}`}
+        </div>
+      </div>`;
+  };
+
   GRUPOS_MED.forEach(grupo=>{
     const mats = tieneZonas
       ? Object.keys(MEDALIA_COORD_DATA).filter(mat=>grupo.zonas.some(z=>(ZONA_DATA[mat]||'').toString().includes(z)))
@@ -2050,6 +2077,7 @@ function renderMedialiaCoord(){
           <div style="font-size:.62rem;color:var(--muted)">Puntuación promedio</div>
         </div>
       </div>
+      ${objetivoCFLHTML(cuentan)}
       ${noHTML}
       ${notasHTML}
       ${sinNotasHTML}
