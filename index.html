@@ -2221,8 +2221,12 @@ function toggleMantenimientosMotivo(rowId){
     const rm = RM_DATA[info.tecId] || RM_DATA[info.tecId.toUpperCase()];
     pares = (rm && rm.visitas || []).filter(v => v.repetido && v.motivo===info.motivo).map(v=>({n:v.nMant, nuevo:!!v.nuevo}));
   } else {
+    // Causa raíz del post-mantenimiento: antes mostraba el número del
+    // mantenimiento POSTERIOR (nMantPost), pero ese no se puede revisar --
+    // se vincula al mismo mantenimiento original (nMant), el mismo número
+    // que ya aparece en "Motivo de las visitas repetidas (RM)".
     const rm = RM_DATA[info.tecId] || RM_DATA[info.tecId.toUpperCase()];
-    pares = (rm && rm.visitas || []).filter(v => v.motivo_post===info.motivo).map(v=>({n:v.nMantPost||v.nMant, nuevo:!!v.nuevo}));
+    pares = (rm && rm.visitas || []).filter(v => v.motivo_post===info.motivo).map(v=>({n:v.nMant, nuevo:!!v.nuevo}));
   }
   // Deduplicar por numero de mantenimiento, quedandose con "nuevo" si algun
   // duplicado lo era.
