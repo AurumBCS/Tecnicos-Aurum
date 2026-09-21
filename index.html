@@ -574,6 +574,7 @@ const AUTH_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt
 const DOCS_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=docs&token=" + APP_TOKEN;
 const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=vacaciones&token=" + APP_TOKEN;
 const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=medalia-coord&token=" + APP_TOKEN;
+const MEDALIA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=medalia&token=" + APP_TOKEN;
 const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=cumplimiento&token=" + APP_TOKEN;
 const RM_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=rm&token=" + APP_TOKEN;
 const TRACK_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=track&token=" + APP_TOKEN;
@@ -583,6 +584,7 @@ const MESES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYC
 const FICHAJE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje&token=" + APP_TOKEN;
 const FICHAJE_INFORME_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje-informe&token=" + APP_TOKEN;
 const FICHAJE_PDF_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje-pdf&token=" + APP_TOKEN;
+const FICHAJE_MIO_URL = FICHAJE_URL.replace("type=fichaje&","type=fichaje-mio&");
 const FICHAJE_HISTORIAL_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje-historial&token=" + APP_TOKEN;
 
 // Confirmaciones por SMS (servidor en la nube) — ACTUALIZAR con la URL real de Render
@@ -625,6 +627,8 @@ let ROSTER_EXTRA = {}; // mat -> {coche, vacAnuales, vacSolicitadas, vacRestante
 let DOCS_DATA = [];
 let VACACIONES_DATA = {};
 let MEDALIA_COORD_DATA = {};
+let MEDALIA_DETALLE_DATA = {}; // mat -> [{mant, fecha, nota, comentario}], una entrada por encuesta
+let MEDALIA_MES_ACTUAL = ''; // "AAAA-MM" del mes mas reciente con encuestas, calculado del propio detalle
 let CUM_DATA = {};
 let RM_DATA = {};
 let _datosActualizados = false;
@@ -1938,6 +1942,33 @@ function renderMedialiaCoord(){
 
   let html=`<div class="section-head" style="margin-top:20px">🏆 Medalia - CFL Interacción</div>`;
 
+  // Objetivo de CFL por zona (solo para GD5381): el promedio de los tecnicos
+  // que cuentan de CADA zona tiene que estar en >= 9.4, por separado. Si no
+  // llega, se calcula cuantas notas de 10 mas harian falta en esa zona.
+  // Las notas son enteros, asi que la suma exacta es round(promedio*cantidad)
+  // por tecnico (el promedio viene redondeado a 2 decimales, el error nunca
+  // llega a 0.5) -- y con enteros el calculo es exacto:
+  //   (S + 10k) / (N + k) >= 9.4  ->  k >= (94N - 10S) / 6
+  const OBJETIVO_CFL = 9.4;
+  const objetivoCFLHTML = cuentanMats=>{
+    if(FICHAJE_ID!=='GD5381') return '';
+    let S=0, N=0;
+    cuentanMats.forEach(m=>{ const d=MEDALIA_COORD_DATA[m]; if(d){ S+=Math.round(d.promedio*d.cantidad); N+=d.cantidad; } });
+    if(!N) return '';
+    const cumple = 94*N - 10*S <= 0;
+    const faltan = cumple ? 0 : Math.ceil((94*N - 10*S)/6);
+    const col = cumple ? 'var(--green2)' : '#e05a4a';
+    return `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div style="font-size:.72rem;color:var(--muted)">Objetivo: ≥ ${OBJETIVO_CFL.toFixed(1)}</div>
+        <div style="font-size:.74rem;color:${col};font-weight:700;text-align:right">
+          ${cumple
+            ? '✓ Objetivo cumplido'
+            : `✗ Faltan ${faltan} nota${faltan===1?'':'s'} de 10 para llegar a ${OBJETIVO_CFL.toFixed(1)}`}
+        </div>
+      </div>`;
+  };
+
   GRUPOS_MED.forEach(grupo=>{
     const mats = tieneZonas
       ? Object.keys(MEDALIA_COORD_DATA).filter(mat=>grupo.zonas.some(z=>(ZONA_DATA[mat]||'').toString().includes(z)))
@@ -1997,6 +2028,43 @@ function renderMedialiaCoord(){
         </div>
       </div>` : '';
 
+    // Notas individuales de cada técnico del grupo (los que cuentan), para
+    // que el JR/coordinador vea el desglose completo y priorice a quienes
+    // tienen nota por debajo de 5 -- son los que más necesitan mejorar para
+    // subir la media del grupo. Ordenados de peor a mejor nota.
+    const conNotas = cuentan
+      .filter(m=>MEDALIA_COORD_DATA[m] && MEDALIA_COORD_DATA[m].cantidad>0)
+      .map(m=>({mat:m, nombre:ROSTER_NOMBRES[m]||m, ...MEDALIA_COORD_DATA[m]}))
+      .sort((a,b)=>a.promedio-b.promedio);
+    const bajas = conNotas.filter(n=>n.promedio<5).length;
+    const idNotas = 'medaliaNotas-' + grupo.nombre.replace(/\s+/g,'');
+    const notasHTML = conNotas.length ? `
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div onclick="const e=document.getElementById('${idNotas}');e.style.display=e.style.display==='none'?'flex':'none';" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.6rem;font-weight:700;letter-spacing:.08em;color:var(--gold3);text-transform:uppercase">Notas de técnicos · ${conNotas.length}${bajas?` · <span style="color:#e05a4a">${bajas} por debajo de 5</span>`:''}</span>
+          <span style="font-size:.65rem;color:var(--muted)">▾</span>
+        </div>
+        <div id="${idNotas}" style="display:none;margin-top:8px;flex-direction:column;gap:4px">
+          ${conNotas.map(n=>{
+            const colN = n.promedio<5?'#e05a4a':n.promedio<8?'var(--orange)':'var(--green2)';
+            const rowId = idNotas + '-' + n.mat;
+            return `<div>
+              <div onclick="toggleNotasMedalia('${n.mat}','${rowId}')" style="cursor:pointer;background:var(--bg);border-radius:8px;padding:6px 10px;display:flex;justify-content:space-between;align-items:center;${n.promedio<5?'border:1px solid #3d1a1a':''}">
+                <div>
+                  <div style="font-size:.72rem;color:var(--text)">${n.nombre} <span style="color:var(--muted)">· ${n.mat}</span></div>
+                  <div style="font-size:.6rem;color:var(--muted)">${n.cantidad} encuesta${n.cantidad===1?'':'s'} · toca para ver el detalle</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:.95rem;font-weight:800;color:${colN}">${n.promedio.toFixed(2)}</div>
+                  ${n.promedio<5?'<div style="font-size:.55rem;color:#e05a4a;font-weight:700">⚠️ Mejorar</div>':''}
+                </div>
+              </div>
+              <div id="${rowId}-list" style="display:none;margin-top:4px;padding-left:8px;border-left:2px solid var(--border2)"></div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : '';
+
     html+=`
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;margin-top:10px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${color},transparent)"></div>
@@ -2010,12 +2078,37 @@ function renderMedialiaCoord(){
           <div style="font-size:.62rem;color:var(--muted)">Puntuación promedio</div>
         </div>
       </div>
+      ${objetivoCFLHTML(cuentan)}
       ${noHTML}
+      ${notasHTML}
       ${sinNotasHTML}
     </div>`;
   });
 
   container.innerHTML=html;
+}
+
+// Desplegable con el detalle de encuestas de un técnico (mantenimiento +
+// comentario del cliente), dentro de "Notas de técnicos". Solo muestra las
+// del mes más reciente con encuestas (MEDALIA_MES_ACTUAL), para que
+// coincida con la cantidad/promedio ya mostrados arriba.
+function toggleNotasMedalia(mat, rowId){
+  const el = document.getElementById(rowId + '-list');
+  if(!el) return;
+  if(el.style.display !== 'none'){ el.style.display='none'; return; }
+  const todas = MEDALIA_DETALLE_DATA[mat] || [];
+  const notas = MEDALIA_MES_ACTUAL ? todas.filter(n=>n.fecha.startsWith(MEDALIA_MES_ACTUAL)) : todas;
+  el.innerHTML = notas.length
+    ? notas.map(n=>`
+      <div style="background:var(--dim);border-radius:8px;padding:8px 10px;margin-top:4px;font-size:.68rem">
+        <div style="display:flex;justify-content:space-between;color:var(--muted);margin-bottom:3px">
+          <span>Mantenimiento #${n.mant}</span>
+          <span>${n.fecha}${n.nota?' · Nota '+n.nota:''}</span>
+        </div>
+        <div style="color:var(--text)">${n.comentario ? escapeHtmlAttr(n.comentario) : '<span style="color:var(--muted)">Sin comentario</span>'}</div>
+      </div>`).join('')
+    : '<div style="font-size:.68rem;color:var(--muted);padding:6px 0">Sin detalle disponible para este mes.</div>';
+  el.style.display='block';
 }
 
 // ══════════════════════════════════════════════
@@ -2221,8 +2314,12 @@ function toggleMantenimientosMotivo(rowId){
     const rm = RM_DATA[info.tecId] || RM_DATA[info.tecId.toUpperCase()];
     pares = (rm && rm.visitas || []).filter(v => v.repetido && v.motivo===info.motivo).map(v=>({n:v.nMant, nuevo:!!v.nuevo}));
   } else {
+    // Causa raíz del post-mantenimiento: antes mostraba el número del
+    // mantenimiento POSTERIOR (nMantPost), pero ese no se puede revisar --
+    // se vincula al mismo mantenimiento original (nMant), el mismo número
+    // que ya aparece en "Motivo de las visitas repetidas (RM)".
     const rm = RM_DATA[info.tecId] || RM_DATA[info.tecId.toUpperCase()];
-    pares = (rm && rm.visitas || []).filter(v => v.motivo_post===info.motivo).map(v=>({n:v.nMantPost||v.nMant, nuevo:!!v.nuevo}));
+    pares = (rm && rm.visitas || []).filter(v => v.motivo_post===info.motivo).map(v=>({n:v.nMant, nuevo:!!v.nuevo}));
   }
   // Deduplicar por numero de mantenimiento, quedandose con "nuevo" si algun
   // duplicado lo era.
@@ -3004,6 +3101,37 @@ async function loadMedialiaCoord(){
   }catch(e){console.log('Medalia error:',e.message);}
 }
 
+// Detalle de encuestas de Medalia (una fila por encuesta, con mantenimiento
+// y comentario del cliente) -- alimenta el desplegable al hacer clic en un
+// técnico dentro de "Notas de técnicos".
+async function loadMedaliaDetalle(){
+  try{
+    const res=await fetchConReintento(MEDALIA_URL+'&t='+Date.now(),{cache:'no-store'});
+    if(!res.ok) return;
+    const csv=await res.text();
+    const rows=parseCSV(csv);
+    if(rows.length>0){
+      const byMat={};
+      let mesMasReciente='';
+      rows.forEach(row=>{
+        const mat=String(row['mat']||'').trim().toUpperCase();
+        const mant=String(row['mantenimiento']||'').trim();
+        const fecha=String(row['fecha']||'').trim();
+        const nota=String(row['nota']||'').trim();
+        const comentario=String(row['comentario']||'').trim();
+        if(!mat || !mant) return;
+        if(!byMat[mat]) byMat[mat]=[];
+        byMat[mat].push({mant,fecha,nota,comentario});
+        const clave=fecha.slice(0,7); // "AAAA-MM"
+        if(clave.length===7 && clave>mesMasReciente) mesMasReciente=clave;
+      });
+      MEDALIA_DETALLE_DATA=byMat;
+      MEDALIA_MES_ACTUAL=mesMasReciente;
+      console.log('Medalia detalle cargado:',Object.keys(MEDALIA_DETALLE_DATA).length,'técnicos · mes:',MEDALIA_MES_ACTUAL);
+    }
+  }catch(e){console.log('Medalia detalle error:',e.message);}
+}
+
 // ════════════════════════════════════════════════════════
 //  CARGAR CUMPLIMIENTO (CSV dinámico)
 // ════════════════════════════════════════════════════════
@@ -3244,12 +3372,15 @@ function formatearFechaLegible(fechaISO){
   return dt.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
 }
 
-async function fetchFichajePorFecha(fecha){
+const FICHAJE_RESPUESTAS_OK = new WeakSet(); // respuestas realmente recibidas del servidor (vs. {} por error de red)
+let FICHAJE_HOY_CARGADO = false;
+async function fetchFichajePorFecha(fecha, soloMio){
   try{
-    const url=FICHAJE_URL+'&fecha='+fecha+'&t='+Date.now();
+    const url=(soloMio?FICHAJE_MIO_URL+'&mat='+encodeURIComponent(FICHAJE_ID||''):FICHAJE_URL)+'&fecha='+fecha+'&t='+Date.now();
     const res=await fetchConReintento(url,{cache:'no-store'});
     if(!res.ok) return {};
     const csv=await res.text();
+    if(csv.indexOf('horaEntrada')===-1) return {}; // respuesta que no es del fichaje (p.ej. backend aún sin este endpoint)
     const rows=parseCSV(csv);
     const porMat={};
     rows.forEach(row=>{
@@ -3276,13 +3407,39 @@ async function fetchFichajePorFecha(fecha){
         idEventoSalida: row['idEventoSalida']||''
       };
     });
+    FICHAJE_RESPUESTAS_OK.add(porMat);
     return porMat;
   }catch(e){console.log('Fichaje error:',e.message); return {};}
 }
 
+// El backend calcula el estado de TODA la plantilla en cada llamada, así que tarda unos
+// segundos. Para que al reabrir sesión el botón ya muestre "Trabajando desde…" al instante,
+// se guarda en el dispositivo el último estado propio conocido de HOY y se pinta de
+// inmediato; la respuesta real del servidor lo confirma/corrige después.
+function claveCacheFichajePropio(mat){ return 'fichajePropio_'+String(mat||'').toUpperCase(); }
+function guardarCacheFichajePropio(mat, registro){
+  try{ localStorage.setItem(claveCacheFichajePropio(mat), JSON.stringify({fecha:hoyISOFichaje(), registro:registro||null})); }catch(e){}
+}
+function leerCacheFichajePropio(mat){
+  try{
+    const c=JSON.parse(localStorage.getItem(claveCacheFichajePropio(mat))||'null');
+    if(c && c.fecha===hoyISOFichaje()) return c;
+  }catch(e){}
+  return null;
+}
+
 // Datos de HOY para el botón personal de fichar — independiente de la fecha que se esté navegando en el Gantt
 async function loadFichajeHoy(){
-  FICHAJE_HOY = await fetchFichajePorFecha(hoyISOFichaje());
+  let resp = await fetchFichajePorFecha(hoyISOFichaje(), true); // endpoint ligero: solo mi estado
+  if(!FICHAJE_RESPUESTAS_OK.has(resp)) resp = await fetchFichajePorFecha(hoyISOFichaje()); // respaldo: endpoint completo
+  const clave = String(FICHAJE_ID||'').toUpperCase();
+  if(FICHAJE_RESPUESTAS_OK.has(resp)){
+    FICHAJE_HOY = resp;
+    if(clave) guardarCacheFichajePropio(clave, resp[clave]);
+  } else if(!FICHAJE_HOY_CARGADO){
+    FICHAJE_HOY = {};
+  }
+  FICHAJE_HOY_CARGADO = true;
 }
 
 // Datos de la fecha navegada en el Gantt (JR / administrativas de fichaje)
@@ -3291,6 +3448,15 @@ async function loadFichajeVista(){
 }
 
 function estadoFichajeBtn(mat){
+  if(!FICHAJE_HOY_CARGADO){
+    // Aún no ha respondido el servidor: se usa el último estado propio guardado de hoy, si lo hay.
+    const c=leerCacheFichajePropio(mat);
+    if(!c) return {estado:'cargando'};
+    const fc=c.registro;
+    if(!fc || !fc.horaEntrada) return {estado:'sinFichar'};
+    if(!fc.horaSalida) return {estado:'abierto', entrada:fc.horaEntrada, horaInicioComida:fc.horaInicioComida, horaFinComida:fc.horaFinComida};
+    return {estado:'cerrado', entrada:fc.horaEntrada, salida:fc.horaSalida, tipoCierre:fc.tipoCierre};
+  }
   const f=FICHAJE_HOY[String(mat||'').toUpperCase()];
   if(!f || !f.horaEntrada) return {estado:'sinFichar'};
   if(!f.horaSalida) return {estado:'abierto', entrada:f.horaEntrada, horaInicioComida:f.horaInicioComida, horaFinComida:f.horaFinComida};
@@ -3333,6 +3499,14 @@ function pintarBotonFichaje(){
   const st=estadoFichajeBtn(FICHAJE_ID);
 
   if(FICHAJE_COOLDOWN_TIMER){ clearTimeout(FICHAJE_COOLDOWN_TIMER); FICHAJE_COOLDOWN_TIMER=null; }
+  if(st.estado==='cargando'){
+    btn.disabled=true;
+    btn.style.opacity='.6';
+    btn.style.color='var(--muted)'; btn.style.borderColor='var(--border2)';
+    btn.textContent='⏳ Comprobando…';
+    btn.title='';
+    return;
+  }
   // Durante los minutos de protección contra doble toque no se muestra una cuenta atrás
   // (se leía como un bloqueo/error) sino el estado real: si ya se fichó entrada, que
   // quede claro que la jornada está en curso; solo se sigue avisando de un bloqueo real
@@ -4517,11 +4691,15 @@ async function doLogin(){
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
   FICHAJE_FECHA_VISTA=null;
+  FICHAJE_HOY_CARGADO=false;
+  // El botón usa el endpoint ligero (solo su estado); el Gantt completo solo lo piden JR/administrativas.
   loadFichajeHoy().then(()=>pintarBotonFichaje());
-  loadFichajeVista().then(()=>{
-    if(CURRENT_USER_TYPE==='jr') renderFichajeJR('jrFichajeContainer');
-    if(CURRENT_USER_TYPE==='fichaje-admin') renderFichajeJR('fichajeAdminContainer');
-  });
+  if(CURRENT_USER_TYPE==='jr' || CURRENT_USER_TYPE==='fichaje-admin'){
+    loadFichajeVista().then(()=>{
+      if(CURRENT_USER_TYPE==='jr') renderFichajeJR('jrFichajeContainer');
+      else renderFichajeJR('fichajeAdminContainer');
+    });
+  }
 
   document.getElementById('spinner').style.display='none';
   document.getElementById('loginBtn').style.opacity='1';
@@ -4593,7 +4771,7 @@ async function doLogin(){
     document.getElementById('tabsBar').style.display='none';
     document.getElementById('btnEquipoTF').style.display = found.id==='GD5381' ? 'block' : 'none';
     renderJRPanel();
-    loadMedialiaCoord().then(()=>renderMedialiaCoord());
+    Promise.all([loadMedialiaCoord(), loadMedaliaDetalle()]).then(()=>renderMedialiaCoord());
     showPanel('jrPanel');
 
   } else if(found.type==='je'){
@@ -4812,6 +4990,7 @@ async function doRefreshData(){
       loadJerarquia(),
       loadVacaciones(),
       loadMedialiaCoord(),
+      loadMedaliaDetalle(),
       loadCumplimiento(),
       loadRM(),
       loadFichajeHoy(),
@@ -4846,7 +5025,7 @@ function doLogout(){
   document.getElementById('tabsBar').style.display='none';
   document.getElementById('tabsBarJR').style.display='none';
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
-  FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={};
+  FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={}; FICHAJE_HOY_CARGADO=false;
   hideAllPanels();
   document.getElementById('mainPanel').style.display='block';
 }
