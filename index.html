@@ -584,6 +584,7 @@ const MESES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYC
 const FICHAJE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje&token=" + APP_TOKEN;
 const FICHAJE_INFORME_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje-informe&token=" + APP_TOKEN;
 const FICHAJE_PDF_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje-pdf&token=" + APP_TOKEN;
+const FICHAJE_MIO_URL = FICHAJE_URL.replace("type=fichaje&","type=fichaje-mio&");
 const FICHAJE_HISTORIAL_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=fichaje-historial&token=" + APP_TOKEN;
 
 // Confirmaciones por SMS (servidor en la nube) — ACTUALIZAR con la URL real de Render
@@ -3371,12 +3372,15 @@ function formatearFechaLegible(fechaISO){
   return dt.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
 }
 
-async function fetchFichajePorFecha(fecha){
+const FICHAJE_RESPUESTAS_OK = new WeakSet(); // respuestas realmente recibidas del servidor (vs. {} por error de red)
+let FICHAJE_HOY_CARGADO = false;
+async function fetchFichajePorFecha(fecha, soloMio){
   try{
-    const url=FICHAJE_URL+'&fecha='+fecha+'&t='+Date.now();
+    const url=(soloMio?FICHAJE_MIO_URL+'&mat='+encodeURIComponent(FICHAJE_ID||''):FICHAJE_URL)+'&fecha='+fecha+'&t='+Date.now();
     const res=await fetchConReintento(url,{cache:'no-store'});
     if(!res.ok) return {};
     const csv=await res.text();
+    if(csv.indexOf('horaEntrada')===-1) return {}; // respuesta que no es del fichaje (p.ej. backend aún sin este endpoint)
     const rows=parseCSV(csv);
     const porMat={};
     rows.forEach(row=>{
@@ -3403,13 +3407,39 @@ async function fetchFichajePorFecha(fecha){
         idEventoSalida: row['idEventoSalida']||''
       };
     });
+    FICHAJE_RESPUESTAS_OK.add(porMat);
     return porMat;
   }catch(e){console.log('Fichaje error:',e.message); return {};}
 }
 
+// El backend calcula el estado de TODA la plantilla en cada llamada, así que tarda unos
+// segundos. Para que al reabrir sesión el botón ya muestre "Trabajando desde…" al instante,
+// se guarda en el dispositivo el último estado propio conocido de HOY y se pinta de
+// inmediato; la respuesta real del servidor lo confirma/corrige después.
+function claveCacheFichajePropio(mat){ return 'fichajePropio_'+String(mat||'').toUpperCase(); }
+function guardarCacheFichajePropio(mat, registro){
+  try{ localStorage.setItem(claveCacheFichajePropio(mat), JSON.stringify({fecha:hoyISOFichaje(), registro:registro||null})); }catch(e){}
+}
+function leerCacheFichajePropio(mat){
+  try{
+    const c=JSON.parse(localStorage.getItem(claveCacheFichajePropio(mat))||'null');
+    if(c && c.fecha===hoyISOFichaje()) return c;
+  }catch(e){}
+  return null;
+}
+
 // Datos de HOY para el botón personal de fichar — independiente de la fecha que se esté navegando en el Gantt
 async function loadFichajeHoy(){
-  FICHAJE_HOY = await fetchFichajePorFecha(hoyISOFichaje());
+  let resp = await fetchFichajePorFecha(hoyISOFichaje(), true); // endpoint ligero: solo mi estado
+  if(!FICHAJE_RESPUESTAS_OK.has(resp)) resp = await fetchFichajePorFecha(hoyISOFichaje()); // respaldo: endpoint completo
+  const clave = String(FICHAJE_ID||'').toUpperCase();
+  if(FICHAJE_RESPUESTAS_OK.has(resp)){
+    FICHAJE_HOY = resp;
+    if(clave) guardarCacheFichajePropio(clave, resp[clave]);
+  } else if(!FICHAJE_HOY_CARGADO){
+    FICHAJE_HOY = {};
+  }
+  FICHAJE_HOY_CARGADO = true;
 }
 
 // Datos de la fecha navegada en el Gantt (JR / administrativas de fichaje)
@@ -3418,6 +3448,15 @@ async function loadFichajeVista(){
 }
 
 function estadoFichajeBtn(mat){
+  if(!FICHAJE_HOY_CARGADO){
+    // Aún no ha respondido el servidor: se usa el último estado propio guardado de hoy, si lo hay.
+    const c=leerCacheFichajePropio(mat);
+    if(!c) return {estado:'cargando'};
+    const fc=c.registro;
+    if(!fc || !fc.horaEntrada) return {estado:'sinFichar'};
+    if(!fc.horaSalida) return {estado:'abierto', entrada:fc.horaEntrada, horaInicioComida:fc.horaInicioComida, horaFinComida:fc.horaFinComida};
+    return {estado:'cerrado', entrada:fc.horaEntrada, salida:fc.horaSalida, tipoCierre:fc.tipoCierre};
+  }
   const f=FICHAJE_HOY[String(mat||'').toUpperCase()];
   if(!f || !f.horaEntrada) return {estado:'sinFichar'};
   if(!f.horaSalida) return {estado:'abierto', entrada:f.horaEntrada, horaInicioComida:f.horaInicioComida, horaFinComida:f.horaFinComida};
@@ -3460,6 +3499,14 @@ function pintarBotonFichaje(){
   const st=estadoFichajeBtn(FICHAJE_ID);
 
   if(FICHAJE_COOLDOWN_TIMER){ clearTimeout(FICHAJE_COOLDOWN_TIMER); FICHAJE_COOLDOWN_TIMER=null; }
+  if(st.estado==='cargando'){
+    btn.disabled=true;
+    btn.style.opacity='.6';
+    btn.style.color='var(--muted)'; btn.style.borderColor='var(--border2)';
+    btn.textContent='⏳ Comprobando…';
+    btn.title='';
+    return;
+  }
   // Durante los minutos de protección contra doble toque no se muestra una cuenta atrás
   // (se leía como un bloqueo/error) sino el estado real: si ya se fichó entrada, que
   // quede claro que la jornada está en curso; solo se sigue avisando de un bloqueo real
@@ -4644,11 +4691,15 @@ async function doLogin(){
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
   FICHAJE_FECHA_VISTA=null;
+  FICHAJE_HOY_CARGADO=false;
+  // El botón usa el endpoint ligero (solo su estado); el Gantt completo solo lo piden JR/administrativas.
   loadFichajeHoy().then(()=>pintarBotonFichaje());
-  loadFichajeVista().then(()=>{
-    if(CURRENT_USER_TYPE==='jr') renderFichajeJR('jrFichajeContainer');
-    if(CURRENT_USER_TYPE==='fichaje-admin') renderFichajeJR('fichajeAdminContainer');
-  });
+  if(CURRENT_USER_TYPE==='jr' || CURRENT_USER_TYPE==='fichaje-admin'){
+    loadFichajeVista().then(()=>{
+      if(CURRENT_USER_TYPE==='jr') renderFichajeJR('jrFichajeContainer');
+      else renderFichajeJR('fichajeAdminContainer');
+    });
+  }
 
   document.getElementById('spinner').style.display='none';
   document.getElementById('loginBtn').style.opacity='1';
@@ -4974,7 +5025,7 @@ function doLogout(){
   document.getElementById('tabsBar').style.display='none';
   document.getElementById('tabsBarJR').style.display='none';
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
-  FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={};
+  FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={}; FICHAJE_HOY_CARGADO=false;
   hideAllPanels();
   document.getElementById('mainPanel').style.display='block';
 }
