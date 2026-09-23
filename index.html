@@ -328,7 +328,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     </div>
     <div style="display:flex;gap:6px">
       <button class="topbar-logout" id="btnCargaExcel" onclick="abrirCargaExcel()" style="display:none;color:#0a0a0a;background:linear-gradient(135deg,#7a5c10,#c9a84c,#e8c96a);border:none;font-weight:700">📂 Cargar Excel</button>
-      <button class="topbar-logout" id="fichajeBtn" style="color:var(--gold);border-color:var(--gold3);font-weight:700">🕐 Fichar entrada</button>
+      <button class="topbar-logout" id="fichajeBtn" style="color:var(--gold);border-color:var(--gold3);font-weight:700">🕐 Empezar jornada</button>
       <button class="topbar-logout" id="refreshBtn" style="color:var(--gold);border-color:var(--gold3)">🔄</button>
       <button class="topbar-logout" id="logoutBtn">Salir</button>
     </div>
@@ -3430,6 +3430,7 @@ function leerCacheFichajePropio(mat){
 
 // Datos de HOY para el botón personal de fichar — independiente de la fecha que se esté navegando en el Gantt
 async function loadFichajeHoy(){
+  if(!FICHAJE_ID) return; // sin sesión todavía — no pisar el estado con una consulta de matrícula vacía
   let resp = await fetchFichajePorFecha(hoyISOFichaje(), true); // endpoint ligero: solo mi estado
   if(!FICHAJE_RESPUESTAS_OK.has(resp)) resp = await fetchFichajePorFecha(hoyISOFichaje()); // respaldo: endpoint completo
   const clave = String(FICHAJE_ID||'').toUpperCase();
@@ -3532,7 +3533,7 @@ function pintarBotonFichaje(){
 
   btn.disabled=false;
   if(st.estado==='sinFichar'){
-    btn.textContent='🕐 Fichar entrada';
+    btn.textContent='🕐 Empezar jornada';
     btn.style.color='var(--gold)'; btn.style.borderColor='var(--gold3)';
   } else if(st.estado==='abierto'){
     btn.textContent='🔴 Finalizar jornada';
@@ -4690,17 +4691,6 @@ async function doLogin(){
   Promise.all([loadVacaciones(), loadCumplimiento(), loadRM()]).then(()=>{
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
-  FICHAJE_FECHA_VISTA=null;
-  FICHAJE_HOY_CARGADO=false;
-  // El botón usa el endpoint ligero (solo su estado); el Gantt completo solo lo piden JR/administrativas.
-  loadFichajeHoy().then(()=>pintarBotonFichaje());
-  if(CURRENT_USER_TYPE==='jr' || CURRENT_USER_TYPE==='fichaje-admin'){
-    loadFichajeVista().then(()=>{
-      if(CURRENT_USER_TYPE==='jr') renderFichajeJR('jrFichajeContainer');
-      else renderFichajeJR('fichajeAdminContainer');
-    });
-  }
-
   document.getElementById('spinner').style.display='none';
   document.getElementById('loginBtn').style.opacity='1';
 
@@ -4812,6 +4802,20 @@ async function doLogin(){
   const _matriculaLogin = (found.type==='tecnico' ? found.tec.id : found.id || '').toUpperCase();
   if(EXCEL_UPLOADERS_PERMITIDOS.includes(_matriculaLogin)){
     document.getElementById('btnCargaExcel').style.display='';
+  }
+
+  // Importante: esto va DESPUÉS de fijar FICHAJE_ID (arriba, según el rol) — si se llama
+  // antes, la petición sale con matrícula vacía, vuelve "sin fichar" para nadie, y esa
+  // respuesta vacía se guarda como si fuera el estado real, pisando el fichaje del día.
+  FICHAJE_FECHA_VISTA=null;
+  FICHAJE_HOY_CARGADO=false;
+  // El botón usa el endpoint ligero (solo su estado); el Gantt completo solo lo piden JR/administrativas.
+  loadFichajeHoy().then(()=>pintarBotonFichaje());
+  if(CURRENT_USER_TYPE==='jr' || CURRENT_USER_TYPE==='fichaje-admin'){
+    loadFichajeVista().then(()=>{
+      if(CURRENT_USER_TYPE==='jr') renderFichajeJR('jrFichajeContainer');
+      else renderFichajeJR('fichajeAdminContainer');
+    });
   }
 
   pintarBotonFichaje();
