@@ -693,7 +693,7 @@ function gradeColor(g){
   return g==='best'?'var(--green2)':g==='ok'?'var(--orange)':'#e05a4a';
 }
 const KPI_CONFIG=[
-  {key:'pRM',  label:'%RM',         icon:'🛠️',unit:'%',min:89.5,detail:'rm'},
+  {key:'pRM',  label:'%RM',         icon:'🛠️',unit:'%',min:87.5,detail:'rm'},
   {key:'pCum', label:'%Cumplimiento',icon:'✅',unit:'%',min:90.0,detail:'cum'},
   {key:'conv', label:'Conv/Ventas', icon:'💰',unit:'%',min:15.0,detail:'ventas'},
   {key:'falt', label:'Faltantes',   icon:'⚠️',unit:'',max:0,detail:null},
@@ -719,7 +719,7 @@ function statusLabel(s){
 function buildKpiAlertBadges(t){
   const pRM=t.pRM||0, pCum=t.pCum||0, conv=t.conv||0;
   const badges=[];
-  if(!t.pRMSinDatos) badges.push({label:`RM ${pRM.toFixed(1)}%`, bad:pRM<89.5});
+  if(!t.pRMSinDatos) badges.push({label:`RM ${pRM.toFixed(1)}%`, bad:pRM<87.5});
   badges.push(
     {label:`Cumpl. ${pCum.toFixed(1)}%`, bad:pCum<90},
     {label:`Conv ${conv.toFixed(1)}%`, bad:conv<15},
@@ -1367,7 +1367,7 @@ function renderEquipoPanel(jeId){
 
   // KPIs equipo: solo %RM, %Cumplimiento, Conversión, PPA
   const JE_KPI_KEYS=[
-    {key:'pRM',  label:'%RM',          icon:'🛠️',unit:'%',min:89.5, dash:'rm'},
+    {key:'pRM',  label:'%RM',          icon:'🛠️',unit:'%',min:87.5, dash:'rm'},
     {key:'pCum', label:'%Cumplimiento',icon:'✅', unit:'%',min:90.0, dash:'cum'},
     {key:'conv', label:'Conversión',   icon:'💰', unit:'%',min:15.0, dash:'conv'},
     {key:'ppa',  label:'PPA',          icon:'⭐', unit:'%',min:10.0, dash:'ppa'},
@@ -1424,7 +1424,7 @@ function renderEquipoPanel(jeId){
     const totalVisitas = rmTecs.reduce((s,x)=>s+x.rm.total,0);
     const totalReps    = rmTecs.reduce((s,x)=>s+x.rm.reps,0);
     const pctRMequipo  = totalVisitas>0?((totalVisitas-totalReps)/totalVisitas*100):0;
-    const rmCol        = pctRMequipo>=89.5?'var(--green2)':'#e05a4a';
+    const rmCol        = pctRMequipo>=87.5?'var(--green2)':'#e05a4a';
     // Top motivos post globales del equipo
     const postMap={};
     rmTecs.forEach(x=>(x.rm.topPost||[]).forEach(([m,n])=>postMap[m]=(postMap[m]||0)+n));
@@ -1460,7 +1460,7 @@ function renderEquipoPanel(jeId){
             ${totalVisitas} visitas · <span style="color:#e05a4a;font-weight:600">${totalReps} repetidas</span> · ${rmTecs.length} técnicos con datos
           </div>
           <div style="font-size:.68rem;margin-top:5px;color:${rmCol};font-weight:600">
-            ${pctRMequipo>=89.5?`✓ Equipo en objetivo · +${(pctRMequipo-89.5).toFixed(2)} puntos`:`✗ Por debajo · faltan ${(89.5-pctRMequipo).toFixed(2)} puntos`}
+            ${pctRMequipo>=87.5?`✓ Equipo en objetivo · +${(pctRMequipo-87.5).toFixed(2)} puntos`:`✗ Por debajo · faltan ${(87.5-pctRMequipo).toFixed(2)} puntos`}
           </div>
         </div>
       </div>
@@ -1510,7 +1510,7 @@ function renderEquipoPanel(jeId){
 
   function tecScore(t){
     let s=t.mlv*2+t.mab;
-    if(t.pRM>=89.5)s+=1;if(t.pCum>=90)s+=1;if(t.conv>=15)s+=1;if(t.ppa>=10)s+=1;
+    if(t.pRM>=87.5)s+=1;if(t.pCum>=90)s+=1;if(t.conv>=15)s+=1;if(t.ppa>=10)s+=1;
     return s;
   }
   const sortedCuentan=[...cuentan].sort((a,b)=>b.mlv-a.mlv);
@@ -1691,7 +1691,7 @@ function buildTecDetailHTML(tec){
       if(rm){
         // %RM siempre el del Resumen App Claude (tec.pRM) -- el Excel de
         // mantenimientos (rm.*) solo aporta el detalle de visitas/repeticiones.
-        const rmCol=tec.pRM>=89.5?'var(--green2)':'#e05a4a';
+        const rmCol=tec.pRM>=87.5?'var(--green2)':'#e05a4a';
         html+=`<div style="background:var(--s1);border:1px solid var(--border2);border-radius:13px;padding:14px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
           <div style="position:relative;width:58px;height:58px;flex-shrink:0">
             <svg width="58" height="58" viewBox="0 0 58 58" style="transform:rotate(-90deg)">
@@ -1769,7 +1769,7 @@ function renderJRPanel(){
     <div class="equipo-kpi"><div class="equipo-kpi-name">MA+B global</div>
       <div class="equipo-kpi-val" style="color:${gradeColor(gmabG)}">${(globalAv.mab||0).toFixed(2)}</div></div>
     <div class="equipo-kpi"><div class="equipo-kpi-name">%RM global</div>
-      <div class="equipo-kpi-val" style="color:${(globalAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(globalAv.pRM||0).toFixed(1)}%</div></div>
+      <div class="equipo-kpi-val" style="color:${(globalAv.pRM||0)>=87.5?'var(--green2)':'#e05a4a'}">${(globalAv.pRM||0).toFixed(1)}%</div></div>
     <div class="equipo-kpi"><div class="equipo-kpi-name">%Cum global</div>
       <div class="equipo-kpi-val" style="color:${(globalAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(globalAv.pCum||0).toFixed(1)}%</div></div>
     <div class="equipo-kpi"><div class="equipo-kpi-name">Conv global</div>
@@ -1823,7 +1823,7 @@ function renderJRPanel(){
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
         <div class="je-mini"><div class="je-mini-n" style="color:${gCol}">${(grupoAv.mlv||0).toFixed(2)}</div><div class="je-mini-l">ML-V</div></div>
-        <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(grupoAv.pRM||0).toFixed(1)}%</div><div class="je-mini-l">%RM</div></div>
+        <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.pRM||0)>=87.5?'var(--green2)':'#e05a4a'}">${(grupoAv.pRM||0).toFixed(1)}%</div><div class="je-mini-l">%RM</div></div>
         <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(grupoAv.pCum||0).toFixed(1)}%</div><div class="je-mini-l">%Cum</div></div>
         <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(grupoAv.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
       </div>
@@ -1841,7 +1841,7 @@ function renderJRPanel(){
     jeListHTML += jeSummaries.map(je=>{
       const g=getGrade(je.av.mlv||0);
       const col=gradeColor(g);
-      const rmOk=(je.av.pRM||0)>=89.5,cumOk=(je.av.pCum||0)>=90,convOk=(je.av.conv||0)>=15;
+      const rmOk=(je.av.pRM||0)>=87.5,cumOk=(je.av.pCum||0)>=90,convOk=(je.av.conv||0)>=15;
       return`<div class="je-card g-${g} fade-up" onclick="showJEDetail('${je.id}')" style="margin-bottom:8px">
         <div class="je-card-top">
           <div>
@@ -1881,7 +1881,7 @@ function renderJRPanel(){
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
         <div class="je-mini"><div class="je-mini-n" style="color:${sgCol}">${(sinGrupoAv.mlv||0).toFixed(2)}</div><div class="je-mini-l">ML-V</div></div>
-        <div class="je-mini"><div class="je-mini-n" style="color:${(sinGrupoAv.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(sinGrupoAv.pRM||0).toFixed(1)}%</div><div class="je-mini-l">%RM</div></div>
+        <div class="je-mini"><div class="je-mini-n" style="color:${(sinGrupoAv.pRM||0)>=87.5?'var(--green2)':'#e05a4a'}">${(sinGrupoAv.pRM||0).toFixed(1)}%</div><div class="je-mini-l">%RM</div></div>
         <div class="je-mini"><div class="je-mini-n" style="color:${(sinGrupoAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(sinGrupoAv.pCum||0).toFixed(1)}%</div><div class="je-mini-l">%Cum</div></div>
         <div class="je-mini"><div class="je-mini-n" style="color:${(sinGrupoAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(sinGrupoAv.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
       </div>
@@ -1893,7 +1893,7 @@ function renderJRPanel(){
       const col=gradeColor(g);
       const tecNombre=CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===id.toUpperCase());
       const nombre=JE_NAMES[id]||(tecNombre&&tecNombre.nombre)||id;
-      const rmOk=(av.pRM||0)>=89.5,cumOk=(av.pCum||0)>=90,convOk=(av.conv||0)>=15;
+      const rmOk=(av.pRM||0)>=87.5,cumOk=(av.pCum||0)>=90,convOk=(av.conv||0)>=15;
       return`<div class="je-card g-${g} fade-up" onclick="showJEDetail('${id}')" style="margin-bottom:8px">
         <div class="je-card-top">
           <div>
@@ -2149,7 +2149,7 @@ function showJEDetail(jeId){
 
     <div class="equipo-kpis" style="margin-bottom:14px">
       <div class="equipo-kpi"><div class="equipo-kpi-name">%RM</div>
-        <div class="equipo-kpi-val" style="color:${(av.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(av.pRM||0).toFixed(1)}%</div></div>
+        <div class="equipo-kpi-val" style="color:${(av.pRM||0)>=87.5?'var(--green2)':'#e05a4a'}">${(av.pRM||0).toFixed(1)}%</div></div>
       <div class="equipo-kpi"><div class="equipo-kpi-name">%Cum</div>
         <div class="equipo-kpi-val" style="color:${(av.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(av.pCum||0).toFixed(1)}%</div></div>
       <div class="equipo-kpi"><div class="equipo-kpi-name">Conv</div>
@@ -2237,7 +2237,7 @@ function showEquipoTF(){
 
     <div class="equipo-kpis" style="margin-bottom:14px">
       <div class="equipo-kpi"><div class="equipo-kpi-name">%RM</div>
-        <div class="equipo-kpi-val" style="color:${(av.pRM||0)>=89.5?'var(--green2)':'#e05a4a'}">${(av.pRM||0).toFixed(1)}%</div></div>
+        <div class="equipo-kpi-val" style="color:${(av.pRM||0)>=87.5?'var(--green2)':'#e05a4a'}">${(av.pRM||0).toFixed(1)}%</div></div>
       <div class="equipo-kpi"><div class="equipo-kpi-name">%Cum</div>
         <div class="equipo-kpi-val" style="color:${(av.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(av.pCum||0).toFixed(1)}%</div></div>
       <div class="equipo-kpi"><div class="equipo-kpi-name">Conv</div>
@@ -2349,7 +2349,7 @@ function _openRMDash(tecId){
   // recalculo desde el Excel de mantenimientos -- rm.* solo aporta el
   // detalle de visitas/repeticiones/motivos.
   const pctResumen = tec.pRM;
-  const pctOk = pctResumen >= 89.5;
+  const pctOk = pctResumen >= 87.5;
   const col = pctOk ? 'var(--green2)' : '#e05a4a';
   const circPreview = 2*Math.PI*28;
   const offsetPreview = circPreview - (pctResumen/100)*circPreview;
@@ -2390,7 +2390,7 @@ function _openRMDash(tecId){
         <div>
           <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
           <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-            Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(pctResumen-89.5).toFixed(2)} puntos`:`Faltan ${(89.5-pctResumen).toFixed(2)} puntos`}
+            Objetivo: ≥ 87.5% · ${pctOk?`Margen de ${(pctResumen-87.5).toFixed(2)} puntos`:`Faltan ${(87.5-pctResumen).toFixed(2)} puntos`}
           </div>
         </div>
       </div>
@@ -2469,7 +2469,7 @@ function _openRMDash(tecId){
       <div>
         <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
         <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-          Objetivo: ≥ 89.5% · ${pctOk?`Margen de ${(pctResumen-89.5).toFixed(2)} puntos`:`Faltan ${(89.5-pctResumen).toFixed(2)} puntos`}
+          Objetivo: ≥ 87.5% · ${pctOk?`Margen de ${(pctResumen-87.5).toFixed(2)} puntos`:`Faltan ${(87.5-pctResumen).toFixed(2)} puntos`}
         </div>
       </div>
     </div>
@@ -2507,19 +2507,19 @@ function showDetail(type){
   window.scrollTo(0,0);
   let html='';
   if(type==='rm'){
-    const pct=tec.pRM,s=getStatus({min:89.5},pct);
+    const pct=tec.pRM,s=getStatus({min:87.5},pct);
     const col=s==='ok'?'var(--green2)':s==='warn'?'var(--orange)':'#e05a4a';
     html=`<div class="detail-hero"><div class="detail-hero-title">🛠️ %RM</div>
       <div class="detail-hero-val" style="color:${col}">${pct.toFixed(2)}%</div>
-      <div class="detail-hero-sub">Objetivo ≥ 89.5% · ${tec.rm} repeticiones de ${tec.palito}</div></div>
+      <div class="detail-hero-sub">Objetivo ≥ 87.5% · ${tec.rm} repeticiones de ${tec.palito}</div></div>
     <div class="stat-row">
       <div class="stat-box"><div class="n">${tec.palito}</div><div class="l">Mantenimientos</div></div>
       <div class="stat-box"><div class="n" style="color:#e05a4a">${tec.rm}</div><div class="l">Repeticiones</div></div>
       <div class="stat-box"><div class="n" style="color:${col}">${pct.toFixed(1)}%</div><div class="l">Tu %RM</div></div>
     </div>
     <div style="font-size:.8rem;color:var(--muted);line-height:1.7;margin-top:8px">
-      ${s==='ok'?`<span style="color:var(--green2)">✓ Por encima del objetivo (89.5%). ¡Buen trabajo!</span>`
-        :`<span style="color:#e05a4a">✗ Necesitas reducir las repeticiones para superar el 89.5%.</span>`}
+      ${s==='ok'?`<span style="color:var(--green2)">✓ Por encima del objetivo (87.5%). ¡Buen trabajo!</span>`
+        :`<span style="color:#e05a4a">✗ Necesitas reducir las repeticiones para superar el 87.5%.</span>`}
     </div>
     <button onclick="showRMDash('${tec.id}')" style="margin-top:14px;width:100%;padding:12px;background:linear-gradient(135deg,var(--dim),#1c1400);border:1px solid var(--border2);border-radius:11px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;letter-spacing:.08em;cursor:pointer;text-transform:uppercase">
       📊 Ver dashboard de RMs →
@@ -2626,12 +2626,12 @@ function _renderDashRanking(type, tecs){
   const CFG={
     rm:{
       title:'🛠️ %RM — Ratio de Mantenimiento',
-      sub:'Objetivo ≥ 89.5% · Cuántos mantenimientos NO se repiten',
-      key:'pRM', min:89.5, unit:'%',
+      sub:'Objetivo ≥ 87.5% · Cuántos mantenimientos NO se repiten',
+      key:'pRM', min:87.5, unit:'%',
       cols:[
         {label:'Mantenimientos',fn:t=>t.palito},
         {label:'Repeticiones',fn:t=>t.rm, color:t=>t.rm===0?'var(--green2)':'#e05a4a'},
-        {label:'%RM',fn:t=>t.pRM.toFixed(1)+'%',color:t=>t.pRM>=89.5?'var(--green2)':'#e05a4a'},
+        {label:'%RM',fn:t=>t.pRM.toFixed(1)+'%',color:t=>t.pRM>=87.5?'var(--green2)':'#e05a4a'},
       ]
     },
     cum:{
@@ -4076,7 +4076,7 @@ const HISTORICO_KPIS = [
   {key:'mlv',  label:'ML-V', pass:v=>v>=7,    fmt:v=>v.toFixed(2)},
   {key:'conv', label:'Conv', pass:v=>v>=15,   fmt:v=>v.toFixed(1)+'%'},
   {key:'pCum', label:'%Cum', pass:v=>v>=90,   fmt:v=>v.toFixed(1)+'%'},
-  {key:'pRM',  label:'%RM',  pass:v=>v>=89.5, fmt:v=>v.toFixed(1)+'%', sinDatosKey:'pRMSinDatos'},
+  {key:'pRM',  label:'%RM',  pass:v=>v>=87.5, fmt:v=>v.toFixed(1)+'%', sinDatosKey:'pRMSinDatos'},
   {key:'nps',  label:'NPS',  pass:v=>v>9.4,   fmt:v=>v.toFixed(1)},
 ];
 
