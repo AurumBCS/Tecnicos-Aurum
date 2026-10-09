@@ -291,6 +291,46 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .fade-up:nth-child(1){animation-delay:.04s}.fade-up:nth-child(2){animation-delay:.08s}
 .fade-up:nth-child(3){animation-delay:.12s}.fade-up:nth-child(4){animation-delay:.16s}
 .fade-up:nth-child(5){animation-delay:.20s}.fade-up:nth-child(6){animation-delay:.24s}
+#controlFichajesPanel{display:none}
+/* ── Control de fichajes (Odoo + Líneas de Comunicación) ── */
+.cf-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.cf-btn{padding:8px 11px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap}
+.cf-btn:disabled{color:var(--muted);cursor:default;opacity:.6}
+.cf-btn.prim{background:var(--gold);border-color:var(--gold);color:#0a0a0a}
+.cf-input{padding:8px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem}
+.cf-dia{font-size:1rem;font-weight:800;color:var(--gold2);text-transform:capitalize;flex:1;min-width:150px}
+.cf-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:7px;margin-bottom:12px}
+.cf-kpi{background:var(--s1);border:1px solid var(--border2);border-left:4px solid var(--c);border-radius:10px;padding:8px 10px;cursor:pointer}
+.cf-kpi.on{outline:1.5px solid var(--gold2)}
+.cf-kpi .n{font-size:1.35rem;font-weight:800;color:var(--text)}
+.cf-kpi .t{font-size:.6rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.cf-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.cf-chip{padding:6px 12px;border-radius:999px;background:var(--s1);border:1px solid var(--border2);color:var(--muted);font-family:var(--font);font-size:.68rem;font-weight:700;cursor:pointer}
+.cf-chip.on{background:var(--gold);border-color:var(--gold);color:#0a0a0a}
+.cf-row{background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:10px 12px;margin-bottom:7px}
+.cf-row.cambio{border-color:var(--gold)}
+.cf-row.pend{border-left:4px solid var(--orange)}
+.cf-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.cf-nom{font-size:.8rem;font-weight:700;color:var(--text)}
+.cf-mat{font-size:.62rem;color:var(--muted)}
+.cf-pill{font-size:.58rem;font-weight:800;padding:3px 8px;border-radius:999px;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+.cf-Operativo{background:rgba(61,170,110,.15);color:var(--green2)}
+.cf-Ausente{background:rgba(212,131,26,.15);color:var(--orange)}
+.cf-Festivo{background:rgba(155,110,220,.15);color:#b48ef0}
+.cf-Baja-empresa{background:rgba(255,255,255,.08);color:var(--muted)}
+.cf-racha{font-size:.62rem;font-weight:800;color:var(--muted);margin-top:4px;text-align:right}
+.cf-racha.alta{color:#e05a4a}
+.cf-edit{display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px}
+.cf-edit select,.cf-edit textarea{width:100%;padding:7px 9px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--font);font-size:.72rem}
+.cf-edit select.pend{border-color:var(--orange);color:var(--orange);font-weight:700}
+.cf-edit textarea{resize:vertical;min-height:36px}
+.cf-obs{font-size:.66rem;color:var(--muted);margin-top:6px;line-height:1.4}
+.cf-rev{display:flex;align-items:center;gap:6px;font-size:.66rem;color:var(--muted)}
+.cf-rev b{color:var(--green2)}
+.cf-guardar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--s2);border-top:1px solid var(--gold);padding:10px 14px;display:none;align-items:center;gap:8px;justify-content:flex-end}
+.cf-guardar.on{display:flex}
+.cf-guardar span{margin-right:auto;font-size:.75rem;font-weight:700;color:var(--gold2)}
+.cf-vacio{padding:26px;text-align:center;color:var(--muted);font-size:.75rem}
 </style>
 </head>
 <body>
@@ -462,6 +502,22 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         Control de fichajes · Toda la empresa
       </div>
       <div id="fichajeAdminContainer"></div>
+    </div>
+  </div>
+
+  <!-- Panel de control de fichajes Odoo + Líneas de Comunicación (CONTROL_FICHAJES_IDS) -->
+  <div id="controlFichajesPanel">
+    <div style="padding:14px 13px 90px;max-width:680px;margin:0 auto">
+      <div class="data-banner" style="margin-bottom:14px">
+        <div class="sync-dot"></div>
+        Control de fichajes · Quién no fichó y por qué
+      </div>
+      <div id="controlFichajesContainer"></div>
+    </div>
+    <div class="cf-guardar" id="cfGuardarBar">
+      <span id="cfNumCambios"></span>
+      <button class="cf-btn" onclick="cfDescartar()">Descartar</button>
+      <button class="cf-btn prim" onclick="cfGuardar()">Guardar cambios</button>
     </div>
   </div>
 
@@ -1095,7 +1151,7 @@ async function cambiarMes(mes){
 //  PANELS VISIBILITY
 // ══════════════════════════════════════════════
 function hideAllPanels(){
-  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','usagePanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel','historicoPanel']
+  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','usagePanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel','historicoPanel']
     .forEach(id=>document.getElementById(id).style.display='none');
 }
 function showPanel(id){
@@ -4617,6 +4673,211 @@ function renderVacacionesJE(jeId, containerId){
 }
 
 // ══════════════════════════════════════════════
+//  CONTROL DE FICHAJES · Odoo + Líneas de Comunicación (CONTROL_FICHAJES_IDS)
+//  Cada mañana el Apps Script (Fichajes.gs) registra el día laborable anterior:
+//  quién fichó en Odoo y, de quien no, el motivo según las Líneas de Comunicación.
+//  Aquí se revisa y se clasifica a mano lo que quedó "Pendiente". Todas las
+//  llamadas van por doPost (accion 'fch-*') con matrícula + DNI, que el servidor
+//  vuelve a comprobar contra el Cuadrante.
+// ══════════════════════════════════════════════
+const CONTROL_FICHAJES_IDS=['314298'];
+const CONTROL_FICHAJES_NOMBRES={'314298':'Anna Gabriela Liberati'};
+const CF_TARJETAS=[
+  ['Operativo','Operativos','var(--green2)'],
+  ['Vacaciones','Vacaciones','#4a90e2'],
+  ['Festivo','Festivo','#9b6edc'],
+  ['Baja médica','Baja médica','#e05a4a'],
+  ['Asuntos propios','Asuntos propios','#2bb3c0'],
+  ['Permiso justificado','Permiso justif.','#26a69a'],
+  ['Otra ocupación','Otra ocupación','#8a8a8a'],
+  ['Ausencia no justificada','No justificada','#d4831a'],
+  ['Otro','Otro','#8a8a8a'],
+  ['Pendiente','Sin comunicar','#ff7a1a'],
+  ['Baja empresa','Baja empresa','#5a5a5a'],
+];
+let CF={mat:'',dni:'',datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{}};
+
+const cfEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cfDDMM=ymd=>ymd?ymd.slice(8,10)+'/'+ymd.slice(5,7)+'/'+ymd.slice(0,4):'';
+const cfNumCambios=()=>Object.keys(CF.cambios).length;
+
+async function cfLlamar(accion,extra){
+  const res=await fetchConReintento(FICHAJE_URL,{method:'POST',
+    body:JSON.stringify(Object.assign({mat:CF.mat,dni:CF.dni,accion},extra||{}))});
+  let data=null;
+  try{ data=await res.json(); }catch(e){}
+  if(!data) throw new Error('Sin respuesta del servidor.');
+  if(data.ok===false) throw new Error(data.error||'Error desconocido.');
+  return data;
+}
+
+function cfCargando(txt){
+  const c=document.getElementById('controlFichajesContainer');
+  if(c) c.innerHTML=`<div class="cf-vacio">⏳ ${cfEsc(txt||'Cargando…')}</div>`;
+}
+
+async function cfAbrir(fecha){
+  if(cfNumCambios() && !confirm('Hay cambios sin guardar. ¿Descartarlos?')) return;
+  cfCargando();
+  try{
+    CF.datos=await cfLlamar('fch-datos',{fecha:fecha||''});
+    CF.cambios={};
+    cfRender();
+  }catch(e){
+    document.getElementById('controlFichajesContainer').innerHTML=`<div class="cf-vacio">❌ ${cfEsc(e.message)}<br><br><button class="cf-btn" onclick="cfAbrir('')">Reintentar</button></div>`;
+  }
+}
+
+async function cfCargarDia(fecha){
+  if(!fecha) return;
+  if(cfNumCambios() && !confirm('Hay cambios sin guardar. ¿Descartarlos?')) return;
+  cfCargando('Leyendo Odoo y las Líneas de Comunicación… (puede tardar unos segundos)');
+  try{
+    CF.datos=await cfLlamar('fch-cargar',{fecha});
+    CF.cambios={};
+  }catch(e){ alert('No se pudo cargar el día: '+e.message); }
+  cfRender();
+}
+
+function cfVisible(r){
+  const q=CF.busca.trim().toLowerCase();
+  if(q && !(r.nombre.toLowerCase().includes(q)||r.matricula.toLowerCase().includes(q))) return false;
+  const motivo=(CF.cambios[r.fila]||r).motivo;
+  if(CF.motivo) return (motivo||r.estado)===CF.motivo;
+  if(CF.filtro==='nofichan') return r.estado==='Ausente';
+  if(CF.filtro==='pendientes') return r.estado==='Ausente' && ['Pendiente','Ausencia no justificada'].includes(motivo);
+  if(CF.filtro==='operativos') return r.estado==='Operativo';
+  return true;
+}
+
+function cfRender(){
+  const c=document.getElementById('controlFichajesContainer');
+  const d=CF.datos;
+  if(!c) return;
+  if(!d){ c.innerHTML=''; return; }
+  const i=d.fechas.indexOf(d.fecha);
+  const opciones=d.fechas.map(f=>`<option value="${f}" ${f===d.fecha?'selected':''}>${cfDDMM(f)}</option>`).join('');
+  const kpis=CF_TARJETAS.filter(t=>d.conteo[t[0]]||['Operativo','Pendiente'].includes(t[0]))
+    .map(([k,txt,color])=>`<div class="cf-kpi ${CF.motivo===k?'on':''}" style="--c:${color}" onclick="cfFiltrarMotivo('${k}')">
+        <div class="n">${d.conteo[k]||0}</div><div class="t">${cfEsc(txt)}</div></div>`).join('');
+  const chip=(f,txt)=>`<button class="cf-chip ${!CF.motivo&&CF.filtro===f?'on':''}" onclick="cfFiltro('${f}')">${txt}</button>`;
+  c.innerHTML=`
+    <div class="cf-bar">
+      <div class="cf-dia">${d.fecha?cfEsc(d.dia)+' '+cfDDMM(d.fecha):'Todavía no hay días registrados'}</div>
+      <button class="cf-btn" ${i<0||i>=d.fechas.length-1?'disabled':''} onclick="cfAbrir('${d.fechas[i+1]||''}')">←</button>
+      <select class="cf-input" onchange="cfAbrir(this.value)">${opciones}</select>
+      <button class="cf-btn" ${i<=0?'disabled':''} onclick="cfAbrir('${d.fechas[i-1]||''}')">→</button>
+    </div>
+    <div class="cf-bar">
+      <button class="cf-btn" onclick="cfCargarDia(CF.datos.fecha)" title="Vuelve a leer Odoo y las Líneas de Comunicación. Lo ya revisado se respeta.">🔄 Actualizar día</button>
+      <input type="date" class="cf-input" title="Cargar otro día" onchange="cfOtraFecha(this.value)">
+      <button class="cf-btn" onclick="cfDescargarDia()">📥 Día (CSV)</button>
+      <button class="cf-btn" onclick="cfDescargarExcel()">📊 Excel completo</button>
+    </div>
+    <div class="cf-kpis">${kpis}</div>
+    <div class="cf-chips">
+      ${chip('nofichan','No ficharon')}${chip('pendientes','Sin justificar')}${chip('operativos','Operativos')}${chip('todos','Todos')}
+    </div>
+    <input type="search" class="cf-input" style="width:100%;margin-bottom:10px" placeholder="Buscar técnico o matrícula…" value="${cfEsc(CF.busca)}" oninput="CF.busca=this.value;cfRenderLista()">
+    <div id="cfLista"></div>`;
+  cfRenderLista();
+}
+
+function cfRenderLista(){
+  const cont=document.getElementById('cfLista');
+  if(!cont) return;
+  const d=CF.datos;
+  const orden=r=>['Pendiente','Ausencia no justificada'].includes((CF.cambios[r.fila]||r).motivo)&&!r.revisadoPor?0:1;
+  const filas=d.filas.filter(cfVisible).sort((a,b)=>orden(a)-orden(b)||b.racha-a.racha||a.nombre.localeCompare(b.nombre));
+  if(!filas.length){
+    cont.innerHTML=`<div class="cf-vacio">${d.filas.length?'Nadie en este filtro ✅':'No hay datos para este día.'}</div>`;
+  } else {
+    cont.innerHTML=filas.map(r=>{
+      const ch=CF.cambios[r.fila]||{}, motivo=ch.motivo??r.motivo, obs=ch.obs??r.obs;
+      const ausente=r.estado==='Ausente';
+      const racha=ausente||r.racha?`<div class="cf-racha ${r.racha>=3?'alta':''}">${r.racha} ${r.racha===1?'día':'días'} seguidos</div>`:'';
+      const editar=ausente?`
+        <div class="cf-edit">
+          <select class="${motivo==='Pendiente'?'pend':''}" onchange="cfCambio(${r.fila},'motivo',this.value)">
+            ${d.motivos.map(m=>`<option ${m===motivo?'selected':''}>${cfEsc(m)}</option>`).join('')}
+          </select>
+          <textarea rows="2" placeholder="Observaciones…" onchange="cfCambio(${r.fila},'obs',this.value)">${cfEsc(obs)}</textarea>
+          <label class="cf-rev">
+            ${r.revisadoPor?`✔ Revisado por <b>${cfEsc(r.revisadoPor)}</b>`:
+              `<input type="checkbox" ${ch.revisar?'checked':''} onchange="cfMarcar(${r.fila},this.checked)"> Marcar como revisado`}
+          </label>
+        </div>`:(obs?`<div class="cf-obs">${cfEsc(obs)}</div>`:'');
+      return `<div class="cf-row ${CF.cambios[r.fila]?'cambio':''} ${ausente&&motivo==='Pendiente'?'pend':''}">
+        <div class="cf-top">
+          <div><div class="cf-nom">${cfEsc(r.nombre)}</div>
+            <div class="cf-mat">${cfEsc(r.matricula)}${r.entrada?' · '+cfEsc(r.entrada)+' – '+cfEsc(r.salida||'…'):''}</div></div>
+          <div><span class="cf-pill cf-${cfEsc(r.estado).replace(' ','-')}">${cfEsc(r.estado)}</span>${racha}</div>
+        </div>${editar}</div>`;
+    }).join('');
+  }
+  const n=cfNumCambios();
+  document.getElementById('cfGuardarBar').classList.toggle('on',n>0);
+  document.getElementById('cfNumCambios').textContent=n+(n===1?' cambio sin guardar':' cambios sin guardar');
+}
+
+function cfFiltro(f){ CF.filtro=f; CF.motivo=''; cfRender(); }
+function cfFiltrarMotivo(k){ CF.motivo=CF.motivo===k?'':k; cfRender(); }
+function cfCambio(fila,campo,valor){
+  const r=CF.datos.filas.find(x=>x.fila===fila);
+  const c=CF.cambios[fila]||{motivo:r.motivo,obs:r.obs};
+  c[campo]=valor; c.revisar=true;
+  CF.cambios[fila]=c;
+  cfRenderLista();
+}
+function cfMarcar(fila,on){
+  if(on) cfCambio(fila,'revisar',true);
+  else { delete CF.cambios[fila]; cfRenderLista(); }
+}
+function cfDescartar(){ CF.cambios={}; cfRenderLista(); }
+
+async function cfGuardar(){
+  const cambios=Object.keys(CF.cambios).map(f=>{
+    const r=CF.datos.filas.find(x=>x.fila===+f);
+    return {fila:+f,nombre:r.nombre,motivo:CF.cambios[f].motivo,obs:CF.cambios[f].obs};
+  });
+  const bar=document.getElementById('cfGuardarBar');
+  bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+  try{
+    CF.datos=await cfLlamar('fch-guardar',{fecha:CF.datos.fecha,cambios});
+    CF.cambios={};
+    cfRender();
+  }catch(e){ alert('No se pudo guardar: '+e.message); }
+  bar.querySelectorAll('button').forEach(b=>b.disabled=false);
+}
+
+function cfOtraFecha(f){
+  if(!f) return;
+  if(CF.datos.fechas.includes(f)) cfAbrir(f);
+  else cfCargarDia(f);
+}
+
+function cfDescargar(blob,nombre){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function cfDescargarDia(){
+  const d=CF.datos;
+  const cab=['Fecha','Técnico','Matrícula','Estado','Entrada','Salida','Horas','Motivo','Días seguidos ausente','Observaciones','Revisado por'];
+  const filas=d.filas.map(r=>[cfDDMM(d.fecha),r.nombre,r.matricula,r.estado,r.entrada,r.salida,r.horas,
+    (CF.cambios[r.fila]||r).motivo,r.racha,(CF.cambios[r.fila]||r).obs,r.revisadoPor]);
+  const csv='﻿'+[cab].concat(filas).map(f=>f.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  cfDescargar(new Blob([csv],{type:'text/csv;charset=utf-8'}),'fichajes_'+d.fecha+'.csv');
+}
+async function cfDescargarExcel(){
+  try{
+    const r=await cfLlamar('fch-excel');
+    const bytes=Uint8Array.from(atob(r.excel),c=>c.charCodeAt(0));
+    cfDescargar(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Control_Fichajes_Tecnicos.xlsx');
+  }catch(e){ alert('No se pudo descargar el Excel: '+e.message); }
+}
+
+// ══════════════════════════════════════════════
 //  LOGIN
 // ══════════════════════════════════════════════
 // Administrativas encargadas de revisar fichajes — solo ven la vista de fichajes, no el panel JR completo
@@ -4625,6 +4886,7 @@ const FICHAJE_ADMIN_NOMBRES={'262876':'Mercedes Teresa Savarino Sainz','EQ5303':
 
 function findUser(q){
   q=q.trim().toUpperCase();
+  if(CONTROL_FICHAJES_IDS.includes(q)) return {type:'control-fichajes',id:q};
   if(FICHAJE_ADMIN_IDS.includes(q)) return {type:'fichaje-admin',id:q};
   // JR nivel — acceso igual que JR9426
   const JR_IDS=['JR9426','CM9651','JN4767','GD5381','BLAS.ALVAREZ','BA8006'];
@@ -4731,7 +4993,21 @@ async function doLogin(){
   const _trackId = found.type==='tecnico' ? found.tec.id : found.id;
   fetch(TRACK_URL + '&mat=' + encodeURIComponent(_trackId), {mode:'no-cors'}).catch(()=>{});
 
-  if(found.type==='fichaje-admin'){
+  if(found.type==='control-fichajes'){
+    CURRENT_USER_TYPE='control-fichajes';
+    const nombreCF=CONTROL_FICHAJES_NOMBRES[found.id]||'Control de fichajes';
+    document.getElementById('topbarName').textContent=nombreCF;
+    document.getElementById('topbarId').textContent=found.id;
+    FICHAJE_ID=found.id; FICHAJE_NOMBRE=nombreCF;
+    document.getElementById('scorePill').innerHTML='<span style="color:var(--gold2);font-weight:700">Control fichajes</span>';
+    document.getElementById('tabsBarJR').style.display='none';
+    document.getElementById('tabsBar').style.display='none';
+    // el DNI se guarda solo en memoria: el servidor lo vuelve a comprobar en cada llamada
+    CF={mat:found.id,dni,datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{}};
+    showPanel('controlFichajesPanel');
+    cfAbrir('');
+
+  } else if(found.type==='fichaje-admin'){
     CURRENT_USER_TYPE='fichaje-admin';
     const nombreAdmin=FICHAJE_ADMIN_NOMBRES[found.id]||'Control de Fichajes';
     document.getElementById('topbarName').textContent=nombreAdmin;
@@ -5030,6 +5306,8 @@ function doLogout(){
   document.getElementById('tabsBarJR').style.display='none';
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
   FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={}; FICHAJE_HOY_CARGADO=false;
+  CF={mat:'',dni:'',datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{}};
+  document.getElementById('cfGuardarBar').classList.remove('on');
   hideAllPanels();
   document.getElementById('mainPanel').style.display='block';
 }
