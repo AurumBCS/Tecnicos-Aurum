@@ -338,6 +338,11 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .cf-hoy-fila{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border)}
 .cf-hoy-fila .nom{font-size:.74rem;font-weight:700;color:var(--text)}
 .cf-hoy-fila .det{font-size:.6rem;color:var(--muted)}
+.cf-je{border-top:1px solid var(--border2);padding-top:8px;margin-top:8px}
+.cf-je-cab{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px}
+.cf-je-nom{font-size:.76rem;font-weight:800;color:var(--gold2)}
+.cf-je .det,.cf-hoy-fila .det{font-size:.6rem;color:var(--muted)}
+.cf-retraso{font-size:.62rem;font-weight:800;color:#e05a4a}
 .cf-tag{font-size:.55rem;font-weight:800;padding:2px 7px;border-radius:999px;background:rgba(74,144,226,.15);color:#7fb2ee;white-space:nowrap}
 .cf-hoy details{margin-top:8px;font-size:.66rem;color:var(--muted)}
 .cf-hoy summary{cursor:pointer;color:var(--gold2);font-weight:700}
@@ -4750,17 +4755,28 @@ async function cfCargarDia(fecha){
   cfRender();
 }
 
-// ── 🚨 Hoy: quién no ha fichado todavía (lo mismo que revisa el barrido de 8:00 a 11:30) ──
-async function cfCargarHoy(){
-  CF.hoy={cargando:true};
-  cfPintarHoy();
+// ── 🚨 Hoy: quién lleva más de 10 min sin fichar desde su hora de entrada, agrupado por jefe
+//    de equipo. Se actualiza sola cada 5 min con el panel abierto; quien ficha desaparece.
+let CF_HOY_TIMER=null;
+async function cfCargarHoy(silencioso){
+  if(!silencioso || !CF.hoy) { CF.hoy={cargando:true}; cfPintarHoy(); }
   try{ CF.hoy=await cfLlamar('fch-hoy'); }
-  catch(e){ CF.hoy={error:e.message}; }
+  catch(e){ if(!silencioso || !CF.hoy || CF.hoy.cargando) CF.hoy={error:e.message}; }
   cfPintarHoy();
+  if(!CF_HOY_TIMER) CF_HOY_TIMER=setInterval(()=>{
+    if(CURRENT_USER_TYPE!=='control-fichajes'){ clearInterval(CF_HOY_TIMER); CF_HOY_TIMER=null; return; }
+    if(!document.hidden) cfCargarHoy(true);
+  },5*60*1000);
 }
 function cfPintarHoy(){
   const el=document.getElementById('cfHoy');
   if(el) el.innerHTML=cfHoyHTML();
+}
+function cfJeNombre(t){ return (typeof JE_NAMES!=='undefined' && JE_NAMES[t.je]) || t.jeNombre || t.je || 'Sin jefe de equipo'; }
+function cfHoyGrupos(){
+  const g={};
+  CF.hoy.sinFichar.forEach(t=>{ const k=cfJeNombre(t); (g[k]=g[k]||{je:t.je,tecs:[]}).tecs.push(t); });
+  return Object.keys(g).sort().map(k=>({nombre:k,je:g[k].je,tecs:g[k].tecs}));
 }
 function cfHoyHTML(){
   const h=CF.hoy;
@@ -4768,29 +4784,40 @@ function cfHoyHTML(){
   if(h.cargando) return `<div class="cf-hoy"><h3>🚨 Hoy</h3><div class="sub">⏳ Consultando Odoo…</div></div>`;
   if(h.error) return `<div class="cf-hoy"><h3>🚨 Hoy</h3><div class="sub">❌ ${cfEsc(h.error)}</div><button class="cf-btn" onclick="cfCargarHoy()">Reintentar</button></div>`;
   if(!h.laborable) return '';
-  const filas=h.sinFichar.map(t=>`<div class="cf-hoy-fila">
-      <div><div class="nom">${cfEsc(t.nombre)}</div>
-        <div class="det">${cfEsc(t.matricula)}${t.provincia?' · '+cfEsc(t.provincia):''} · entrada prevista ${cfEsc(t.inicio)}</div></div>
-      ${t.canarias?'<span class="cf-tag">Canarias −1h</span>':''}</div>`).join('');
+  const grupos=cfHoyGrupos().map((g,i)=>`
+    <div class="cf-je">
+      <div class="cf-je-cab">
+        <div><div class="cf-je-nom">👤 Avisar a ${cfEsc(g.nombre)}</div>
+          <div class="det">${g.tecs.length} técnico${g.tecs.length>1?'s':''} sin fichar</div></div>
+        <button class="cf-btn" onclick="cfCopiarHoy(${i})">📋 Copiar</button>
+      </div>
+      ${g.tecs.map(t=>`<div class="cf-hoy-fila">
+        <div><div class="nom">${cfEsc(t.nombre)}</div>
+          <div class="det">${cfEsc(t.matricula)}${t.provincia?' · '+cfEsc(t.provincia):''} · entrada ${cfEsc(t.inicio)}</div></div>
+        <div style="text-align:right">${t.canarias?'<span class="cf-tag">Canarias −1h</span><br>':''}
+          <span class="cf-retraso">${t.retraso} min</span></div></div>`).join('')}
+    </div>`).join('');
+  const trasAviso=h.fichadoTrasAviso&&h.fichadoTrasAviso.length?`<details><summary>✅ ${h.fichadoTrasAviso.length} ya han fichado después de salir en la lista</summary>
+      ${h.fichadoTrasAviso.map(t=>`<div style="margin-top:4px">${cfEsc(t.nombre)} · en lista desde ${cfEsc(t.aviso)} · fichó ${cfEsc(t.entrada)}</div>`).join('')}</details>`:'';
   const just=h.justificados.length?`<details><summary>${h.justificados.length} sin fichar pero justificados (vacaciones, baja, festivo…)</summary>
       ${h.justificados.map(t=>`<div style="margin-top:4px">${cfEsc(t.nombre)} · <b>${cfEsc(t.motivo)}</b></div>`).join('')}</details>`:'';
   return `<div class="cf-hoy">
     <div style="display:flex;align-items:center;gap:6px">
       <h3>🚨 Hoy · ${h.sinFichar.length} sin fichar</h3>
-      ${h.sinFichar.length?'<button class="cf-btn" onclick="cfCopiarHoy()">📋 Copiar</button>':''}
-      <button class="cf-btn" onclick="cfCargarHoy()">🔄</button>
+      <button class="cf-btn" onclick="cfCargarHoy()" title="Actualizar ahora">🔄</button>
     </div>
-    <div class="sub">${cfDDMM(h.fecha)} · actualizado a las ${cfEsc(h.hora)} · ${h.fichados} ya fichados${h.todavia?' · '+h.todavia+' aún no empiezan su jornada':''}</div>
-    ${filas||'<div class="cf-vacio" style="padding:8px">✅ Todos los que debían empezar ya han fichado</div>'}
-    ${just}
+    <div class="sub">${cfDDMM(h.fecha)} · actualizado a las ${cfEsc(h.hora)} (se actualiza solo cada 5 min) · ${h.fichados} ya fichados${h.todavia?' · '+h.todavia+' aún en su margen de '+h.margen+' min':''}</div>
+    ${grupos||'<div class="cf-vacio" style="padding:8px">✅ Todos los que debían empezar ya han fichado</div>'}
+    ${trasAviso}${just}
   </div>`;
 }
-function cfCopiarHoy(){
-  const h=CF.hoy;
-  const txt='Sin fichar hoy '+cfDDMM(h.fecha)+' ('+h.hora+'):\n'+h.sinFichar.map(t=>'- '+t.nombre+' ('+t.matricula+')').join('\n');
-  const ok=()=>alert('Lista copiada: '+h.sinFichar.length+' técnicos.');
-  if(navigator.clipboard) navigator.clipboard.writeText(txt).then(ok).catch(()=>prompt('Copia la lista:',txt));
-  else prompt('Copia la lista:',txt);
+function cfCopiarHoy(i){
+  const h=CF.hoy, g=cfHoyGrupos()[i];
+  const txt='Hola '+g.nombre.split(' ')[0]+', estos técnicos de tu equipo todavía no han fichado hoy en Odoo:\n'+
+    g.tecs.map(t=>'- '+t.nombre+' (entrada '+t.inicio+')').join('\n')+'\n¿Puedes avisarles para que fichen? Gracias.';
+  const ok=()=>alert('Mensaje copiado para '+g.nombre+'.');
+  if(navigator.clipboard) navigator.clipboard.writeText(txt).then(ok).catch(()=>prompt('Copia el mensaje:',txt));
+  else prompt('Copia el mensaje:',txt);
 }
 
 function cfVisible(r){
