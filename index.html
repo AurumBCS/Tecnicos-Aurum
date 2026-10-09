@@ -4760,6 +4760,10 @@ function cfRender(){
   const kpis=CF_TARJETAS.filter(t=>d.conteo[t[0]]||['Operativo','Pendiente'].includes(t[0]))
     .map(([k,txt,color])=>`<div class="cf-kpi ${CF.motivo===k?'on':''}" style="--c:${color}" onclick="cfFiltrarMotivo('${k}')">
         <div class="n">${d.conteo[k]||0}</div><div class="t">${cfEsc(txt)}</div></div>`).join('');
+  const nombresMes=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const meses=Array.from(new Set(d.fechas.map(f=>f.slice(0,7))))
+    .map(m=>`<option value="${m}">Mes de ${nombresMes[+m.slice(5,7)-1]} ${m.slice(0,4)}</option>`).join('')
+    +'<option value="">Todo el histórico</option>';
   const chip=(f,txt)=>`<button class="cf-chip ${!CF.motivo&&CF.filtro===f?'on':''}" onclick="cfFiltro('${f}')">${txt}</button>`;
   c.innerHTML=`
     <div class="cf-bar">
@@ -4772,7 +4776,10 @@ function cfRender(){
       <button class="cf-btn" onclick="cfCargarDia(CF.datos.fecha)" title="Vuelve a leer Odoo y las Líneas de Comunicación. Lo ya revisado se respeta.">🔄 Actualizar día</button>
       <input type="date" class="cf-input" title="Cargar otro día" onchange="cfOtraFecha(this.value)">
       <button class="cf-btn" onclick="cfDescargarDia()">📥 Día (CSV)</button>
-      <button class="cf-btn" onclick="cfDescargarExcel()">📊 Excel completo</button>
+    </div>
+    <div class="cf-bar">
+      <select class="cf-input" id="cfMesExcel">${meses}</select>
+      <button class="cf-btn" onclick="cfDescargarExcel(document.getElementById('cfMesExcel').value)">📊 Descargar Excel</button>
     </div>
     <div class="cf-kpis">${kpis}</div>
     <div class="cf-chips">
@@ -4869,12 +4876,20 @@ function cfDescargarDia(){
   const csv='﻿'+[cab].concat(filas).map(f=>f.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
   cfDescargar(new Blob([csv],{type:'text/csv;charset=utf-8'}),'fichajes_'+d.fecha+'.csv');
 }
-async function cfDescargarExcel(){
+// mes 'yyyy-MM' → Excel de ese mes (Registro, Resumen, Calendario, Diario; también queda guardado
+// en la carpeta de Drive "Control Fichajes - Excel mensual"); mes '' → todo el histórico
+async function cfDescargarExcel(mes){
+  const c=document.getElementById('controlFichajesContainer');
+  const aviso=document.createElement('div');
+  aviso.className='cf-vacio'; aviso.textContent='⏳ Preparando el Excel…';
+  c.prepend(aviso);
   try{
-    const r=await cfLlamar('fch-excel');
+    const r=await cfLlamar('fch-excel',{mes});
     const bytes=Uint8Array.from(atob(r.excel),c=>c.charCodeAt(0));
-    cfDescargar(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Control_Fichajes_Tecnicos.xlsx');
+    cfDescargar(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),r.nombre||'Control_Fichajes_Tecnicos.xlsx');
+    if(r.pendientes) alert('Excel descargado. Ojo: en ese mes quedan '+r.pendientes+' ausencias "Pendiente" sin clasificar.');
   }catch(e){ alert('No se pudo descargar el Excel: '+e.message); }
+  aviso.remove();
 }
 
 // ══════════════════════════════════════════════
