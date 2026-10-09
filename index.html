@@ -331,6 +331,16 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .cf-guardar.on{display:flex}
 .cf-guardar span{margin-right:auto;font-size:.75rem;font-weight:700;color:var(--gold2)}
 .cf-vacio{padding:26px;text-align:center;color:var(--muted);font-size:.75rem}
+.cf-hoy{background:var(--s1);border:1px solid #6b2a1a;border-radius:14px;padding:12px;margin-bottom:16px;position:relative;overflow:hidden}
+.cf-hoy::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#e05a4a,transparent)}
+.cf-hoy h3{margin:0;font-size:.85rem;color:#f08a7a;display:flex;align-items:center;gap:6px;flex:1}
+.cf-hoy .sub{font-size:.62rem;color:var(--muted);margin:4px 0 10px}
+.cf-hoy-fila{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border)}
+.cf-hoy-fila .nom{font-size:.74rem;font-weight:700;color:var(--text)}
+.cf-hoy-fila .det{font-size:.6rem;color:var(--muted)}
+.cf-tag{font-size:.55rem;font-weight:800;padding:2px 7px;border-radius:999px;background:rgba(74,144,226,.15);color:#7fb2ee;white-space:nowrap}
+.cf-hoy details{margin-top:8px;font-size:.66rem;color:var(--muted)}
+.cf-hoy summary{cursor:pointer;color:var(--gold2);font-weight:700}
 </style>
 </head>
 <body>
@@ -4695,7 +4705,7 @@ const CF_TARJETAS=[
   ['Pendiente','Sin comunicar','#ff7a1a'],
   ['Baja empresa','Baja empresa','#5a5a5a'],
 ];
-let CF={mat:'',dni:'',datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{}};
+let CF={mat:'',dni:'',datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
 
 const cfEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cfDDMM=ymd=>ymd?ymd.slice(8,10)+'/'+ymd.slice(5,7)+'/'+ymd.slice(0,4):'';
@@ -4719,6 +4729,7 @@ function cfCargando(txt){
 async function cfAbrir(fecha){
   if(cfNumCambios() && !confirm('Hay cambios sin guardar. ¿Descartarlos?')) return;
   cfCargando();
+  if(!CF.hoy) cfCargarHoy();
   try{
     CF.datos=await cfLlamar('fch-datos',{fecha:fecha||''});
     CF.cambios={};
@@ -4737,6 +4748,49 @@ async function cfCargarDia(fecha){
     CF.cambios={};
   }catch(e){ alert('No se pudo cargar el día: '+e.message); }
   cfRender();
+}
+
+// ── 🚨 Hoy: quién no ha fichado todavía (lo mismo que revisa el barrido de 8:00 a 11:30) ──
+async function cfCargarHoy(){
+  CF.hoy={cargando:true};
+  cfPintarHoy();
+  try{ CF.hoy=await cfLlamar('fch-hoy'); }
+  catch(e){ CF.hoy={error:e.message}; }
+  cfPintarHoy();
+}
+function cfPintarHoy(){
+  const el=document.getElementById('cfHoy');
+  if(el) el.innerHTML=cfHoyHTML();
+}
+function cfHoyHTML(){
+  const h=CF.hoy;
+  if(!h) return '';
+  if(h.cargando) return `<div class="cf-hoy"><h3>🚨 Hoy</h3><div class="sub">⏳ Consultando Odoo…</div></div>`;
+  if(h.error) return `<div class="cf-hoy"><h3>🚨 Hoy</h3><div class="sub">❌ ${cfEsc(h.error)}</div><button class="cf-btn" onclick="cfCargarHoy()">Reintentar</button></div>`;
+  if(!h.laborable) return '';
+  const filas=h.sinFichar.map(t=>`<div class="cf-hoy-fila">
+      <div><div class="nom">${cfEsc(t.nombre)}</div>
+        <div class="det">${cfEsc(t.matricula)}${t.provincia?' · '+cfEsc(t.provincia):''} · entrada prevista ${cfEsc(t.inicio)}</div></div>
+      ${t.canarias?'<span class="cf-tag">Canarias −1h</span>':''}</div>`).join('');
+  const just=h.justificados.length?`<details><summary>${h.justificados.length} sin fichar pero justificados (vacaciones, baja, festivo…)</summary>
+      ${h.justificados.map(t=>`<div style="margin-top:4px">${cfEsc(t.nombre)} · <b>${cfEsc(t.motivo)}</b></div>`).join('')}</details>`:'';
+  return `<div class="cf-hoy">
+    <div style="display:flex;align-items:center;gap:6px">
+      <h3>🚨 Hoy · ${h.sinFichar.length} sin fichar</h3>
+      ${h.sinFichar.length?'<button class="cf-btn" onclick="cfCopiarHoy()">📋 Copiar</button>':''}
+      <button class="cf-btn" onclick="cfCargarHoy()">🔄</button>
+    </div>
+    <div class="sub">${cfDDMM(h.fecha)} · actualizado a las ${cfEsc(h.hora)} · ${h.fichados} ya fichados${h.todavia?' · '+h.todavia+' aún no empiezan su jornada':''}</div>
+    ${filas||'<div class="cf-vacio" style="padding:8px">✅ Todos los que debían empezar ya han fichado</div>'}
+    ${just}
+  </div>`;
+}
+function cfCopiarHoy(){
+  const h=CF.hoy;
+  const txt='Sin fichar hoy '+cfDDMM(h.fecha)+' ('+h.hora+'):\n'+h.sinFichar.map(t=>'- '+t.nombre+' ('+t.matricula+')').join('\n');
+  const ok=()=>alert('Lista copiada: '+h.sinFichar.length+' técnicos.');
+  if(navigator.clipboard) navigator.clipboard.writeText(txt).then(ok).catch(()=>prompt('Copia la lista:',txt));
+  else prompt('Copia la lista:',txt);
 }
 
 function cfVisible(r){
@@ -4766,6 +4820,8 @@ function cfRender(){
     +'<option value="">Todo el histórico</option>';
   const chip=(f,txt)=>`<button class="cf-chip ${!CF.motivo&&CF.filtro===f?'on':''}" onclick="cfFiltro('${f}')">${txt}</button>`;
   c.innerHTML=`
+    <div id="cfHoy">${cfHoyHTML()}</div>
+    <div class="section-head">Registro de días anteriores</div>
     <div class="cf-bar">
       <div class="cf-dia">${d.fecha?cfEsc(d.dia)+' '+cfDDMM(d.fecha):'Todavía no hay días registrados'}</div>
       <button class="cf-btn" ${i<0||i>=d.fechas.length-1?'disabled':''} onclick="cfAbrir('${d.fechas[i+1]||''}')">←</button>
@@ -5018,7 +5074,7 @@ async function doLogin(){
     document.getElementById('tabsBarJR').style.display='none';
     document.getElementById('tabsBar').style.display='none';
     // el DNI se guarda solo en memoria: el servidor lo vuelve a comprobar en cada llamada
-    CF={mat:found.id,dni,datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{}};
+    CF={mat:found.id,dni,datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
     showPanel('controlFichajesPanel');
     cfAbrir('');
 
@@ -5321,7 +5377,7 @@ function doLogout(){
   document.getElementById('tabsBarJR').style.display='none';
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
   FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={}; FICHAJE_HOY_CARGADO=false;
-  CF={mat:'',dni:'',datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{}};
+  CF={mat:'',dni:'',datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
   document.getElementById('cfGuardarBar').classList.remove('on');
   hideAllPanels();
   document.getElementById('mainPanel').style.display='block';
