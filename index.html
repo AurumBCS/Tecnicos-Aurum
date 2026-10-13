@@ -317,6 +317,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .cf-Operativo{background:rgba(61,170,110,.15);color:var(--green2)}
 .cf-Ausente{background:rgba(212,131,26,.15);color:var(--orange)}
 .cf-Festivo{background:rgba(155,110,220,.15);color:#b48ef0}
+.cf-Formación{background:rgba(201,168,76,.15);color:var(--gold2)}
 .cf-Baja-empresa{background:rgba(255,255,255,.08);color:var(--muted)}
 .cf-racha{font-size:.62rem;font-weight:800;color:var(--muted);margin-top:4px;text-align:right}
 .cf-racha.alta{color:#e05a4a}
@@ -4701,6 +4702,7 @@ const CF_TARJETAS=[
   ['Operativo','Operativos','var(--green2)'],
   ['Vacaciones','Vacaciones','#4a90e2'],
   ['Festivo','Festivo','#9b6edc'],
+  ['Formación','Formación','#c9a84c'],
   ['Baja médica','Baja médica','#e05a4a'],
   ['Asuntos propios','Asuntos propios','#2bb3c0'],
   ['Permiso justificado','Permiso justif.','#26a69a'],
@@ -4806,7 +4808,7 @@ function cfHoyHTML(){
       <h3>🚨 Hoy · ${h.sinFichar.length} sin fichar</h3>
       <button class="cf-btn" onclick="cfCargarHoy()" title="Actualizar ahora">🔄</button>
     </div>
-    <div class="sub">${cfDDMM(h.fecha)} · actualizado a las ${cfEsc(h.hora)} (se actualiza solo cada 5 min) · ${h.fichados} ya fichados${h.todavia?' · '+h.todavia+' aún en su margen de '+h.margen+' min':''}</div>
+    <div class="sub">${cfDDMM(h.fecha)} · actualizado a las ${cfEsc(h.hora)} (se actualiza solo cada 5 min) · ${h.fichados} ya fichados${h.todavia?' · '+h.todavia+' aún en su margen de '+h.margen+' min':''}${h.formacion?' · '+h.formacion+' en formación':''}</div>
     ${grupos||'<div class="cf-vacio" style="padding:8px">✅ Todos los que debían empezar ya han fichado</div>'}
     ${trasAviso}${just}
   </div>`;
@@ -4858,7 +4860,7 @@ function cfRender(){
     <div class="cf-bar">
       <button class="cf-btn" onclick="cfCargarDia(CF.datos.fecha)" title="Vuelve a leer Odoo y las Líneas de Comunicación. Lo ya revisado se respeta.">🔄 Actualizar día</button>
       <input type="date" class="cf-input" title="Cargar otro día" onchange="cfOtraFecha(this.value)">
-      <button class="cf-btn" onclick="cfDescargarDia()">📥 Día (CSV)</button>
+      <button class="cf-btn prim" onclick="cfInformeDia()" title="Excel del día por zonas: Resumen, Detalle con filtros y Bajas">📥 Informe del día</button>
     </div>
     <div class="cf-bar">
       <select class="cf-input" id="cfMesExcel">${meses}</select>
@@ -4885,7 +4887,7 @@ function cfRenderLista(){
     cont.innerHTML=filas.map(r=>{
       const ch=CF.cambios[r.fila]||{}, motivo=ch.motivo??r.motivo, obs=ch.obs??r.obs;
       const ausente=r.estado==='Ausente';
-      const racha=ausente||r.racha?`<div class="cf-racha ${r.racha>=3?'alta':''}">${r.racha} ${r.racha===1?'día':'días'} seguidos</div>`:'';
+      const racha=ausente||r.racha?`<div class="cf-racha ${r.racha>=3?'alta':''}">${r.racha} ${r.racha===1?'día seguido':'días seguidos'}</div>`:'';
       const editar=ausente?`
         <div class="cf-edit">
           <select class="${motivo==='Pendiente'?'pend':''}" onchange="cfCambio(${r.fila},'motivo',this.value)">
@@ -4951,6 +4953,33 @@ function cfDescargar(blob,nombre){
   a.href=URL.createObjectURL(blob); a.download=nombre;
   document.body.appendChild(a); a.click(); a.remove();
 }
+// Informe del día en Excel (Resumen por zona · Detalle con filtros · Bajas con días acumulados).
+// No se descarga mientras quede alguien sin justificar: se muestran solo esos para clasificarlos.
+async function cfInformeDia(){
+  const d=CF.datos;
+  if(!d||!d.fecha) return;
+  if(cfNumCambios()){ alert('Tienes cambios sin guardar. Pulsa "Guardar cambios" antes de descargar el informe.'); return; }
+  const c=document.getElementById('controlFichajesContainer');
+  const aviso=document.createElement('div');
+  aviso.className='cf-vacio'; aviso.textContent='⏳ Preparando el informe del '+cfDDMM(d.fecha)+'…';
+  c.prepend(aviso);
+  try{
+    const r=await cfLlamar('fch-informe',{fecha:d.fecha});
+    if(r.pendientes){
+      CF.filtro='nofichan'; CF.motivo='Pendiente'; CF.busca='';
+      cfRender();
+      alert('Antes de descargar el informe del '+cfDDMM(d.fecha)+' hay que justificar a '+r.pendientes+' técnico'+(r.pendientes>1?'s':'')+
+        ' que no ficharon.\n\nTe los muestro ahora: elige el motivo de cada uno (vacaciones, baja, festivo, formación, falta no justificada…), pulsa "Guardar cambios" y vuelve a pulsar "Informe del día".');
+      const lista=document.getElementById('cfLista');
+      if(lista) lista.scrollIntoView({behavior:'smooth',block:'start'});
+      return;
+    }
+    const bytes=Uint8Array.from(atob(r.excel),ch=>ch.charCodeAt(0));
+    cfDescargar(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),r.nombre||('Informe_Fichajes_'+d.fecha+'.xlsx'));
+  }catch(e){ alert('No se pudo generar el informe: '+e.message); }
+  finally{ aviso.remove(); }
+}
+
 function cfDescargarDia(){
   const d=CF.datos;
   const cab=['Fecha','Técnico','Matrícula','Estado','Entrada','Salida','Horas','Motivo','Días seguidos ausente','Observaciones','Revisado por'];
