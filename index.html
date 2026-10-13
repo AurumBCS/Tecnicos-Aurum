@@ -4796,7 +4796,7 @@ function cfHoyHTML(){
       ${g.tecs.map(t=>`<div class="cf-hoy-fila">
         <div><div class="nom">${cfEsc(t.nombre)}</div>
           <div class="det">${cfEsc(t.matricula)}${t.provincia?' · '+cfEsc(t.provincia):''} · entrada ${cfEsc(t.inicio)}</div></div>
-        <div style="text-align:right">${t.canarias?'<span class="cf-tag">Canarias −1h</span><br>':''}
+        <div style="text-align:right">${t.formacion?'<span class="cf-tag" style="background:rgba(201,168,76,.15);color:var(--gold2)">Formación</span><br>':''}${t.canarias?'<span class="cf-tag">Canarias −1h</span><br>':''}
           <span class="cf-retraso">${t.retraso} min</span></div></div>`).join('')}
     </div>`).join('');
   const trasAviso=h.fichadoTrasAviso&&h.fichadoTrasAviso.length?`<details><summary>✅ ${h.fichadoTrasAviso.length} ya han fichado después de salir en la lista</summary>
@@ -4808,7 +4808,7 @@ function cfHoyHTML(){
       <h3>🚨 Hoy · ${h.sinFichar.length} sin fichar</h3>
       <button class="cf-btn" onclick="cfCargarHoy()" title="Actualizar ahora">🔄</button>
     </div>
-    <div class="sub">${cfDDMM(h.fecha)} · actualizado a las ${cfEsc(h.hora)} (se actualiza solo cada 5 min) · ${h.fichados} ya fichados${h.todavia?' · '+h.todavia+' aún en su margen de '+h.margen+' min':''}${h.formacion?' · '+h.formacion+' en formación':''}</div>
+    <div class="sub">${cfDDMM(h.fecha)} · actualizado a las ${cfEsc(h.hora)} (se actualiza solo cada 5 min) · ${h.fichados} ya fichados${h.todavia?' · '+h.todavia+' aún en su margen de '+h.margen+' min':''}</div>
     ${grupos||'<div class="cf-vacio" style="padding:8px">✅ Todos los que debían empezar ya han fichado</div>'}
     ${trasAviso}${just}
   </div>`;
@@ -4829,7 +4829,7 @@ function cfVisible(r){
   if(CF.motivo) return (motivo||r.estado)===CF.motivo;
   if(CF.filtro==='nofichan') return r.estado==='Ausente';
   if(CF.filtro==='pendientes') return r.estado==='Ausente' && ['Pendiente','Ausencia no justificada'].includes(motivo);
-  if(CF.filtro==='operativos') return r.estado==='Operativo';
+  if(CF.filtro==='operativos') return r.estado==='Operativo'||r.estado==='Formación';
   return true;
 }
 
@@ -4969,7 +4969,7 @@ async function cfInformeDia(){
       CF.filtro='nofichan'; CF.motivo='Pendiente'; CF.busca='';
       cfRender();
       alert('Antes de descargar el informe del '+cfDDMM(d.fecha)+' hay que justificar a '+r.pendientes+' técnico'+(r.pendientes>1?'s':'')+
-        ' que no ficharon.\n\nTe los muestro ahora: elige el motivo de cada uno (vacaciones, baja, festivo, formación, falta no justificada…), pulsa "Guardar cambios" y vuelve a pulsar "Informe del día".');
+        ' que no ficharon.\n\nTe los muestro ahora: elige el motivo de cada uno (vacaciones, baja, festivo, falta no justificada…), pulsa "Guardar cambios" y vuelve a pulsar "Informe del día".');
       const lista=document.getElementById('cfLista');
       if(lista) lista.scrollIntoView({behavior:'smooth',block:'start'});
       return;
