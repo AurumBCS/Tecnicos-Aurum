@@ -27,7 +27,7 @@ let JE_NAMES  = { 'JR9426': 'Coordinador Regional' };
 // Si la matrícula escrita en el campo normal de carga coincide con una de estas,
 // se sube todo sin filtrar. Cualquier otra matrícula sigue el comportamiento normal
 // (JE ve su equipo, técnico ve solo lo suyo).
-const UPLOADERS_PERMITIDOS = ['262876', 'CM9651', 'GD5381', 'EQ5303'];
+const UPLOADERS_PERMITIDOS = ['262876', 'CM9651', 'GD5381', 'EQ5303', '273379'];
 
 function fetchCSV(url, redirects = 0) {
   return new Promise((resolve, reject) => {

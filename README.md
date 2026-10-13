@@ -241,7 +241,7 @@ App Node/Express **separada** del portal principal, en la subcarpeta `confirmaci
 
 ### Flujo
 
-1. Se sube un Excel de actividades/citas (`POST /upload`, campo `excel` + `matricula`) — matrículas en `UPLOADERS_PERMITIDOS` (`262876`, `CM9651`, `GD5381`, `EQ5303`) suben todo sin filtrar; un JE (matrícula en `JERARQUIA`) sube solo su equipo; cualquier otra matrícula sube solo lo suyo.
+1. Se sube un Excel de actividades/citas (`POST /upload`, campo `excel` + `matricula`) — matrículas en `UPLOADERS_PERMITIDOS` (`262876`, `CM9651`, `GD5381`, `EQ5303`, `273379`) suben todo sin filtrar; un JE (matrícula en `JERARQUIA`) sube solo su equipo; cualquier otra matrícula sube solo lo suyo.
 2. Cada fila nueva queda en estado `pendiente` (filas ya existentes con la misma clave — nº de mantenimiento, o cliente+fecha+timeslot+técnico si no hay nº — se ignoran: **volver a subir el mismo Excel no duplica**).
 3. Nadie recibe el SMS automáticamente al subir — un humano tiene que entrar y mandar:
    - **`je.html`** (coordinador, matrícula+DNI de JE) — ve las citas de todo su equipo agrupadas por técnico. Puede enviar una por una (📱 Enviar SMS) o **en lote**: checkbox por cita + "☑️ Seleccionar todos los pendientes" + barra inferior "📤 Enviar", que abre los SMS nativos uno detrás de otro (detecta cuándo el usuario vuelve de la app de mensajes — `visibilitychange` — y abre el siguiente automáticamente).
