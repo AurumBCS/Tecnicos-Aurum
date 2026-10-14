@@ -505,7 +505,7 @@ app.post('/upload', upload.single('excel'), (req, res) => {
     //    reprogramada: se actualiza y vuelve a "pendiente" para confirmarla de nuevo.
     //    (Antes se descartaba por tener el mismo nº y se quedaba la cita vieja.)
     //  - nueva → se añade.
-    // Las citas de días ya pasados se eliminan antes de comparar.
+    // Antes de comparar se eliminan las citas de hoy o anteriores (ver purgarCitasPasadas).
     purgarCitasPasadas();
     const claveCita = a => a.numMantenimiento
       ? a.numMantenimiento
@@ -572,19 +572,25 @@ function fechaCitaISO(fecha) {
   return `${anio}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
 }
 
-// Elimina las citas de días anteriores a hoy. Sustituye a la limpieza total de
-// medianoche, que en Render casi nunca llegaba a ejecutarse (el servicio gratuito
-// se duerme y el temporizador se pierde) — por eso se acumulaban citas viejas.
+// Las citas se confirman el día ANTES (la ruta que se sube hoy es la de mañana),
+// así que después de medianoche ya no sirven: se elimina toda cita con fecha de
+// hoy o anterior. En Render el temporizador de medianoche casi nunca llegaba a
+// ejecutarse (el servicio gratuito se duerme), por eso esto se llama también al
+// arrancar, cada hora y cada vez que alguien abre sus citas.
 function purgarCitasPasadas() {
   const hoy = hoyMadridISO();
   const antes = appointments.length;
   appointments = appointments.filter(a => {
     const f = fechaCitaISO(a.fecha);
-    return !f || f >= hoy;
+    return !f || f > hoy;
   });
   const quitadas = antes - appointments.length;
   if (quitadas > 0) console.log(`  Citas de días pasados eliminadas: ${quitadas}`);
   return quitadas;
+}
+
+function purgarYGuardar() {
+  if (purgarCitasPasadas() > 0) { guardarSesion(); broadcast({ type: 'update', appointments }); }
 }
 
 function asegurarDiaActual() {
@@ -872,6 +878,7 @@ app.post('/reset', (req, res) => {
 // El técnico abre /tecnico.html, ve solo sus citas y manda el SMS con el
 // enlace nativo sms: — el servidor nunca envía el SMS, solo guarda el estado.
 app.get('/mis-citas', (req, res) => {
+  purgarYGuardar();
   const matricula = String(req.query.matricula || '').trim().toUpperCase();
   const dni       = String(req.query.dni || '').trim();
   if (!matricula || !dni) return res.json({ ok: false, error: 'Falta matrícula o DNI' });
@@ -892,6 +899,7 @@ app.get('/mis-citas', (req, res) => {
 // Usa la misma jerarquía en vivo (Google Sheets) que ya carga el servidor,
 // así que funciona con cualquier matrícula de JE sin tener que tocar código.
 app.get('/mis-citas-equipo', (req, res) => {
+  purgarYGuardar();
   const matricula = String(req.query.matricula || '').trim().toUpperCase();
   const dni       = String(req.query.dni || '').trim();
   if (!matricula || !dni) return res.json({ ok: false, error: 'Falta matrícula o DNI' });
@@ -933,6 +941,7 @@ app.post('/marcar-respuesta', (req, res) => {
 
 // ── Status ────────────────────────────────────────────────────────────────────
 app.get('/status', (req, res) => {
+  purgarYGuardar();
   res.json({ waStatus, count: appointments.length, sendingActive });
 });
 
@@ -1033,8 +1042,7 @@ function programarLimpiezaMedianoche() {
   console.log(`  Limpieza automática programada en ${min} minutos (medianoche)`);
 
   setTimeout(() => {
-    // Solo se quitan las citas de días pasados (antes se borraba TODO, también
-    // las de mañana ya cargadas). Ver purgarCitasPasadas().
+    // Pasada la medianoche las citas de hoy ya no sirven. Ver purgarCitasPasadas().
     purgarCitasPasadas();
     dailyStats   = { date: hoyStr(), count: 0 }; // reiniciar contador diario
     guardarSesion();
@@ -1049,13 +1057,9 @@ cargarJerarquia();
 setInterval(cargarJerarquia, 60 * 60 * 1000);
 cargarAuth();
 setInterval(cargarAuth, 60 * 60 * 1000);
-iniciarPersistencia().then(() => {
-  // Al arrancar (Render reinicia el servicio a menudo) y luego cada hora
-  if (purgarCitasPasadas() > 0) { guardarSesion(); broadcast({ type: 'update', appointments }); }
-});
-setInterval(() => {
-  if (purgarCitasPasadas() > 0) { guardarSesion(); broadcast({ type: 'update', appointments }); }
-}, 60 * 60 * 1000);
+// Al arrancar (Render reinicia el servicio a menudo) y luego cada hora
+iniciarPersistencia().then(purgarYGuardar);
+setInterval(purgarYGuardar, 60 * 60 * 1000);
 programarLimpiezaMedianoche();
 
 const PORT = process.env.PORT || 3000;
