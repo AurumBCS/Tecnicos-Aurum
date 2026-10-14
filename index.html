@@ -332,6 +332,32 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .cf-guardar.on{display:flex}
 .cf-guardar span{margin-right:auto;font-size:.75rem;font-weight:700;color:var(--gold2)}
 .cf-vacio{padding:26px;text-align:center;color:var(--muted);font-size:.75rem}
+.cf-rapido{margin-top:8px}
+.cf-rapido .tit{font-size:.62rem;font-weight:700;color:var(--orange);margin-bottom:5px}
+.cf-rapido .bts{display:flex;flex-wrap:wrap;gap:5px}
+.cf-rb{padding:6px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:.66rem;font-weight:700;cursor:pointer}
+.cf-rb:hover{border-color:var(--gold);color:var(--gold2)}
+.cf-rb:disabled{opacity:.5;cursor:default}
+.cf-pendbtn{width:100%;margin-bottom:12px;padding:11px;border-radius:10px;background:rgba(212,131,26,.12);border:1px solid var(--orange);color:var(--orange);font-family:var(--font);font-size:.78rem;font-weight:800;cursor:pointer}
+#cfAsis{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:14px}
+#cfAsis .caja{background:var(--s1);border:1px solid var(--gold3);border-radius:16px;width:100%;max-width:440px;max-height:92vh;overflow:auto;padding:16px;position:relative}
+#cfAsis .caja::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold2),transparent)}
+#cfAsis .prog{font-size:.62rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+#cfAsis .barra{height:4px;background:var(--dim);border-radius:4px;margin:6px 0 12px;overflow:hidden}
+#cfAsis .barra div{height:100%;background:var(--gold)}
+#cfAsis h3{margin:0 0 4px;font-size:.95rem;color:var(--gold2)}
+#cfAsis .aviso{font-size:.68rem;color:var(--orange);margin-bottom:10px}
+#cfAsis .tec{background:var(--bg);border:1px solid var(--border2);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+#cfAsis .tec .n{font-size:.88rem;font-weight:800;color:var(--text)}
+#cfAsis .tec .m{font-size:.66rem;color:var(--muted);margin-top:3px;line-height:1.5}
+#cfAsis .opciones{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+#cfAsis .opciones button{padding:12px 8px;border-radius:10px;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:.74rem;font-weight:700;cursor:pointer;text-align:left}
+#cfAsis .opciones button:hover{border-color:var(--gold);color:var(--gold2)}
+#cfAsis .opciones button:disabled{opacity:.45;cursor:default}
+#cfAsis input{width:100%;margin-top:10px;padding:9px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem}
+#cfAsis .pie{display:flex;gap:8px;justify-content:space-between;margin-top:12px}
+#cfAsis .fin{text-align:center;padding:14px 4px}
+#cfAsis .fin .ok{font-size:2.2rem}
 .cf-hoy{background:var(--s1);border:1px solid #6b2a1a;border-radius:14px;padding:12px;margin-bottom:16px;position:relative;overflow:hidden}
 .cf-hoy::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#e05a4a,transparent)}
 .cf-hoy h3{margin:0;font-size:.85rem;color:#f08a7a;display:flex;align-items:center;gap:6px;flex:1}
@@ -4827,6 +4853,106 @@ function cfCopiarHoy(i){
   else prompt('Copia el mensaje:',txt);
 }
 
+// ── Justificar con un clic: la app pregunta "¿qué pasó?" por cada técnico que no fichó y no tiene nada
+//    comunicado ('Pendiente'), y cada respuesta se guarda al momento.
+const CF_OPCIONES={
+  'Vacaciones':'🏖️ Vacaciones','Baja médica':'🏥 Baja médica','Festivo':'🎉 Festivo','Asuntos propios':'📝 Asuntos propios',
+  'Permiso justificado':'✅ Permiso justificado','Otra ocupación':'🛠️ Otra ocupación','Ausencia no justificada':'❌ Falta no justificada','Otro':'❔ Otro'
+};
+let CF_ASIS=null;
+function cfOpciones(){ return (CF.datos&&CF.datos.motivos||Object.keys(CF_OPCIONES)).filter(m=>m!=='Pendiente'); }
+function cfPendientes(){
+  return CF.datos?CF.datos.filas.filter(r=>r.estado==='Ausente'&&(CF.cambios[r.fila]||r).motivo==='Pendiente'):[];
+}
+function cfJeDe(mat){
+  if(typeof JERARQUIA==='undefined') return '';
+  const je=Object.keys(JERARQUIA).find(k=>(JERARQUIA[k]||[]).includes(mat));
+  return je?((typeof JE_NAMES!=='undefined'&&JE_NAMES[je])||je):'';
+}
+// Guarda en el servidor el motivo de un técnico (y una nota opcional). Devuelve true si se guardó.
+async function cfJustificar(fila,motivo,nota){
+  const r=CF.datos.filas.find(x=>x.fila===fila);
+  if(!r) return false;
+  const base=(CF.cambios[fila]||r).obs||'';
+  const obs=nota?(base?base+' · ':'')+nota:base;
+  try{
+    const datos=await cfLlamar('fch-guardar',{fecha:CF.datos.fecha,cambios:[{fila,nombre:r.nombre,motivo,obs}]});
+    delete CF.cambios[fila];
+    CF.datos=datos;
+    return true;
+  }catch(e){ alert('No se pudo guardar: '+e.message); return false; }
+}
+async function cfRapido(btn,fila,motivo){
+  btn.parentElement.querySelectorAll('button').forEach(b=>b.disabled=true);
+  btn.textContent='Guardando…';
+  if(await cfJustificar(fila,motivo)) cfRender();
+  else cfRenderLista();
+}
+function cfAsistente(paraInforme){
+  const lista=cfPendientes();
+  CF_ASIS={cola:lista.map(r=>r.fila),total:lista.length,hechos:0,paraInforme:!!paraInforme,guardando:false};
+  cfPintarAsistente();
+}
+function cfCerrarAsistente(){
+  const el=document.getElementById('cfAsis');
+  if(el) el.remove();
+  CF_ASIS=null;
+}
+function cfPintarAsistente(){
+  if(!CF_ASIS) return;
+  let el=document.getElementById('cfAsis');
+  if(!el){ el=document.createElement('div'); el.id='cfAsis'; document.body.appendChild(el); }
+  const a=CF_ASIS, d=CF.datos;
+  if(!a.cola.length){
+    el.innerHTML=`<div class="caja"><div class="fin">
+        <div class="ok">✅</div>
+        <h3>${a.total?'¡Listo! Todos justificados':'No queda nadie por justificar'}</h3>
+        <div style="font-size:.72rem;color:var(--muted);margin:6px 0 14px">${cfEsc(d.dia)} ${cfDDMM(d.fecha)}${a.hechos?' · '+a.hechos+' guardado'+(a.hechos>1?'s':''):''}</div>
+        ${a.paraInforme?`<button class="cf-btn prim" style="width:100%;padding:11px" onclick="cfCerrarAsistente();cfInformeDia()">📥 Descargar el informe del día</button>`:''}
+        <button class="cf-btn" style="width:100%;padding:10px;margin-top:8px" onclick="cfCerrarAsistente()">Cerrar</button>
+      </div></div>`;
+    return;
+  }
+  const r=d.filas.find(x=>x.fila===a.cola[0]);
+  if(!r){ a.cola.shift(); return cfPintarAsistente(); }
+  const je=cfJeDe(r.matricula), hechos=a.total-a.cola.length;
+  el.innerHTML=`<div class="caja">
+    <div class="prog">Técnico ${hechos+1} de ${a.total}</div>
+    <div class="barra"><div style="width:${Math.round(hechos/a.total*100)}%"></div></div>
+    <h3>¿Qué pasó con este técnico?</h3>
+    ${a.paraInforme?`<div class="aviso">Para descargar el informe del ${cfDDMM(d.fecha)} hay que justificar a quien no fichó.</div>`:''}
+    <div class="tec">
+      <div class="n">${cfEsc(r.nombre)}</div>
+      <div class="m">Matrícula ${cfEsc(r.matricula)}${je?' · Jefe de equipo: '+cfEsc(je):''}<br>
+        No fichó el ${cfEsc(d.dia.toLowerCase())} ${cfDDMM(d.fecha)} y no hay nada comunicado${r.racha>1?' · <b style="color:#e05a4a">'+r.racha+' días seguidos sin fichar</b>':''}
+        ${r.obs?'<br>📌 '+cfEsc(r.obs):''}</div>
+    </div>
+    <div class="opciones">${cfOpciones().map(m=>`<button ${a.guardando?'disabled':''} onclick="cfAsisElegir('${m}')">${CF_OPCIONES[m]||cfEsc(m)}</button>`).join('')}</div>
+    <input id="cfAsisNota" placeholder="Nota opcional (p. ej. avisado por su jefe de equipo)" ${a.guardando?'disabled':''}>
+    <div class="pie">
+      <button class="cf-btn" ${a.guardando?'disabled':''} onclick="cfCerrarAsistente()">Cerrar</button>
+      <span style="font-size:.66rem;color:var(--muted);align-self:center">${a.guardando?'⏳ Guardando…':''}</span>
+      <button class="cf-btn" ${a.guardando||a.cola.length<2?'disabled':''} onclick="cfAsisSaltar()">Saltar →</button>
+    </div>
+  </div>`;
+}
+async function cfAsisElegir(motivo){
+  const a=CF_ASIS;
+  if(!a||a.guardando) return;
+  const nota=(document.getElementById('cfAsisNota')||{}).value||'';
+  a.guardando=true; cfPintarAsistente();
+  const ok=await cfJustificar(a.cola[0],motivo,nota.trim());
+  a.guardando=false;
+  if(ok){ a.cola.shift(); a.hechos++; cfRender(); }
+  cfPintarAsistente();
+}
+function cfAsisSaltar(){
+  const a=CF_ASIS;
+  if(!a||a.cola.length<2) return;
+  a.cola.push(a.cola.shift());
+  cfPintarAsistente();
+}
+
 function cfVisible(r){
   const q=CF.busca.trim().toLowerCase();
   if(q && !(r.nombre.toLowerCase().includes(q)||r.matricula.toLowerCase().includes(q))) return false;
@@ -4871,6 +4997,7 @@ function cfRender(){
       <select class="cf-input" id="cfMesExcel">${meses}</select>
       <button class="cf-btn" onclick="cfDescargarExcel(document.getElementById('cfMesExcel').value)">📊 Descargar Excel</button>
     </div>
+    ${cfPendientes().length?`<button class="cf-pendbtn" onclick="cfAsistente(false)">❓ Justificar ${cfPendientes().length} técnico${cfPendientes().length>1?'s':''} sin fichar y sin comunicar</button>`:''}
     <div class="cf-kpis">${kpis}</div>
     <div class="cf-chips">
       ${chip('nofichan','No ficharon')}${chip('pendientes','Sin justificar')}${chip('operativos','Operativos')}${chip('todos','Todos')}
@@ -4893,7 +5020,11 @@ function cfRenderLista(){
       const ch=CF.cambios[r.fila]||{}, motivo=ch.motivo??r.motivo, obs=ch.obs??r.obs;
       const ausente=r.estado==='Ausente';
       const racha=ausente||r.racha?`<div class="cf-racha ${r.racha>=3?'alta':''}">${r.racha} ${r.racha===1?'día seguido':'días seguidos'}</div>`:'';
-      const editar=ausente?`
+      const rapido=ausente&&motivo==='Pendiente'&&!CF.cambios[r.fila]?`
+        <div class="cf-rapido"><div class="tit">¿Qué pasó? Un clic y queda guardado:</div>
+          <div class="bts">${cfOpciones().map(m=>`<button class="cf-rb" onclick="cfRapido(this,${r.fila},'${m}')">${CF_OPCIONES[m]||cfEsc(m)}</button>`).join('')}</div>
+        </div>`:'';
+      const editar=ausente?rapido+`
         <div class="cf-edit">
           <select class="${motivo==='Pendiente'?'pend':''}" onchange="cfCambio(${r.fila},'motivo',this.value)">
             ${d.motivos.map(m=>`<option ${m===motivo?'selected':''}>${cfEsc(m)}</option>`).join('')}
@@ -4971,12 +5102,8 @@ async function cfInformeDia(){
   try{
     const r=await cfLlamar('fch-informe',{fecha:d.fecha});
     if(r.pendientes){
-      CF.filtro='nofichan'; CF.motivo='Pendiente'; CF.busca='';
-      cfRender();
-      alert('Antes de descargar el informe del '+cfDDMM(d.fecha)+' hay que justificar a '+r.pendientes+' técnico'+(r.pendientes>1?'s':'')+
-        ' que no ficharon.\n\nTe los muestro ahora: elige el motivo de cada uno (vacaciones, baja, festivo, falta no justificada…), pulsa "Guardar cambios" y vuelve a pulsar "Informe del día".');
-      const lista=document.getElementById('cfLista');
-      if(lista) lista.scrollIntoView({behavior:'smooth',block:'start'});
+      // pregunta uno por uno qué pasó con cada técnico; al terminar ofrece descargar el informe
+      cfAsistente(true);
       return;
     }
     const bytes=Uint8Array.from(atob(r.excel),ch=>ch.charCodeAt(0));
@@ -5439,6 +5566,7 @@ function doLogout(){
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
   FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={}; FICHAJE_HOY_CARGADO=false;
   CF={mat:'',dni:'',datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
+  cfCerrarAsistente();
   document.getElementById('cfGuardarBar').classList.remove('on');
   hideAllPanels();
   document.getElementById('mainPanel').style.display='block';
