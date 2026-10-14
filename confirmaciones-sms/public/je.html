@@ -94,6 +94,12 @@
     .card-actions { display:flex; gap:6px; align-items:center; }
     .chk-envio { width:18px; height:18px; accent-color: var(--gold); flex-shrink:0; cursor:pointer; }
 
+    #filtro-tecnico {
+      width: 100%; background: var(--dim); border: 1.5px solid var(--border2); color: var(--text);
+      border-radius: 10px; padding: 11px 12px; font-size: .9rem; font-family: var(--font); outline: none;
+      margin-bottom: 10px;
+    }
+    #filtro-tecnico:focus { border-color: var(--gold); }
     .barra-acciones { display:flex; gap:8px; margin-bottom:10px; }
     .btn-sel-todos {
       background: rgba(122,104,64,.15); color: var(--gold3); border: 1px solid rgba(122,104,64,.35);
@@ -147,6 +153,9 @@
   </div>
 
   <div id="content" style="display:none">
+    <select id="filtro-tecnico" onchange="cambiarFiltroTecnico(this.value)">
+      <option value="">👥 Todos los técnicos</option>
+    </select>
     <div class="stats">
       <div class="stat"><b id="st-total">0</b><span>Total</span></div>
       <div class="stat"><b id="st-pend">0</b><span>Pend.</span></div>
@@ -180,6 +189,7 @@
   let seleccionados = new Set();
   let colaEnvio = [];
   let enviandoEnCola = false;
+  let filtroTecnico = ''; // '' = todos los técnicos del equipo
 
   const savedMat = localStorage.getItem('mi_matricula_je');
   const savedDni = localStorage.getItem('mi_dni_je');
@@ -213,28 +223,60 @@
       .catch(() => {});
   }
 
+  // Citas visibles según el técnico elegido en el desplegable
+  function citasVisibles() {
+    return filtroTecnico ? citas.filter(c => c.tecnico === filtroTecnico) : citas;
+  }
+
+  function renderFiltroTecnico() {
+    const sel = document.getElementById('filtro-tecnico');
+    const tecnicos = [...new Set(citas.map(c => c.tecnico))].sort();
+    // Si el técnico elegido ya no tiene citas, volver a "Todos"
+    if (filtroTecnico && !tecnicos.includes(filtroTecnico)) filtroTecnico = '';
+    const html = '<option value="">👥 Todos los técnicos (' + citas.length + ')</option>' +
+      tecnicos.map(t => {
+        const lista = citas.filter(c => c.tecnico === t);
+        const pend = lista.filter(c => c.status === 'pendiente').length;
+        return '<option value="' + esc(t) + '">' + esc(t) + ' — ' + lista.length + (pend ? ' (' + pend + ' pend.)' : '') + '</option>';
+      }).join('');
+    // Solo reconstruir si cambió (el refresco cada 15s cerraría el desplegable abierto en el móvil)
+    if (sel.dataset.html !== html) { sel.innerHTML = html; sel.dataset.html = html; }
+    sel.value = filtroTecnico;
+  }
+
+  function cambiarFiltroTecnico(tec) {
+    filtroTecnico = tec;
+    // Al cambiar de técnico se limpia la selección, para no enviar SMS a citas que no se ven
+    seleccionados.clear();
+    if (tec) openTecnicos.add(tec);
+    render();
+  }
+
   function render() {
-    const total = citas.filter(c => c.status !== 'sin_telefono').length;
-    const pend  = citas.filter(c => c.status === 'pendiente').length;
-    const conf  = citas.filter(c => c.status === 'confirmado').length;
-    const noconf= citas.filter(c => c.status === 'no_confirmado').length;
+    renderFiltroTecnico();
+    const citasAll = citas;
+    const citas_ = citasVisibles();
+    const total = citas_.filter(c => c.status !== 'sin_telefono').length;
+    const pend  = citas_.filter(c => c.status === 'pendiente').length;
+    const conf  = citas_.filter(c => c.status === 'confirmado').length;
+    const noconf= citas_.filter(c => c.status === 'no_confirmado').length;
     document.getElementById('st-total').textContent = total;
     document.getElementById('st-pend').textContent  = pend;
     document.getElementById('st-conf').textContent  = conf;
     document.getElementById('st-no').textContent    = noconf;
 
     // Quitar de la seleccion las citas que ya no se pueden enviar (p.ej. si cambio de estado)
-    citas.forEach(c => { if (c.status === 'sin_telefono') seleccionados.delete(c.id); });
+    citasAll.forEach(c => { if (c.status === 'sin_telefono') seleccionados.delete(c.id); });
     actualizarBarraSeleccion();
 
     const cont  = document.getElementById('grupos');
     const empty = document.getElementById('empty');
-    if (citas.length === 0) { cont.innerHTML = ''; empty.style.display = ''; return; }
+    if (citas_.length === 0) { cont.innerHTML = ''; empty.style.display = ''; return; }
     empty.style.display = 'none';
 
     // Agrupar por técnico
     const porTecnico = {};
-    citas.forEach(c => {
+    citas_.forEach(c => {
       if (!porTecnico[c.tecnico]) porTecnico[c.tecnico] = [];
       porTecnico[c.tecnico].push(c);
     });
@@ -306,7 +348,7 @@
   }
 
   function seleccionarTodosPendientes() {
-    const pendientes = citas.filter(c => c.status === 'pendiente');
+    const pendientes = citasVisibles().filter(c => c.status === 'pendiente');
     if (pendientes.length === 0) { showToast('No hay citas pendientes', 'error'); return; }
     pendientes.forEach(c => seleccionados.add(c.id));
     render();
