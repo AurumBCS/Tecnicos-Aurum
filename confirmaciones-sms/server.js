@@ -77,8 +77,8 @@ async function cargarJerarquia() {
       const mat = String(cols[iMat] || '').toUpperCase();
       if (!je || !mat) return;
       if (iNombre >= 0 && cols[iNombre]) nombres[mat] = cols[iNombre];
-      if (mat === je) return; // el cuadrante a veces pone al JE dentro de su propio equipo
-      if (!jer[je]) jer[je] = [];
+      // El JE cuenta dentro de su propio equipo (también ve y confirma sus propias citas)
+      if (!jer[je]) jer[je] = [je];
       if (!jer[je].includes(mat)) jer[je].push(mat);
     });
     if (!Object.keys(jer).length) throw new Error('Jerarquía vacía');
