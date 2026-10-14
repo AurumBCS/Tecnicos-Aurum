@@ -22,6 +22,7 @@ app.use(express.json());
 const JERARQUIA_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSvU7Aah_5VokujbrbolwqCAZLRxrDQqrAZiNpgvNZMXeD-KCPLmJqRjIlPGmswlg/pub?output=csv';
 let JERARQUIA = {};
 let JE_NAMES  = { 'JR9426': 'Coordinador Regional' };
+let TEC_NAMES = {}; // matrícula de técnico → nombre (del cuadrante)
 
 // Matrículas autorizadas para hacer la carga CENTRAL del Excel (todos los técnicos, sin filtrar).
 // Si la matrícula escrita en el campo normal de carga coincide con una de estas,
@@ -51,6 +52,7 @@ async function cargarJerarquia() {
     const lines = raw.trim().split('\n').slice(1);
     const jer = {};
     const names = { 'JR9426': 'Coordinador Regional' };
+    const tecNames = {};
     lines.forEach(line => {
       const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
       if (cols.length < 5) return;
@@ -63,10 +65,13 @@ async function cargarJerarquia() {
       } else if (tipo === '5 TEC' && jde && matricula) {
         if (!jer[jde]) jer[jde] = [];
         if (!jer[jde].includes(matricula)) jer[jde].push(matricula);
+        const nombreCompleto = `${nombre} ${cols[6] || ''}`.trim(); // Nombre(S) + Apellidos(S)
+        if (nombreCompleto) tecNames[matricula.toUpperCase()] = nombreCompleto;
       }
     });
     JERARQUIA = jer;
     JE_NAMES  = names;
+    TEC_NAMES = tecNames;
     const total = Object.values(jer).reduce((s, v) => s + v.length, 0);
     console.log(`  Jerarquía cargada: ${Object.keys(jer).length} JEs · ${total} técnicos`);
   } catch(e) {
@@ -389,6 +394,15 @@ function toWANumber(phone) {
   const clean = normalizePhone(phone);
   if (!clean || clean.length < 9) return null;
   return `34${clean}@c.us`;
+}
+
+// Nombre a mostrar del técnico de una cita. El Excel que se sube no siempre
+// trae la columna "Técnico" (p. ej. la exportación por buckets) — en ese caso
+// se usa el nombre del cuadrante por matrícula, y si tampoco está, la matrícula.
+function nombreTecnicoCita(a) {
+  if (a.tecnico) return a.tecnico;
+  const mat = String(a.matricula || '').trim().toUpperCase();
+  return TEC_NAMES[mat] ? `${TEC_NAMES[mat]} (${mat})` : mat;
 }
 
 function extractTechName(tecnico) {
@@ -825,7 +839,9 @@ app.get('/mis-citas-equipo', (req, res) => {
     return res.json({ ok: false, error: 'Esa matrícula no es de un jefe de equipo reconocido' });
   }
 
-  const delEquipo = appointments.filter(a => tecnicos.includes(String(a.matricula || '').trim().toUpperCase()));
+  const delEquipo = appointments
+    .filter(a => tecnicos.includes(String(a.matricula || '').trim().toUpperCase()))
+    .map(a => a.tecnico ? a : { ...a, tecnico: nombreTecnicoCita(a) });
   res.json({ ok: true, citas: delEquipo, nombre: JE_NAMES[matricula] || matricula, totalTecnicos: tecnicos.length });
 });
 
