@@ -1063,8 +1063,9 @@
       .then(d => {
         if (d.ok) {
           result.style.color = 'var(--green2)';
-          const msg = d.added > 0
-            ? `✅  ${d.added} citas nuevas añadidas · ${d.count} total`
+          const reprog = d.updated > 0 ? ` · ${d.updated} reprogramadas` : '';
+          const msg = (d.added > 0 || d.updated > 0)
+            ? `✅  ${d.added} citas nuevas añadidas${reprog} · ${d.count} total`
             : `✅  Sin citas nuevas · ${d.count} ya cargadas`;
           result.textContent = msg;
           showToast(d.added > 0 ? `${d.added} citas nuevas añadidas` : 'Sin citas nuevas que añadir', d.added > 0 ? 'success' : 'warning');

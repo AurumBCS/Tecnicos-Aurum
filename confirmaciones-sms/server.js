@@ -498,26 +498,46 @@ app.post('/upload', upload.single('excel'), (req, res) => {
         };
       });
 
-    const getKey = a => a.numMantenimiento
+    // Se comparan con las ya cargadas:
+    //  - misma cita (mismo nº de mantenimiento + misma fecha y tramo) → se deja como
+    //    está, conservando su estado (enviado/confirmado...) — no se duplica.
+    //  - mismo nº de mantenimiento pero OTRA fecha o tramo → es una cita
+    //    reprogramada: se actualiza y vuelve a "pendiente" para confirmarla de nuevo.
+    //    (Antes se descartaba por tener el mismo nº y se quedaba la cita vieja.)
+    //  - nueva → se añade.
+    // Las citas de días ya pasados se eliminan antes de comparar.
+    purgarCitasPasadas();
+    const claveCita = a => a.numMantenimiento
       ? a.numMantenimiento
-      : `${a.cliente}|${a.fecha}|${a.timeslot}|${a.tecnico}`;
+      : `${a.cliente}|${a.matricula}|${a.fecha}|${a.timeslot}`;
 
-    const existingKeys = new Map(appointments.map(a => [getKey(a), a]));
+    const existentes = new Map(appointments.map(a => [claveCita(a), a]));
     let nextId = appointments.length > 0 ? Math.max(...appointments.map(a => a.id)) + 1 : 0;
     let added  = 0;
+    let updated = 0;
 
     newAppointments.forEach(na => {
-      const key = getKey(na);
-      if (existingKeys.has(key)) return;
-      na.id = nextId++;
-      appointments.push(na);
-      added++;
+      const actual = existentes.get(claveCita(na));
+      if (!actual) {
+        na.id = nextId++;
+        appointments.push(na);
+        existentes.set(claveCita(na), na);
+        added++;
+        return;
+      }
+      if (actual.fecha === na.fecha && actual.timeslot === na.timeslot) return; // misma cita
+      Object.assign(actual, {
+        tecnico: na.tecnico, matricula: na.matricula, cliente: na.cliente, telefono: na.telefono,
+        timeslot: na.timeslot, tipo: na.tipo, fecha: na.fecha,
+        status: na.status, respuesta: '', horaRespuesta: '', sentAt: ''
+      });
+      updated++;
     });
 
     guardarSesion();
     broadcast({ type: 'update', appointments });
     broadcast({ type: 'je', je: currentJE });
-    res.json({ ok: true, count: appointments.length, added, je: currentJE });
+    res.json({ ok: true, count: appointments.length, added, updated, je: currentJE });
   } catch (e) {
     console.error('Error al leer Excel:', e);
     res.json({ ok: false, error: e.message });
@@ -538,6 +558,34 @@ const LONG_PAUSE_MAX   = 15 * 60 * 1000;
 let dailyStats = { date: hoyStr(), count: 0 };
 
 function hoyStr() { return new Date().toISOString().slice(0, 10); }
+
+// Fecha de hoy en España como "AAAA-MM-DD" (el servidor de Render corre en UTC)
+function hoyMadridISO() {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid' }).format(new Date());
+}
+
+// "15/10/26" o "15/10/2026" → "2026-10-15"; null si no se reconoce
+function fechaCitaISO(fecha) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(String(fecha || '').trim());
+  if (!m) return null;
+  const anio = m[3].length === 2 ? '20' + m[3] : m[3];
+  return `${anio}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+}
+
+// Elimina las citas de días anteriores a hoy. Sustituye a la limpieza total de
+// medianoche, que en Render casi nunca llegaba a ejecutarse (el servicio gratuito
+// se duerme y el temporizador se pierde) — por eso se acumulaban citas viejas.
+function purgarCitasPasadas() {
+  const hoy = hoyMadridISO();
+  const antes = appointments.length;
+  appointments = appointments.filter(a => {
+    const f = fechaCitaISO(a.fecha);
+    return !f || f >= hoy;
+  });
+  const quitadas = antes - appointments.length;
+  if (quitadas > 0) console.log(`  Citas de días pasados eliminadas: ${quitadas}`);
+  return quitadas;
+}
 
 function asegurarDiaActual() {
   const h = hoyStr();
@@ -985,12 +1033,12 @@ function programarLimpiezaMedianoche() {
   console.log(`  Limpieza automática programada en ${min} minutos (medianoche)`);
 
   setTimeout(() => {
-    appointments = [];
-    currentJE    = null;
+    // Solo se quitan las citas de días pasados (antes se borraba TODO, también
+    // las de mañana ya cargadas). Ver purgarCitasPasadas().
+    purgarCitasPasadas();
     dailyStats   = { date: hoyStr(), count: 0 }; // reiniciar contador diario
     guardarSesion();
     broadcast({ type: 'update', appointments });
-    broadcast({ type: 'je', je: null });
     console.log('\n  Limpieza de medianoche completada (contador diario a 0)\n');
     programarLimpiezaMedianoche();
   }, ms);
@@ -1001,7 +1049,13 @@ cargarJerarquia();
 setInterval(cargarJerarquia, 60 * 60 * 1000);
 cargarAuth();
 setInterval(cargarAuth, 60 * 60 * 1000);
-iniciarPersistencia();
+iniciarPersistencia().then(() => {
+  // Al arrancar (Render reinicia el servicio a menudo) y luego cada hora
+  if (purgarCitasPasadas() > 0) { guardarSesion(); broadcast({ type: 'update', appointments }); }
+});
+setInterval(() => {
+  if (purgarCitasPasadas() > 0) { guardarSesion(); broadcast({ type: 'update', appointments }); }
+}, 60 * 60 * 1000);
 programarLimpiezaMedianoche();
 
 const PORT = process.env.PORT || 3000;
