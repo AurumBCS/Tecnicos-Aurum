@@ -830,11 +830,14 @@ app.get('/mis-citas', (req, res) => {
   if (!verificarDNI(matricula, dni)) {
     return res.json({ ok: false, error: 'Matrícula o DNI incorrectos' });
   }
-  const manana = fechaManana();
+  // Todas las citas cargadas del técnico, igual que ve su JE. Antes solo se
+  // devolvían las de "mañana", y se quedaban fuera (p. ej. un sábado se carga la
+  // ruta del lunes, o el Excel trae la fecha en otro formato que dd/mm/aa).
   const mias = appointments.filter(a =>
-    String(a.matricula || '').trim().toUpperCase() === matricula && a.fecha === manana
+    String(a.matricula || '').trim().toUpperCase() === matricula
   );
-  res.json({ ok: true, citas: mias, fecha: manana });
+  const fechas = [...new Set(mias.map(a => a.fecha).filter(Boolean))];
+  res.json({ ok: true, citas: mias, fecha: fechas.join(' y ') });
 });
 
 // ── Vista móvil para JE: todo el equipo, agrupado por técnico ────────────────
