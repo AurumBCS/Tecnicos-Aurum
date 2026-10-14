@@ -19,7 +19,6 @@ app.use(express.static('public'));
 app.use(express.json());
 
 // ── Jerarquía JE → Técnicos (cargada dinámicamente desde Google Sheets) ──────
-const JERARQUIA_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSvU7Aah_5VokujbrbolwqCAZLRxrDQqrAZiNpgvNZMXeD-KCPLmJqRjIlPGmswlg/pub?output=csv';
 let JERARQUIA = {};
 let JE_NAMES  = { 'JR9426': 'Coordinador Regional' };
 let TEC_NAMES = {}; // matrícula de técnico → nombre (del cuadrante)
@@ -46,36 +45,50 @@ function fetchCSV(url, redirects = 0) {
   });
 }
 
+// Parte una línea CSV respetando comillas ("a","b, c",d)
+function parseLineaCSV(line) {
+  const out = []; let cur = ''; let q = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+    else if (ch === ',' && !q) { out.push(cur.trim()); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+// La jerarquía se pide al mismo Apps Script que usa el portal (?type=jerarquia),
+// que lee el Cuadrante ACTUAL directamente. Antes se leía un CSV "publicado en la
+// web" de una copia vieja del cuadrante, desactualizada (JEs con técnicos que ya
+// no son suyos). Columnas: JE, Matricula, Zona, CuentaJE, CuentaEmpresa, Nombre, ...
 async function cargarJerarquia() {
   try {
-    const raw = await fetchCSV(JERARQUIA_CSV_URL);
-    const lines = raw.trim().split('\n').slice(1);
+    const raw = await fetchCSV(JERARQUIA_URL);
+    const lines = raw.trim().split('\n');
+    const hdr = parseLineaCSV(lines[0] || '').map(h => h.toLowerCase());
+    const iJE = hdr.indexOf('je'), iMat = hdr.indexOf('matricula'), iNombre = hdr.indexOf('nombre');
+    if (iJE < 0 || iMat < 0) throw new Error('Respuesta inesperada: ' + (lines[0] || '').slice(0, 80));
     const jer = {};
-    const names = { 'JR9426': 'Coordinador Regional' };
-    const tecNames = {};
-    lines.forEach(line => {
-      const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-      if (cols.length < 5) return;
-      const tipo      = cols[0];
-      const jde       = cols[3];
-      const matricula = cols[4];
-      const nombre    = cols[5] || '';
-      if (tipo === '4 JDE' && matricula) {
-        names[matricula] = nombre;
-      } else if (tipo === '5 TEC' && jde && matricula) {
-        if (!jer[jde]) jer[jde] = [];
-        if (!jer[jde].includes(matricula)) jer[jde].push(matricula);
-        const nombreCompleto = `${nombre} ${cols[6] || ''}`.trim(); // Nombre(S) + Apellidos(S)
-        if (nombreCompleto) tecNames[matricula.toUpperCase()] = nombreCompleto;
-      }
+    const nombres = {};
+    lines.slice(1).forEach(line => {
+      const cols = parseLineaCSV(line);
+      const je  = String(cols[iJE]  || '').toUpperCase();
+      const mat = String(cols[iMat] || '').toUpperCase();
+      if (!je || !mat) return;
+      if (iNombre >= 0 && cols[iNombre]) nombres[mat] = cols[iNombre];
+      if (mat === je) return; // el cuadrante a veces pone al JE dentro de su propio equipo
+      if (!jer[je]) jer[je] = [];
+      if (!jer[je].includes(mat)) jer[je].push(mat);
     });
+    if (!Object.keys(jer).length) throw new Error('Jerarquía vacía');
     JERARQUIA = jer;
-    JE_NAMES  = names;
-    TEC_NAMES = tecNames;
+    JE_NAMES  = { ...nombres, 'JR9426': 'Coordinador Regional' };
+    TEC_NAMES = nombres;
     const total = Object.values(jer).reduce((s, v) => s + v.length, 0);
     console.log(`  Jerarquía cargada: ${Object.keys(jer).length} JEs · ${total} técnicos`);
   } catch(e) {
-    console.error('  [Jerarquía] Error al cargar:', e.message, '— usando respaldo');
+    console.error('  [Jerarquía] Error al cargar:', e.message, '— usando datos anteriores');
   }
 }
 
@@ -84,6 +97,7 @@ async function cargarJerarquia() {
 // en google-apps-script-final.gs e Index.html) — sin él devuelve "no autorizado".
 const APP_TOKEN = '74ffa953c19c831f33d06b8b0d5e38ab1ee707ed881c3426';
 const AUTH_URL = 'https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=auth&token=' + APP_TOKEN;
+const JERARQUIA_URL = AUTH_URL.replace('type=auth', 'type=jerarquia');
 let AUTH_DATA = {};
 
 async function cargarAuth() {
