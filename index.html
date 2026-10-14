@@ -677,14 +677,16 @@ const FICHAJE_TECNICOS_HABILITADO = false; // Cambiar a true cuando se active el
 const VACACIONES_DOCS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR9A0fhBk2ViKKewyKP8rJz364_MsEwi8CD_DEIjokUAeZiJzieR1k3KuZm6Kx9B68YrNTtalq8peFn/pub?output=csv";
 // Coordinadores y JEs precargados — AUTH_DATA nunca está vacío aunque falle el endpoint
 // Contraseñas fijas que NO se reemplazan con el DNI del cuadrante al cargar loadAuth()
-const AUTH_FIJAS = { 'JR9426': '19115809' };
+const AUTH_FIJAS = {
+  'JR9426': '19115809',
+  'GD5381': 'Zizo2169',
+  '314298': 'Zizo2169'
+};
 let AUTH_DATA = {
   'CM9651':       'Y4798543K',
   'JN4767':       '77843052N',
-  'GD5381':       '60233494J',
   'BLAS.ALVAREZ': '80065456H',
   'BA8006':       '80065456H',
-  'JR9426':       '19115809', // contraseña fija (ver AUTH_FIJAS)
   '273371':       '05323734Q',
   '286800':       'Z0952631E',
   'Q29994':       '60246677V',
@@ -693,6 +695,7 @@ let AUTH_DATA = {
   '302154':       'Y9078755W',
   '239831':       '48650727T'
 };
+Object.assign(AUTH_DATA, AUTH_FIJAS);
 let AUTH_CUADRANTE_LOADED = false;
 let ZONA_DATA = {};
 let CUENTA_DATA = {}; // mat -> {je: bool, empresa: bool}
