@@ -333,6 +333,11 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .cf-guardar span{margin-right:auto;font-size:.75rem;font-weight:700;color:var(--gold2)}
 .cf-vacio{padding:26px;text-align:center;color:var(--muted);font-size:.75rem}
 .cf-rapido{margin-top:8px}
+.cf-just{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.cf-mot{font-size:.7rem;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--dim);color:var(--gold2);border:1px solid var(--border2)}
+.cf-src{font-size:.6rem;color:var(--muted)}
+.cf-link{margin-left:auto;background:none;border:none;color:var(--muted);font-family:var(--font);font-size:.62rem;cursor:pointer;text-decoration:underline;padding:2px}
+.cf-link:hover{color:var(--gold2)}
 .cf-rapido .tit{font-size:.62rem;font-weight:700;color:var(--orange);margin-bottom:5px}
 .cf-rapido .bts{display:flex;flex-wrap:wrap;gap:5px}
 .cf-rb{padding:6px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:.66rem;font-weight:700;cursor:pointer}
@@ -4770,7 +4775,7 @@ async function cfAbrir(fecha){
   if(!CF.hoy) cfCargarHoy();
   try{
     CF.datos=await cfLlamar('fch-datos',{fecha:fecha||''});
-    CF.cambios={};
+    CF.cambios={}; CF_EDITAR.clear();
     cfRender();
   }catch(e){
     document.getElementById('controlFichajesContainer').innerHTML=`<div class="cf-vacio">❌ ${cfEsc(e.message)}<br><br><button class="cf-btn" onclick="cfAbrir('')">Reintentar</button></div>`;
@@ -4860,6 +4865,14 @@ const CF_OPCIONES={
   'Permiso justificado':'✅ Permiso justificado','Otra ocupación':'🛠️ Otra ocupación','Ausencia no justificada':'❌ Falta no justificada','Otro':'❔ Otro'
 };
 let CF_ASIS=null;
+const CF_EDITAR=new Set();   // filas ya justificadas que Anna ha abierto con "✏️ Cambiar"
+function cfEditar(fila){ CF_EDITAR.add(fila); cfRenderLista(); }
+function cfOrigen(r){
+  if(r.revisadoPor) return 'Justificado por '+r.revisadoPor;
+  if(/^LC:/.test(r.obs||'')) return 'Comunicado en las Líneas de Comunicación';
+  if(/^Odoo:/.test(r.obs||'')) return 'Registrado en Odoo';
+  return '';
+}
 function cfOpciones(){ return (CF.datos&&CF.datos.motivos||Object.keys(CF_OPCIONES)).filter(m=>m!=='Pendiente'); }
 function cfPendientes(){
   return CF.datos?CF.datos.filas.filter(r=>r.estado==='Ausente'&&(CF.cambios[r.fila]||r).motivo==='Pendiente'):[];
@@ -5019,12 +5032,24 @@ function cfRenderLista(){
     cont.innerHTML=filas.map(r=>{
       const ch=CF.cambios[r.fila]||{}, motivo=ch.motivo??r.motivo, obs=ch.obs??r.obs;
       const ausente=r.estado==='Ausente';
-      const racha=ausente||r.racha?`<div class="cf-racha ${r.racha>=3?'alta':''}">${r.racha} ${r.racha===1?'día seguido':'días seguidos'}</div>`:'';
-      const rapido=ausente&&motivo==='Pendiente'&&!CF.cambios[r.fila]?`
+      // en rojo solo si la ausencia no está justificada (pendiente o falta no justificada)
+      const sinJustificar=['Pendiente','Ausencia no justificada'].includes(motivo);
+      const racha=ausente||r.racha?`<div class="cf-racha ${r.racha>=3&&sinJustificar?'alta':''}">${r.racha} ${r.racha===1?'día seguido':'días seguidos'}</div>`:'';
+      const pendiente=ausente&&motivo==='Pendiente'&&!CF.cambios[r.fila]&&!CF_EDITAR.has(r.fila);
+      const rapido=pendiente?`
         <div class="cf-rapido"><div class="tit">¿Qué pasó? Un clic y queda guardado:</div>
           <div class="bts">${cfOpciones().map(m=>`<button class="cf-rb" onclick="cfRapido(this,${r.fila},'${m}')">${CF_OPCIONES[m]||cfEsc(m)}</button>`).join('')}</div>
+          ${obs?`<div class="cf-obs">📌 ${cfEsc(obs)}</div>`:''}
+          <div style="text-align:right"><button class="cf-link" onclick="cfEditar(${r.fila})">✏️ Elegir con una nota</button></div>
         </div>`:'';
-      const editar=ausente?rapido+`
+      // ya justificado (por las Líneas de Comunicación, Odoo o a mano): ficha cerrada, sin nada que hacer
+      const justificado=ausente&&motivo!=='Pendiente'&&!CF.cambios[r.fila]&&!CF_EDITAR.has(r.fila);
+      const cerrado=justificado?`
+        <div class="cf-just"><span class="cf-mot">${CF_OPCIONES[motivo]||cfEsc(motivo)}</span>
+          <span class="cf-src">${cfEsc(cfOrigen(r))}</span>
+          <button class="cf-link" onclick="cfEditar(${r.fila})">✏️ Cambiar</button></div>
+        ${obs?`<div class="cf-obs">${cfEsc(String(obs).replace(/^(LC|Odoo): /,''))}</div>`:''}`:'';
+      const editar=justificado?cerrado:pendiente?rapido:ausente?`
         <div class="cf-edit">
           <select class="${motivo==='Pendiente'?'pend':''}" onchange="cfCambio(${r.fila},'motivo',this.value)">
             ${d.motivos.map(m=>`<option ${m===motivo?'selected':''}>${cfEsc(m)}</option>`).join('')}
@@ -5072,7 +5097,7 @@ async function cfGuardar(){
   bar.querySelectorAll('button').forEach(b=>b.disabled=true);
   try{
     CF.datos=await cfLlamar('fch-guardar',{fecha:CF.datos.fecha,cambios});
-    CF.cambios={};
+    CF.cambios={}; CF_EDITAR.clear();
     cfRender();
   }catch(e){ alert('No se pudo guardar: '+e.message); }
   bar.querySelectorAll('button').forEach(b=>b.disabled=false);
@@ -5566,6 +5591,7 @@ function doLogout(){
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
   FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={}; FICHAJE_HOY_CARGADO=false;
   CF={mat:'',dni:'',datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
+  CF_EDITAR.clear();
   cfCerrarAsistente();
   document.getElementById('cfGuardarBar').classList.remove('on');
   hideAllPanels();
