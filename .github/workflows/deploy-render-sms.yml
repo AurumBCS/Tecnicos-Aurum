@@ -1,0 +1,38 @@
+name: Deploy Render confirmaciones-sms
+
+# Lanza un deploy de confirmaciones-sms en Render (servicio tecnicos-aurum)
+# cada vez que cambia algo en confirmaciones-sms/. El Auto-Deploy "On Commit"
+# de Render no siempre se disparaba solo, asi que se llama directamente a su
+# Deploy Hook. La URL del hook es secreta: vive en el secret RENDER_DEPLOY_HOOK
+# del repositorio (Settings -> Secrets and variables -> Actions), nunca aqui.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'confirmaciones-sms/**'
+      - '.github/workflows/deploy-render-sms.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar al Deploy Hook de Render
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "::error::Falta el secret RENDER_DEPLOY_HOOK"
+            exit 1
+          fi
+          # -o /dev/null: no imprimir la respuesta (trae el id del deploy, no hace falta)
+          code=$(curl -sS -o /dev/null -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK")
+          echo "Respuesta de Render: HTTP $code"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::error::Render no acepto el deploy (HTTP $code)"
+            exit 1
+          fi
+          echo "Deploy lanzado en Render."
