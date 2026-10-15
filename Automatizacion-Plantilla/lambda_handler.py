@@ -50,15 +50,10 @@ def handler(event, context):
             f"Evento invalido, falta 'tarea' (manana/manana_sso/mediodia/tarde/listar_buckets/correo): {event}"
         )
 
-    if tarea == "manana":
-        import tomar_capturas
-        import enviar_correo_matutino
-
-        _correr(tomar_capturas.main, "tomar_capturas")
-        _correr(enviar_correo_matutino.main, "enviar_correo_matutino")
-    elif tarea == "manana_sso":
+    if tarea in ("manana", "manana_sso"):
         # Consola nueva con la cuenta de Verisure (SSO + Authenticator): un solo
         # inicio de sesion para capturas + Excel del dia + correo a Mercedes.
+        # (El usuario de "capturas" de la consola vieja ya no se usa.)
         import correo_matutino_sso
 
         _correr(correo_matutino_sso.main, "correo_matutino_sso")
