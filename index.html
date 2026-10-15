@@ -4810,7 +4810,10 @@ function cfPintarHoy(){
   const el=document.getElementById('cfHoy');
   if(el) el.innerHTML=cfHoyHTML();
 }
-function cfJeNombre(t){ return (typeof JE_NAMES!=='undefined' && JE_NAMES[t.je]) || t.jeNombre || t.je || 'Sin jefe de equipo'; }
+function cfJeNombre(t){
+  if(['Administración','Management','Founder'].includes(t.colectivo)) return '🏢 '+t.colectivo;
+  return (typeof JE_NAMES!=='undefined' && JE_NAMES[t.je]) || t.jeNombre || t.je || 'Sin jefe de equipo';
+}
 function cfHoyGrupos(){
   const g={};
   CF.hoy.sinFichar.forEach(t=>{ const k=cfJeNombre(t); (g[k]=g[k]||{je:t.je,tecs:[]}).tecs.push(t); });
@@ -4825,7 +4828,7 @@ function cfHoyHTML(){
   const grupos=cfHoyGrupos().map((g,i)=>`
     <div class="cf-je">
       <div class="cf-je-cab">
-        <div><div class="cf-je-nom">👤 Avisar a ${cfEsc(g.nombre)}</div>
+        <div><div class="cf-je-nom">${g.nombre.indexOf('🏢')===0?cfEsc(g.nombre):'👤 Avisar a '+cfEsc(g.nombre)}</div>
           <div class="det">${g.tecs.length} técnico${g.tecs.length>1?'s':''} sin fichar</div></div>
         <button class="cf-btn" onclick="cfCopiarHoy(${i})">📋 Copiar</button>
       </div>
@@ -4994,7 +4997,11 @@ function cfRender(){
   const chip=(f,txt)=>`<button class="cf-chip ${!CF.motivo&&CF.filtro===f?'on':''}" onclick="cfFiltro('${f}')">${txt}</button>`;
   c.innerHTML=`
     <div id="cfHoy">${cfHoyHTML()}</div>
-    <div class="section-head">Registro de días anteriores</div>
+    <div class="cf-bar">
+      <button class="cf-btn prim" onclick="cfInformeHoy()" title="Carga los fichajes de hoy y descarga el informe del día por zonas">📥 Informe de hoy</button>
+      <button class="cf-btn" onclick="cfAcumulado()" title="Excel con todo lo registrado desde febrero, para filtrar por persona y mes">📚 Excel acumulado</button>
+    </div>
+    <div class="section-head">Registro de días</div>
     <div class="cf-bar">
       <div class="cf-dia">${d.fecha?cfEsc(d.dia)+' '+cfDDMM(d.fecha):'Todavía no hay días registrados'}</div>
       <button class="cf-btn" ${i<0||i>=d.fechas.length-1?'disabled':''} onclick="cfAbrir('${d.fechas[i+1]||''}')">←</button>
@@ -5145,6 +5152,34 @@ function cfDescargarDia(){
   const csv='﻿'+[cab].concat(filas).map(f=>f.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
   cfDescargar(new Blob([csv],{type:'text/csv;charset=utf-8'}),'fichajes_'+d.fecha+'.csv');
 }
+// Informe de hoy (para descargarlo al final de la tarde): carga los fichajes de hoy y genera el informe.
+// Si queda alguien sin justificar se abre el asistente "¿Qué pasó?". A la mañana siguiente se completa solo.
+async function cfInformeHoy(){
+  if(cfNumCambios()){ alert('Tienes cambios sin guardar. Pulsa "Guardar cambios" antes.'); return; }
+  const h=new Date(), hoy=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');
+  if(h.getDay()===0||h.getDay()===6){ alert('Hoy es fin de semana: no hay informe del día.'); return; }
+  cfCargando('Cargando los fichajes de hoy desde Odoo… (puede tardar unos segundos)');
+  try{
+    CF.datos=await cfLlamar('fch-cargar',{fecha:hoy});
+    CF.cambios={}; CF_EDITAR.clear();
+  }catch(e){ alert('No se pudo cargar el día de hoy: '+e.message); }
+  cfRender();
+  if(CF.datos&&CF.datos.fecha===hoy) await cfInformeDia();
+}
+// Excel con todo lo registrado (desde febrero): por persona, por persona y mes, y el registro día a día.
+async function cfAcumulado(){
+  const c=document.getElementById('controlFichajesContainer');
+  const aviso=document.createElement('div');
+  aviso.className='cf-vacio'; aviso.textContent='⏳ Preparando el Excel acumulado… (puede tardar hasta un minuto)';
+  c.prepend(aviso);
+  try{
+    const r=await cfLlamar('fch-acumulado');
+    const bytes=Uint8Array.from(atob(r.excel),ch=>ch.charCodeAt(0));
+    cfDescargar(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),r.nombre||'Fichajes_Acumulado.xlsx');
+  }catch(e){ alert('No se pudo generar el acumulado: '+e.message); }
+  finally{ aviso.remove(); }
+}
+
 // mes 'yyyy-MM' → Excel de ese mes (Registro, Resumen, Calendario, Diario; también queda guardado
 // en la carpeta de Drive "Control Fichajes - Excel mensual"); mes '' → todo el histórico
 async function cfDescargarExcel(mes){
