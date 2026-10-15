@@ -45,9 +45,9 @@ def _correr(fn, nombre):
 
 def handler(event, context):
     tarea = (event or {}).get("tarea")
-    if tarea not in ("manana", "mediodia", "tarde", "listar_buckets", "correo"):
+    if tarea not in ("manana", "manana_sso", "mediodia", "tarde", "listar_buckets", "correo"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (manana/mediodia/tarde/listar_buckets/correo): {event}"
+            f"Evento invalido, falta 'tarea' (manana/manana_sso/mediodia/tarde/listar_buckets/correo): {event}"
         )
 
     if tarea == "manana":
@@ -56,6 +56,12 @@ def handler(event, context):
 
         _correr(tomar_capturas.main, "tomar_capturas")
         _correr(enviar_correo_matutino.main, "enviar_correo_matutino")
+    elif tarea == "manana_sso":
+        # Consola nueva con la cuenta de Verisure (SSO + Authenticator): un solo
+        # inicio de sesion para capturas + Excel del dia + correo a Mercedes.
+        import correo_matutino_sso
+
+        _correr(correo_matutino_sso.main, "correo_matutino_sso")
     elif tarea == "correo":
         # Solo el correo (sin volver a tomar capturas) -- para probar la
         # exportacion por buckets sin esperar los ~2 min de capturas.

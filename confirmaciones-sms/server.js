@@ -414,8 +414,9 @@ function toWANumber(phone) {
 // trae la columna "Técnico" (p. ej. la exportación por buckets) — en ese caso
 // se usa el nombre del cuadrante por matrícula, y si tampoco está, la matrícula.
 function nombreTecnicoCita(a) {
-  if (a.tecnico) return a.tecnico;
   const mat = String(a.matricula || '').trim().toUpperCase();
+  // La consola nueva pone solo la matrícula en "Técnico" → se busca el nombre
+  if (a.tecnico && String(a.tecnico).trim().toUpperCase() !== mat) return a.tecnico;
   return TEC_NAMES[mat] ? `${TEC_NAMES[mat]} (${mat})` : mat;
 }
 
@@ -914,7 +915,7 @@ app.get('/mis-citas-equipo', (req, res) => {
 
   const delEquipo = appointments
     .filter(a => tecnicos.includes(String(a.matricula || '').trim().toUpperCase()))
-    .map(a => a.tecnico ? a : { ...a, tecnico: nombreTecnicoCita(a) });
+    .map(a => ({ ...a, tecnico: nombreTecnicoCita(a) }));
   res.json({ ok: true, citas: delEquipo, nombre: JE_NAMES[matricula] || matricula, totalTecnicos: tecnicos.length });
 });
 

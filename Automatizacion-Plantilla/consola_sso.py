@@ -1,0 +1,199 @@
+"""
+Consola de despacho NUEVA (securitasdirect.fs.ocs.oraclecloud.com) con la
+cuenta de Verisure de Gustavo (JE-BCN-GD5381), que entra por "Sign in with
+SSO" -> Microsoft -> aprobacion en Microsoft Authenticator.
+
+Recorrido confirmado en vivo con Gustavo el 2026-10-15:
+  1. Sign in with SSO -> Microsoft (correo, contraseña, Authenticator).
+  2. Se abre en "Mi ruta"; menu (☰) -> "Actividades" = Consola de despacho.
+  3. Panel izquierdo:
+     - Arriba, con estrella, los FAVORITOS (un equipo por JE + "AURUM" +
+       "Tenerife"). Para el correo de la mañana se hace clic en cada uno
+       (menos "AURUM") y se toma una captura, con la fecha de HOY.
+     - Abajo, los grupos/buckets. Los que tienen tecnicos son los de icono
+       de personas (res-type 2 o 3) cuyo nombre lleva "Aurum" (los de
+       Viatek y Smart NO se sacan). Bolsas / Pendiente de Agendar no tienen
+       tecnicos y se ignoran.
+  4. "Acciones -> Exportar" de un grupo solo pide a la consola esta
+     direccion, que devuelve un CSV:
+       /?m=gridexport&a=download&itype=manage&providerId=<pid>&date=<AAAA-MM-DD>
+         &panel=top&view=time&downloadId=<aleatorio>&dates=<AAAA-MM-DD>
+     Se pide directamente para cada grupo (los 78 grupos tardan ~11 s), en
+     vez de hacer clic grupo por grupo. Es la misma peticion que hace el
+     boton, con la misma sesion.
+  5. En el CSV la columna "Técnico" trae solo la matricula; se copia a una
+     columna "Matrícula", que es la que usa confirmaciones-sms para filtrar
+     por equipo.
+"""
+
+import csv
+import io
+import os
+import random
+import string
+from pathlib import Path
+
+from comun_ofs import (
+    es_pagina_microsoft,
+    iniciar_sesion_microsoft,
+    registrar_error,
+)
+
+URL_CONSOLA = "https://securitasdirect.fs.ocs.oraclecloud.com/"
+SELECTOR_GRUPOS = ".edt-root .edt-label[data-label-pid]"
+
+
+def leer_credenciales_sso():
+    """Correo y contraseña de Microsoft de la cuenta de Verisure."""
+    correo = os.environ.get("MS_EMAIL") or os.environ.get("ETADIRECT_USER")
+    clave = os.environ.get("MS_PASS") or os.environ.get("ETADIRECT_PASS")
+    if not correo or not clave:
+        raise RuntimeError("Faltan ETADIRECT_USER / ETADIRECT_PASS (correo y contraseña de Microsoft) en la Lambda")
+    return correo, clave
+
+
+def entrar_a_consola(page, correo, clave):
+    """Login por SSO y abre Actividades (Consola de despacho)."""
+    page.goto(URL_CONSOLA, wait_until="domcontentloaded")
+    page.wait_for_timeout(2000)
+
+    if not es_pagina_microsoft(page) and page.locator(SELECTOR_GRUPOS).count() == 0:
+        boton_sso = page.get_by_role("button", name="Sign in with SSO")
+        if boton_sso.count() == 0:
+            boton_sso = page.get_by_text("Sign in with SSO")
+        if boton_sso.count() > 0:
+            boton_sso.first.click()
+            page.wait_for_timeout(3000)
+
+    if es_pagina_microsoft(page):
+        iniciar_sesion_microsoft(page, correo, clave)
+
+    # Tras el login se abre "Mi ruta"; la consola esta en menu -> Actividades
+    page.wait_for_selector("button[aria-label='Menú'], " + SELECTOR_GRUPOS, timeout=90000)
+    if page.locator(SELECTOR_GRUPOS).count() == 0:
+        page.locator("button[aria-label='Menú']").first.click()
+        page.wait_for_timeout(1000)
+        page.get_by_role("link", name="Actividades", exact=True).first.click()
+    page.wait_for_selector(SELECTOR_GRUPOS, state="attached", timeout=90000)
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(2000)
+
+
+def grupos_aurum(page):
+    """[{pid, nombre}] de los grupos con tecnicos de Aurum (sin Viatek/Smart)."""
+    grupos = page.evaluate(
+        """sel => {
+            const vistos = new Set();
+            return [...document.querySelectorAll(sel)].map(b => {
+                const ic = b.parentElement.querySelector('.edt-icon');
+                const span = b.querySelector('span.rtl-text');
+                return { pid: b.dataset.labelPid, nombre: span ? span.innerText.trim() : '',
+                         tipo: ic ? ic.getAttribute('res-type') : '' };
+            }).filter(g => {
+                if (vistos.has(g.pid)) return false;
+                vistos.add(g.pid);
+                return (g.tipo === '2' || g.tipo === '3') && /aurum/i.test(g.nombre);
+            });
+        }""",
+        SELECTOR_GRUPOS,
+    )
+    if not grupos:
+        raise RuntimeError("No se encontro ningun grupo Aurum en el panel izquierdo")
+    return grupos
+
+
+def _id_descarga():
+    return "".join(random.choices(string.ascii_lowercase + string.digits, k=18))
+
+
+def descargar_csv_grupos(page, fecha_iso):
+    """Descarga el CSV de cada grupo Aurum para fecha_iso. Devuelve [(nombre, texto)]."""
+    resultados = []
+    for g in grupos_aurum(page):
+        url = (
+            f"{URL_CONSOLA}?m=gridexport&a=download&itype=manage&providerId={g['pid']}"
+            f"&date={fecha_iso}&panel=top&view=time&downloadId={_id_descarga()}&dates={fecha_iso}"
+        )
+        try:
+            resp = page.request.get(url, timeout=60000)
+            if not resp.ok:
+                registrar_error("consola_sso", f"{g['nombre']}: HTTP {resp.status}")
+                continue
+            texto = resp.body().decode("utf-8-sig", errors="replace")
+            resultados.append((g["nombre"], texto))
+        except Exception as e:
+            registrar_error("consola_sso", f"{g['nombre']}: {e}")
+    print(f"[consola] CSV descargados: {len(resultados)} grupos")
+    return resultados
+
+
+def unir_csv_en_xlsx(csvs, ruta_final):
+    """Une los CSV en un solo .xlsx (una cabecera) y añade la columna "Matrícula".
+
+    Devuelve el numero de filas de datos.
+    """
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    cabecera = None
+    i_tecnico = None
+    filas = 0
+    for nombre, texto in csvs:
+        lector = list(csv.reader(io.StringIO(texto)))
+        lector = [f for f in lector if any(c.strip() for c in f)]
+        if not lector:
+            continue
+        if cabecera is None:
+            cabecera = lector[0]
+            i_tecnico = cabecera.index("Técnico") if "Técnico" in cabecera else None
+            ws.append(cabecera + ["Matrícula"])
+        elif lector[0] != cabecera:
+            registrar_error("consola_sso", f"{nombre}: columnas distintas, se omite")
+            continue
+        for fila in lector[1:]:
+            fila = fila + [""] * (len(cabecera) - len(fila))
+            matricula = fila[i_tecnico].strip() if i_tecnico is not None else ""
+            ws.append(fila[: len(cabecera)] + [matricula])
+            filas += 1
+    if cabecera is None:
+        raise RuntimeError("Ningun CSV traia datos para armar el Excel")
+    wb.save(str(ruta_final))
+    return filas
+
+
+def favoritos_para_capturas(page):
+    """Nombres de los equipos favoritos (estrella), sin "AURUM"."""
+    nombres = page.evaluate(
+        """() => {
+            const out = [];
+            for (const b of document.querySelectorAll('.edt-favorites-root .edt-favorite-item .edt-group-name')) {
+                if (!b.getBoundingClientRect().width) continue;
+                const t = b.innerText.trim();
+                if (t && !out.includes(t)) out.push(t);
+            }
+            return out;
+        }"""
+    )
+    return [n for n in nombres if n.strip().upper() != "AURUM"]
+
+
+def capturar_favoritos(page, carpeta, prefijo):
+    """Clic en cada favorito (menos AURUM) y captura de pantalla. Devuelve las rutas."""
+    carpeta = Path(carpeta)
+    carpeta.mkdir(parents=True, exist_ok=True)
+    rutas = []
+    for numero, nombre in enumerate(favoritos_para_capturas(page), start=1):
+        boton = page.locator(".edt-favorites-root .edt-favorite-item .edt-group-name:visible").filter(has_text=nombre)
+        try:
+            boton.first.scroll_into_view_if_needed()
+            boton.first.click()
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(2500)
+            ruta = carpeta / f"{prefijo}_{numero}.png"
+            page.screenshot(path=str(ruta))
+            rutas.append(ruta)
+        except Exception as e:
+            registrar_error("consola_sso", f"no se pudo capturar '{nombre}': {e}")
+    print(f"[consola] capturas: {len(rutas)}")
+    return rutas
