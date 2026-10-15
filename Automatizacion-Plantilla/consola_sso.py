@@ -86,12 +86,18 @@ def entrar_a_consola(page, correo, clave):
     if es_pagina_microsoft(page):
         iniciar_sesion_microsoft(page, correo, clave)
 
-    # Tras el login se abre "Mi ruta"; la consola esta en menu -> Actividades
-    page.wait_for_selector("button[aria-label='Menú'], " + SELECTOR_GRUPOS, timeout=90000)
+    # Tras el login se abre "Mi ruta" (Lista de actividades); la consola esta en
+    # menu (☰) -> Actividades. Confirmado en vivo: hay DOS botones "Menú" y el
+    # primero esta escondido, y el enlace es a.global-navigation-item--activities
+    # (no depende del idioma).
+    enlace = "a.global-navigation-item--activities"
+    page.wait_for_selector("button[aria-label='Menú']:visible, button[aria-label='Menu']:visible, "
+                           + enlace + ":visible, " + SELECTOR_GRUPOS, timeout=90000)
     if page.locator(SELECTOR_GRUPOS).count() == 0:
-        page.locator("button[aria-label='Menú']").first.click()
-        page.wait_for_timeout(1000)
-        page.get_by_role("link", name="Actividades", exact=True).first.click()
+        if page.locator(enlace + ":visible").count() == 0:
+            page.locator("button[aria-label='Menú']:visible, button[aria-label='Menu']:visible").first.click()
+            page.wait_for_selector(enlace + ":visible", timeout=15000)
+        page.locator(enlace + ":visible").first.click()
     page.wait_for_selector(SELECTOR_GRUPOS, state="attached", timeout=90000)
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(2000)
