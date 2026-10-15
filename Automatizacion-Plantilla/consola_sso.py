@@ -50,13 +50,14 @@ def leer_credenciales_sso():
     """Correo y contraseña de Microsoft (cuenta de Verisure) para el SSO.
 
     En la pantalla de la consola NO se escribe ningun usuario: se pulsa
-    "Sign in with SSO" y se entra con estos datos en Microsoft. Las variables
-    ETADIRECT_USER/ETADIRECT_PASS de la consola vieja ya no se usan aqui.
+    "Sign in with SSO" y se entra con estos datos en Microsoft. El correo es
+    fijo (CORREO_SSO_DEFECTO, o MS_EMAIL si existe) -- ETADIRECT_USER NO se
+    usa. La contraseña de Microsoft se guarda en ETADIRECT_PASS (o MS_PASS).
     """
     correo = (os.environ.get("MS_EMAIL") or CORREO_SSO_DEFECTO).strip()
-    clave = (os.environ.get("MS_PASS") or "").strip()
+    clave = (os.environ.get("MS_PASS") or os.environ.get("ETADIRECT_PASS") or "").strip()
     if not clave:
-        raise RuntimeError("Falta MS_PASS (contraseña de Microsoft de la cuenta de Verisure) en las variables de la Lambda")
+        raise RuntimeError("Falta ETADIRECT_PASS (contraseña de Microsoft de la cuenta de Verisure) en las variables de la Lambda")
     return correo, clave
 
 

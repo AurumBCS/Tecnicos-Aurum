@@ -386,7 +386,7 @@ def iniciar_sesion_microsoft(page, correo, clave):
     page.click("#idSIButton9")
     page.wait_for_timeout(3000)
     if _visible(page, "#passwordError"):
-        raise RuntimeError("Microsoft rechazo la contraseña (revisa MS_PASS en la Lambda)")
+        raise RuntimeError("Microsoft rechazo la contraseña (revisa ETADIRECT_PASS en la Lambda)")
 
     # 3) Segundo paso: elegir "Aprobar una solicitud en Microsoft Authenticator"
     for _ in range(3):
