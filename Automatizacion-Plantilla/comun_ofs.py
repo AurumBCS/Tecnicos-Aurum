@@ -363,8 +363,8 @@ def iniciar_sesion_microsoft(page, correo, clave):
         page.wait_for_timeout(2500)
         if _visible(page, "#usernameError"):
             raise RuntimeError(
-                f"Microsoft no reconoce el usuario {correo_oculto} -- revisa que ETADIRECT_USER en la "
-                "Lambda sea exactamente gustavoa.perez@verisure.es (sin espacios)"
+                f"Microsoft no reconoce el usuario {correo_oculto} -- revisa MS_EMAIL en la Lambda "
+                "(si no existe se usa gustavoa.perez@verisure.es)"
             )
 
     # 2) Contraseña. Microsoft puede ofrecer primero la llave de acceso /
@@ -386,7 +386,7 @@ def iniciar_sesion_microsoft(page, correo, clave):
     page.click("#idSIButton9")
     page.wait_for_timeout(3000)
     if _visible(page, "#passwordError"):
-        raise RuntimeError("Microsoft rechazo la contraseña (revisa ETADIRECT_PASS en la Lambda)")
+        raise RuntimeError("Microsoft rechazo la contraseña (revisa MS_PASS en la Lambda)")
 
     # 3) Segundo paso: elegir "Aprobar una solicitud en Microsoft Authenticator"
     for _ in range(3):

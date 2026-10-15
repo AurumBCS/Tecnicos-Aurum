@@ -14,7 +14,8 @@ va directamente en la peticion de exportacion (no hace falta tocar las flechas).
 Credenciales: se leen SIEMPRE de variables de entorno (ver README.md).
 
 Variables de entorno:
-  ETADIRECT_USER / ETADIRECT_PASS   correo y contraseña de Microsoft (cuenta de Verisure)
+  MS_PASS       contraseña de Microsoft de la cuenta de Verisure (obligatoria)
+  MS_EMAIL      (opcional) correo de Microsoft, por defecto gustavoa.perez@verisure.es
   GMAIL_USER / GMAIL_APP_PASSWORD   para los avisos por correo
   AVISO_EMAIL   (opcional) destino de los avisos, por defecto gustavo.perez@aurumbcs.com
 

@@ -43,12 +43,20 @@ URL_CONSOLA = "https://securitasdirect.fs.ocs.oraclecloud.com/"
 SELECTOR_GRUPOS = ".edt-root .edt-label[data-label-pid]"
 
 
+CORREO_SSO_DEFECTO = "gustavoa.perez@verisure.es"
+
+
 def leer_credenciales_sso():
-    """Correo y contraseña de Microsoft de la cuenta de Verisure."""
-    correo = (os.environ.get("MS_EMAIL") or os.environ.get("ETADIRECT_USER") or "").strip()
-    clave = (os.environ.get("MS_PASS") or os.environ.get("ETADIRECT_PASS") or "").strip()
-    if not correo or not clave:
-        raise RuntimeError("Faltan ETADIRECT_USER / ETADIRECT_PASS (correo y contraseña de Microsoft) en la Lambda")
+    """Correo y contraseña de Microsoft (cuenta de Verisure) para el SSO.
+
+    En la pantalla de la consola NO se escribe ningun usuario: se pulsa
+    "Sign in with SSO" y se entra con estos datos en Microsoft. Las variables
+    ETADIRECT_USER/ETADIRECT_PASS de la consola vieja ya no se usan aqui.
+    """
+    correo = (os.environ.get("MS_EMAIL") or CORREO_SSO_DEFECTO).strip()
+    clave = (os.environ.get("MS_PASS") or "").strip()
+    if not clave:
+        raise RuntimeError("Falta MS_PASS (contraseña de Microsoft de la cuenta de Verisure) en las variables de la Lambda")
     return correo, clave
 
 
