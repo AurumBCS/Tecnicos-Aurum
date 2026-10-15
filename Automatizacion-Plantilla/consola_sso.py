@@ -45,8 +45,8 @@ SELECTOR_GRUPOS = ".edt-root .edt-label[data-label-pid]"
 
 def leer_credenciales_sso():
     """Correo y contraseña de Microsoft de la cuenta de Verisure."""
-    correo = os.environ.get("MS_EMAIL") or os.environ.get("ETADIRECT_USER")
-    clave = os.environ.get("MS_PASS") or os.environ.get("ETADIRECT_PASS")
+    correo = (os.environ.get("MS_EMAIL") or os.environ.get("ETADIRECT_USER") or "").strip()
+    clave = (os.environ.get("MS_PASS") or os.environ.get("ETADIRECT_PASS") or "").strip()
     if not correo or not clave:
         raise RuntimeError("Faltan ETADIRECT_USER / ETADIRECT_PASS (correo y contraseña de Microsoft) en la Lambda")
     return correo, clave

@@ -349,7 +349,11 @@ def iniciar_sesion_microsoft(page, correo, clave):
     aprobacion en Microsoft Authenticator. Lanza RuntimeError con un mensaje
     claro si algo no sale como se espera (el que llama manda la captura).
     """
-    correo_ms = os.environ.get("MS_EMAIL") or correo
+    correo_ms = (os.environ.get("MS_EMAIL") or correo).strip()
+    # Para diagnosticar sin exponer el dato completo en el log: "gus***@verisure.es"
+    usuario, _, dominio = correo_ms.partition("@")
+    correo_oculto = f"{usuario[:3]}***@{dominio}" if dominio else f"{correo_ms[:3]}*** (sin @, ¿no es un correo?)"
+    print(f"[microsoft] usuario: {correo_oculto} ({len(correo_ms)} caracteres)")
 
     # 1) Correo
     page.wait_for_selector("input[name=loginfmt], input[name=passwd], #idRichContext_DisplaySign", timeout=30000)
@@ -357,6 +361,11 @@ def iniciar_sesion_microsoft(page, correo, clave):
         page.fill("input[name=loginfmt]", correo_ms)
         page.click("#idSIButton9")
         page.wait_for_timeout(2500)
+        if _visible(page, "#usernameError"):
+            raise RuntimeError(
+                f"Microsoft no reconoce el usuario {correo_oculto} -- revisa que ETADIRECT_USER en la "
+                "Lambda sea exactamente gustavoa.perez@verisure.es (sin espacios)"
+            )
 
     # 2) Contraseña. Microsoft puede ofrecer primero la llave de acceso /
     #    huella: se elige "Usar mi contraseña" (a veces tras "Otras formas").
@@ -376,8 +385,8 @@ def iniciar_sesion_microsoft(page, correo, clave):
     page.fill("input[name=passwd]", clave)
     page.click("#idSIButton9")
     page.wait_for_timeout(3000)
-    if _visible(page, "#passwordError, #usernameError"):
-        raise RuntimeError("Microsoft rechazo el correo o la contraseña")
+    if _visible(page, "#passwordError"):
+        raise RuntimeError("Microsoft rechazo la contraseña (revisa ETADIRECT_PASS en la Lambda)")
 
     # 3) Segundo paso: elegir "Aprobar una solicitud en Microsoft Authenticator"
     for _ in range(3):
