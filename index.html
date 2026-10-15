@@ -336,6 +336,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .cf-just{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
 .cf-mot{font-size:.7rem;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--dim);color:var(--gold2);border:1px solid var(--border2)}
 .cf-src{font-size:.6rem;color:var(--muted)}
+.cf-quepasa{font-size:.74rem;font-weight:700;color:var(--text);margin-top:7px}
+.cf-quepasa b{color:var(--gold2)}
 .cf-link{margin-left:auto;background:none;border:none;color:var(--muted);font-family:var(--font);font-size:.62rem;cursor:pointer;text-decoration:underline;padding:2px}
 .cf-link:hover{color:var(--gold2)}
 .cf-rapido .tit{font-size:.62rem;font-weight:700;color:var(--orange);margin-bottom:5px}
@@ -4870,6 +4872,28 @@ const CF_OPCIONES={
 let CF_ASIS=null;
 const CF_EDITAR=new Set();   // filas ya justificadas que Anna ha abierto con "✏️ Cambiar"
 function cfEditar(fila){ CF_EDITAR.add(fila); cfRenderLista(); }
+// Explica en palabras el periodo de una ausencia a partir del texto de su comunicación
+// ("VACACIONES AÑO EN CURSO 13/10–16/10", "BAJA MEDICA … 01/09 (sin alta comunicada)"…).
+function cfQuePasa(motivo,obs){
+  const t=String(obs||''), m=t.match(/(\d{2})\/(\d{2})(?:\s*[–-]\s*(\d{2})\/(\d{2}))?/);
+  if(!m||!CF.datos||!CF.datos.fecha) return '';
+  const hoy=new Date(CF.datos.fecha+'T12:00:00'), dia=864e5;
+  const fecha=(d,mes,ref,alReves)=>{ let f=new Date(ref.getFullYear(),mes-1,d,12);
+    if(alReves&&f>ref) f=new Date(ref.getFullYear()-1,mes-1,d,12);
+    if(!alReves&&f<ref) f=new Date(ref.getFullYear()+1,mes-1,d,12); return f; };
+  const ddmm=f=>String(f.getDate()).padStart(2,'0')+'/'+String(f.getMonth()+1).padStart(2,'0');
+  const desde=fecha(+m[1],+m[2],hoy,true);
+  const hasta=m[3]?fecha(+m[3],+m[4],desde,false):null;
+  const dias=(a,b)=>Math.round((b-a)/dia)+1;
+  if(motivo==='Baja médica'){
+    const n=dias(desde,hoy);
+    return 'De baja desde el <b>'+ddmm(desde)+'</b> · lleva <b>'+n+' día'+(n===1?'':'s')+'</b>'+
+      (/sin alta/i.test(t)?' · sin alta comunicada':hasta?' · hasta el '+ddmm(hasta):'');
+  }
+  if(!hasta||+hasta===+desde) return 'Solo el <b>'+ddmm(desde)+'</b>';
+  const n=dias(desde,hasta);
+  return 'Del <b>'+ddmm(desde)+'</b> al <b>'+ddmm(hasta)+'</b> ('+n+' día'+(n===1?'':'s')+' naturales)';
+}
 function cfOrigen(r){
   if(r.revisadoPor) return 'Justificado por '+r.revisadoPor;
   if(/^LC:/.test(r.obs||'')) return 'Comunicado en las Líneas de Comunicación';
@@ -5041,7 +5065,7 @@ function cfRenderLista(){
       const ausente=r.estado==='Ausente';
       // en rojo solo si la ausencia no está justificada (pendiente o falta no justificada)
       const sinJustificar=['Pendiente','Ausencia no justificada'].includes(motivo);
-      const racha=ausente||r.racha?`<div class="cf-racha ${r.racha>=3&&sinJustificar?'alta':''}">${r.racha} ${r.racha===1?'día seguido':'días seguidos'}</div>`:'';
+      const racha=ausente&&sinJustificar?`<div class="cf-racha ${r.racha>=3?'alta':''}">${r.racha} ${r.racha===1?'día seguido sin fichar':'días seguidos sin fichar'}</div>`:'';
       const pendiente=ausente&&motivo==='Pendiente'&&!CF.cambios[r.fila]&&!CF_EDITAR.has(r.fila);
       const rapido=pendiente?`
         <div class="cf-rapido"><div class="tit">¿Qué pasó? Un clic y queda guardado:</div>
@@ -5055,6 +5079,7 @@ function cfRenderLista(){
         <div class="cf-just"><span class="cf-mot">${CF_OPCIONES[motivo]||cfEsc(motivo)}</span>
           <span class="cf-src">${cfEsc(cfOrigen(r))}</span>
           <button class="cf-link" onclick="cfEditar(${r.fila})">✏️ Cambiar</button></div>
+        ${cfQuePasa(motivo,obs)?`<div class="cf-quepasa">${cfQuePasa(motivo,obs)}</div>`:''}
         ${obs?`<div class="cf-obs">${cfEsc(String(obs).replace(/^(LC|Odoo): /,''))}</div>`:''}`:'';
       const editar=justificado?cerrado:pendiente?rapido:ausente?`
         <div class="cf-edit">
