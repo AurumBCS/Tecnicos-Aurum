@@ -335,7 +335,12 @@ def _clic_si_visible(page, *selectores):
         loc = page.locator(sel)
         try:
             if loc.count() > 0 and loc.first.is_visible():
-                loc.first.click()
+                try:
+                    loc.first.click(timeout=5000)
+                except Exception:
+                    # Algo lo tapa (p. ej. el pie de pagina de Microsoft):
+                    # se dispara el clic directamente sobre el elemento.
+                    loc.first.dispatch_event("click")
                 page.wait_for_timeout(1500)
                 return True
         except Exception:
@@ -360,14 +365,18 @@ def _escribir_como_persona(page, selector, texto):
     campo = page.locator(f"{selector}:visible").first
     campo.wait_for(state="visible", timeout=10000)
     page.wait_for_timeout(800)  # animacion de entrada de la pantalla
-    campo.click()
+    # focus() en vez de click(): en la Lambda el pie de pagina de Microsoft
+    # (#footerLinks) queda encima del campo e intercepta los clics (visto en vivo).
+    campo.focus()
     campo.fill("")
     campo.press_sequentially(texto, delay=40)
     page.wait_for_timeout(300)
     try:
-        return len(campo.input_value())
+        escritos = len(campo.input_value())
     except Exception:
-        return -1
+        escritos = -1
+    campo.press("Enter")  # enviar con Enter (el boton tambien puede quedar tapado)
+    return escritos
 
 
 def iniciar_sesion_microsoft(page, correo, clave):
@@ -481,7 +490,6 @@ def iniciar_sesion_microsoft(page, correo, clave):
             if correo_enviado > 3:
                 raise RuntimeError("Microsoft vuelve una y otra vez a pedir el correo (bucle) -- ver pantallas en el log")
             _escribir_como_persona(page, "input[name=loginfmt]", correo_ms)
-            _clic_si_visible(page, "#idSIButton9")
             continue
 
         # Contraseña
@@ -490,7 +498,6 @@ def iniciar_sesion_microsoft(page, correo, clave):
                 raise RuntimeError("Microsoft sigue pidiendo la contraseña")
             escrito = _escribir_como_persona(page, "input[name=passwd]", clave)
             print(f"[microsoft] contraseña escrita: {escrito} de {len(clave)} caracteres")
-            _clic_si_visible(page, "#idSIButton9")
             contrasena_enviada += 1
             continue
 
