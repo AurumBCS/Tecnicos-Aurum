@@ -281,11 +281,12 @@ MFA_REENVIOS = 1       # si no se aprueba a tiempo, se reintenta una vez
 
 
 def es_pagina_microsoft(page):
+    from urllib.parse import urlparse
     try:
-        url = page.url
+        dominio = (urlparse(page.url).hostname or "").lower()
     except Exception:
         return False
-    return any(h in url for h in ("login.microsoftonline.com", "login.microsoft.com", "login.live.com"))
+    return dominio.endswith("microsoftonline.com") or dominio.endswith("microsoft.com") or dominio.endswith("live.com")
 
 
 def enviar_aviso(asunto, cuerpo, captura=None, adjunto=None):
@@ -445,7 +446,11 @@ def iniciar_sesion_microsoft(page, correo, clave):
         # Terminado solo cuando ya estamos de vuelta en la consola de Oracle
         # (Microsoft puede pasar por otras direcciones suyas, p. ej. la de
         # "Let's keep your account secure" / mysignins).
-        if "oraclecloud.com" in page.url or "etadirect.com" in page.url:
+        # Ojo: mirar SOLO el dominio -- la direccion de Microsoft lleva la de
+        # Oracle dentro como parametro (RelayState=...oraclecloud.com...).
+        from urllib.parse import urlparse
+        dominio = (urlparse(page.url).hostname or "").lower()
+        if dominio.endswith("oraclecloud.com") or dominio.endswith("etadirect.com"):
             print("[microsoft] inicio de sesion completado")
             return
 
