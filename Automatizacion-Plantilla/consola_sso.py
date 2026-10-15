@@ -63,6 +63,15 @@ def leer_credenciales_sso():
 
 def entrar_a_consola(page, correo, clave):
     """Login por SSO y abre Actividades (Consola de despacho)."""
+    # El navegador del servidor no puede usar llave de acceso / huella, pero
+    # Microsoft la intenta igual si el navegador dice que la soporta, y al
+    # cancelarla vuelve a pedir el correo (bucle visto en vivo). Se le oculta
+    # la API de llaves de acceso (WebAuthn) para que ofrezca la contraseña,
+    # igual que haria cualquier navegador sin soporte.
+    page.context.add_init_script(
+        "try { delete window.PublicKeyCredential; } catch (e) {}"
+        "try { Object.defineProperty(navigator, 'credentials', { get: () => undefined }); } catch (e) {}"
+    )
     page.goto(URL_CONSOLA, wait_until="domcontentloaded")
     page.wait_for_timeout(2000)
 

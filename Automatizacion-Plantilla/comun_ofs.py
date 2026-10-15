@@ -377,6 +377,8 @@ def iniciar_sesion_microsoft(page, correo, clave):
     aviso_sin_numero = False
     reenvios = 0
     contrasena_enviada = 0
+    correo_enviado = 0
+    cancelaciones_fido = 0
 
     while time.time() < limite:
         page.wait_for_timeout(2000)
@@ -394,6 +396,9 @@ def iniciar_sesion_microsoft(page, correo, clave):
         if "/bridge/fido" in page.url:
             from urllib.parse import urlparse, parse_qs
             cancel = parse_qs(urlparse(page.url).query).get("cancelUrl", [""])[0]
+            cancelaciones_fido += 1
+            if cancelaciones_fido > 3:
+                raise RuntimeError("Microsoft insiste en la llave de acceso/huella y no ofrece la contraseña")
             print("[microsoft] llave de acceso/huella -- se cancela")
             if cancel:
                 page.goto(cancel, wait_until="domcontentloaded")
@@ -451,6 +456,9 @@ def iniciar_sesion_microsoft(page, correo, clave):
         # Correo
         campo_correo = page.locator("input[name=loginfmt]")
         if campo_correo.count() > 0 and campo_correo.first.is_visible() and campo_correo.first.is_editable():
+            correo_enviado += 1
+            if correo_enviado > 3:
+                raise RuntimeError("Microsoft vuelve una y otra vez a pedir el correo (bucle) -- ver pantallas en el log")
             page.fill("input[name=loginfmt]", correo_ms)
             _clic_si_visible(page, "#idSIButton9")
             continue
