@@ -178,7 +178,7 @@ async function cargarCitasDesdeSheet() {
     const raw  = await fetchCSV(CITAS_SHEET_URL + '?action=cargar');
     const data = JSON.parse(raw);
     if (data.ok && data.citas.length > 0) {
-      appointments = data.citas;
+      appointments = data.citas.map(normalizarCita);
       console.log(`  Citas restauradas desde Google Sheets: ${appointments.length}`);
     }
   } catch (e) {
@@ -200,7 +200,7 @@ function cargarSesion() {
     if (!fs.existsSync(SESSION_FILE)) return;
     const data = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'));
     if (data.appointments?.length > 0) {
-      appointments = data.appointments;
+      appointments = data.appointments.map(normalizarCita);
       currentJE    = data.currentJE || null;
       console.log(`  Sesión restaurada: ${appointments.length} citas cargadas.`);
     }
@@ -219,6 +219,9 @@ async function iniciarPersistencia() {
   if (appointments.length === 0) {
     cargarSesion(); // respaldo local si el Sheet no tenia nada o fallo la carga
   }
+  // Si alguna cita se completo al cargar (matricula sacada de "Técnico"),
+  // guardar ya la version corregida en la hoja.
+  if (appointments.some(a => a.matricula)) guardarSesion();
 }
 
 let appointments  = [];
@@ -420,9 +423,33 @@ function nombreTecnicoCita(a) {
   return TEC_NAMES[mat] ? `${TEC_NAMES[mat]} (${mat})` : mat;
 }
 
+// La columna "Técnico" viene de varias formas segun de donde salga el Excel:
+//   "E-MD-297373-Nombre"            (consola vieja)
+//   "💰E-V-362606-Nombre Apellidos"  (consola nueva, exportado a mano; con emoji)
+//   "297373"                        (consola nueva, exportacion automatica)
+// La matricula es el 3er bloque "LETRAS-LETRAS-<MATRICULA>-" o el valor entero
+// si es solo la matricula.
+const RE_TECNICO = /([A-Z]+)-([A-Z]+)-([A-Z]?\d{4,7})-\s*(.*)$/;
+
 function extractTechName(tecnico) {
-  const match = /^[A-Z]-[A-Z]+-\d+-(.+)$/.exec(String(tecnico || ''));
-  return match ? match[1].trim() : String(tecnico || '').trim();
+  const t = String(tecnico || '').trim();
+  const m = RE_TECNICO.exec(t);
+  return m ? m[4].trim() : t;
+}
+
+function matriculaDeTecnico(tecnico) {
+  const t = String(tecnico || '').trim();
+  const m = RE_TECNICO.exec(t);
+  if (m) return m[3].toUpperCase();
+  return /^[A-Z]?\d{4,7}$/i.test(t) ? t.toUpperCase() : '';
+}
+
+// Completa la matricula de una cita que no la trae (el Excel de la consola
+// nueva no tiene columna "Matrícula") y deja en "tecnico" solo el nombre.
+function normalizarCita(a) {
+  if (!a.matricula) a.matricula = matriculaDeTecnico(a.tecnico);
+  if (a.tecnico && RE_TECNICO.test(String(a.tecnico))) a.tecnico = extractTechName(a.tecnico);
+  return a;
 }
 
 function formatFecha(val) {
@@ -474,7 +501,7 @@ app.post('/upload', upload.single('excel'), (req, res) => {
       .filter(r => {
         if (!r['Nombre del Cliente']) return false;
         if (matriculasPermitidas) {
-          const mat = String(r['Matrícula'] || '').trim().toUpperCase();
+          const mat = String(r['Matrícula'] || matriculaDeTecnico(r['Técnico'])).trim().toUpperCase();
           return matriculasPermitidas.includes(mat);
         }
         return true;
@@ -486,7 +513,7 @@ app.post('/upload', upload.single('excel'), (req, res) => {
         return {
           id: i,
           tecnico: extractTechName(r['Técnico']),
-          matricula: String(r['Matrícula'] || ''),
+          matricula: String(r['Matrícula'] || matriculaDeTecnico(r['Técnico'])),
           cliente: String(r['Nombre del Cliente'] || '').trim(),
           telefono,
           numMantenimiento: String(r['Número de Mantenimiento'] || '').trim(),
