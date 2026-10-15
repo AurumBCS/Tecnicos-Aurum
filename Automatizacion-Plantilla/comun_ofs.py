@@ -442,7 +442,10 @@ def iniciar_sesion_microsoft(page, correo, clave):
 
     while time.time() < limite:
         page.wait_for_timeout(2000)
-        if not es_pagina_microsoft(page):
+        # Terminado solo cuando ya estamos de vuelta en la consola de Oracle
+        # (Microsoft puede pasar por otras direcciones suyas, p. ej. la de
+        # "Let's keep your account secure" / mysignins).
+        if "oraclecloud.com" in page.url or "etadirect.com" in page.url:
             print("[microsoft] inicio de sesion completado")
             return
 
@@ -477,6 +480,16 @@ def iniciar_sesion_microsoft(page, correo, clave):
                 raise RuntimeError(f"Microsoft rechazo la contraseña (revisa ETADIRECT_PASS en la Lambda): {error_txt}")
         if _visible(page, "#idDiv_SAASDS_Title"):
             raise RuntimeError("La solicitud de Authenticator fue rechazada")
+
+        # "Let's keep your account secure" (Microsoft propone registrar otro
+        # metodo de verificacion) -> "Not now" / "Ahora no" (confirmado en vivo)
+        if _clic_si_visible(
+            page,
+            "#btnAskLater", "a#btnAskLater",
+            "text=Not now", "text=Ahora no", "text=Skip setup", "text=Omitir la configuración",
+        ):
+            print("[microsoft] 'Let's keep your account secure' -> Not now")
+            continue
 
         # "¿Mantener la sesion iniciada?" -> Si
         if _visible(page, "#KmsiCheckboxField") or _visible(page, "#KmsiDescription"):
