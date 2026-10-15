@@ -364,12 +364,40 @@ def _texto_pantalla(page):
         return ""
 
 
+def _campo_real(page, nombre):
+    """Locator del input `nombre` que de verdad esta en pantalla, o None.
+
+    Microsoft deja en cada pantalla copias escondidas de los otros campos
+    (para los gestores de contraseñas): en la del correo hay un "passwd"
+    escondido y en la de la contraseña un "loginfmt" escondido
+    (.moveOffScreen, fuera de la pantalla). Playwright los da por
+    "visibles", y confundirlos hacia escribir la contraseña en la pantalla
+    del correo y viceversa (visto en vivo). Se exige que el campo este
+    dentro de la ventana y sea editable.
+    """
+    loc = page.locator(f"input[name={nombre}]:not(.moveOffScreen)")
+    for i in range(loc.count()):
+        campo = loc.nth(i)
+        try:
+            if not campo.is_visible() or not campo.is_editable():
+                continue
+            caja = campo.bounding_box()
+            ancho = (page.viewport_size or {}).get("width", 1920)
+            alto = (page.viewport_size or {}).get("height", 1080)
+            if caja and caja["width"] > 20 and caja["height"] > 10 \
+                    and 0 <= caja["x"] and caja["x"] + caja["width"] <= ancho \
+                    and 0 <= caja["y"] and caja["y"] + caja["height"] <= alto:
+                return campo
+        except Exception:
+            continue
+    return None
+
+
 def _escribir_como_persona(page, selector, texto):
-    """Escribe tecla a tecla en el campo VISIBLE (con .fill() la pagina de
+    """Escribe tecla a tecla en el campo (Locator de _campo_real) (con .fill() la pagina de
     Microsoft a veces no registraba la contraseña y la mandaba vacia: "Please
     enter your password", visto en vivo). Devuelve cuantos caracteres quedaron."""
-    campo = page.locator(f"{selector}:visible").first
-    campo.wait_for(state="visible", timeout=10000)
+    campo = selector  # un Locator ya elegido con _campo_real()
     page.wait_for_timeout(800)  # animacion de entrada de la pantalla
     # focus() en vez de click(): en la Lambda el pie de pagina de Microsoft
     # (#footerLinks) queda encima del campo e intercepta los clics (visto en vivo).
@@ -490,10 +518,11 @@ def iniciar_sesion_microsoft(page, correo, clave):
             continue
 
         # Contraseña
-        if _visible(page, "input[name=passwd]"):
+        campo_clave = _campo_real(page, "passwd")
+        if campo_clave is not None:
             if contrasena_enviada >= 3:
                 raise RuntimeError("Microsoft sigue pidiendo la contraseña")
-            escrito = _escribir_como_persona(page, "input[name=passwd]", clave)
+            escrito = _escribir_como_persona(page, campo_clave, clave)
             print(f"[microsoft] contraseña escrita: {escrito} de {len(clave)} caracteres")
             contrasena_enviada += 1
             continue
@@ -502,12 +531,13 @@ def iniciar_sesion_microsoft(page, correo, clave):
         # loginfmt escondido fuera de la pantalla (.moveOffScreen, para los
         # gestores de contraseñas) -- por eso la contraseña se mira ANTES y
         # aqui se excluye ese campo (escribir ahi mandaba la contraseña vacia).
-        campo_correo = page.locator("input[name=loginfmt]:not(.moveOffScreen)")
-        if campo_correo.count() > 0 and campo_correo.first.is_visible() and campo_correo.first.is_editable():
+        campo_correo = _campo_real(page, "loginfmt")
+        if campo_correo is not None:
             correo_enviado += 1
             if correo_enviado > 3:
                 raise RuntimeError("Microsoft vuelve una y otra vez a pedir el correo (bucle) -- ver pantallas en el log")
-            _escribir_como_persona(page, "input[name=loginfmt]:not(.moveOffScreen)", correo_ms)
+            _escribir_como_persona(page, campo_correo, correo_ms)
+            print("[microsoft] correo escrito")
             continue
 
         # Pantallas donde hay que elegir otra forma (llave de acceso por defecto,
