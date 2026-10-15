@@ -185,9 +185,17 @@ def _completar_formulario_login(page, usuario, clave):
     """
     page.wait_for_selector("#username", timeout=15000)
     page.fill("#username", usuario)
-    page.fill("#password", clave)
+    # Las cuentas de Verisure entran por el inicio de sesion de Microsoft
+    # (SSO): al escribir el usuario la consola puede no pedir contraseña y
+    # redirigir a login.microsoftonline.com. En ese caso se sigue alli.
+    if page.locator("#password:visible").count() > 0:
+        page.fill("#password", clave)
     page.click("#sign-in")
-    page.wait_for_timeout(1500)
+    page.wait_for_timeout(3000)
+    if es_pagina_microsoft(page):
+        iniciar_sesion_microsoft(page, usuario, clave)
+        page.wait_for_selector(".toaGantt-provTree", timeout=90000)
+        return
 
     # Caso observado en vivo (causante real de las fallas del 2026-08-24/25):
     # si la cuenta ya tiene demasiadas sesiones abiertas -- por ejemplo,
@@ -240,7 +248,193 @@ def _completar_formulario_login(page, usuario, clave):
 def iniciar_sesion(page, usuario, clave):
     """Navega al login desde cero y lo completa."""
     page.goto(URL_LOGIN, wait_until="networkidle")
+    if es_pagina_microsoft(page):
+        iniciar_sesion_microsoft(page, usuario, clave)
+        page.wait_for_selector(".toaGantt-provTree", timeout=90000)
+        return
     _completar_formulario_login(page, usuario, clave)
+
+
+# ── Inicio de sesion de Microsoft (cuenta de Verisure) ──────────────────────
+#
+# La cuenta de Verisure exige un segundo paso (MFA). De las opciones que
+# ofrece se usa "Aprobar una solicitud en la aplicacion Microsoft
+# Authenticator": Microsoft muestra un numero de 2 digitos, se lo enviamos
+# por correo a Gustavo (AVISO_EMAIL) y el lo escribe en Authenticator en el
+# movil. El script NUNCA aprueba nada por su cuenta -- cada inicio de sesion
+# lo aprueba una persona. La huella / llave de acceso del Mac no se usa
+# (no es posible ni deseable desde un servidor).
+#
+# Selectores de Microsoft (estables desde hace años en login.microsoftonline.com):
+#   input[name=loginfmt]  correo        input[name=passwd]  contraseña
+#   #idSIButton9          Siguiente / Iniciar sesion / "Si" (mantener sesion)
+#   [data-value=PhoneAppNotification]   opcion "Aprobar en Authenticator"
+#   #idRichContext_DisplaySign          numero a escribir en el movil
+AVISO_EMAIL = os.environ.get("AVISO_EMAIL", "gustavo.perez@aurumbcs.com")
+MFA_ESPERA_SEG = 150   # lo que Microsoft deja abierta la solicitud (aprox.)
+MFA_REENVIOS = 1       # si no se aprueba a tiempo, se reintenta una vez
+
+
+def es_pagina_microsoft(page):
+    try:
+        return "login.microsoftonline.com" in page.url or "login.live.com" in page.url
+    except Exception:
+        return False
+
+
+def enviar_aviso(asunto, cuerpo, captura=None):
+    """Correo corto a AVISO_EMAIL (numero de aprobacion, errores, resultado)."""
+    gmail_user = os.environ.get("GMAIL_USER")
+    gmail_pass = os.environ.get("GMAIL_APP_PASSWORD")
+    if not gmail_user or not gmail_pass:
+        print(f"[aviso] sin GMAIL_USER/GMAIL_APP_PASSWORD -- no se envia: {asunto}")
+        return
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.image import MIMEImage
+
+    msg = MIMEMultipart()
+    msg["From"] = gmail_user
+    msg["To"] = AVISO_EMAIL
+    msg["Subject"] = asunto
+    msg.attach(MIMEText(cuerpo, "plain"))
+    if captura:
+        try:
+            msg.attach(MIMEImage(captura, name="pantalla.png"))
+        except Exception:
+            pass
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+            server.starttls()
+            server.login(gmail_user, gmail_pass)
+            server.sendmail(gmail_user, [AVISO_EMAIL], msg.as_string())
+        print(f"[aviso] correo enviado a {AVISO_EMAIL}: {asunto}")
+    except Exception as e:
+        print(f"[aviso] no se pudo enviar el correo '{asunto}': {e}")
+
+
+def _visible(page, selector):
+    try:
+        return page.locator(selector).first.is_visible()
+    except Exception:
+        return False
+
+
+def _clic_si_visible(page, *selectores):
+    for sel in selectores:
+        loc = page.locator(sel)
+        try:
+            if loc.count() > 0 and loc.first.is_visible():
+                loc.first.click()
+                page.wait_for_timeout(1500)
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def iniciar_sesion_microsoft(page, correo, clave):
+    """
+    Completa el inicio de sesion de Microsoft con correo + contraseña y
+    aprobacion en Microsoft Authenticator. Lanza RuntimeError con un mensaje
+    claro si algo no sale como se espera (el que llama manda la captura).
+    """
+    correo_ms = os.environ.get("MS_EMAIL") or correo
+
+    # 1) Correo
+    page.wait_for_selector("input[name=loginfmt], input[name=passwd], #idRichContext_DisplaySign", timeout=30000)
+    if _visible(page, "input[name=loginfmt]"):
+        page.fill("input[name=loginfmt]", correo_ms)
+        page.click("#idSIButton9")
+        page.wait_for_timeout(2500)
+
+    # 2) Contraseña. Microsoft puede ofrecer primero la llave de acceso /
+    #    huella: se elige "Usar mi contraseña" (a veces tras "Otras formas").
+    for _ in range(3):
+        if _visible(page, "input[name=passwd]"):
+            break
+        _clic_si_visible(
+            page,
+            "#idA_PWD_SwitchToPassword",
+            "text=Usar mi contraseña", "text=Use your password",
+            "text=Otras formas de iniciar sesión", "text=Other ways to sign in",
+            "text=Iniciar sesión de otra manera", "text=Sign in another way",
+        )
+        page.wait_for_timeout(1500)
+    if not _visible(page, "input[name=passwd]"):
+        raise RuntimeError("Microsoft no mostro el campo de contraseña")
+    page.fill("input[name=passwd]", clave)
+    page.click("#idSIButton9")
+    page.wait_for_timeout(3000)
+    if _visible(page, "#passwordError, #usernameError"):
+        raise RuntimeError("Microsoft rechazo el correo o la contraseña")
+
+    # 3) Segundo paso: elegir "Aprobar una solicitud en Microsoft Authenticator"
+    for _ in range(3):
+        if _visible(page, "#idRichContext_DisplaySign"):
+            break
+        if _clic_si_visible(
+            page,
+            "[data-value=PhoneAppNotification]",
+            "text=Aprobar una solicitud en la aplicación Microsoft Authenticator",
+            "text=Approve a request on my Microsoft Authenticator app",
+        ):
+            continue
+        _clic_si_visible(
+            page,
+            "#signInAnotherWay",
+            "text=Iniciar sesión de otra manera", "text=Sign in another way",
+            "text=Otras formas de iniciar sesión",
+        )
+        page.wait_for_timeout(1500)
+
+    # 4) Numero → correo → esperar a que Gustavo apruebe en el movil
+    for intento in range(1 + MFA_REENVIOS):
+        numero = ""
+        try:
+            page.wait_for_selector("#idRichContext_DisplaySign", timeout=15000)
+            numero = page.locator("#idRichContext_DisplaySign").inner_text().strip()
+        except Exception:
+            pass  # algunas cuentas aprueban sin numero
+        hora = datetime.now().strftime("%H:%M")
+        if numero:
+            enviar_aviso(
+                f"Aprueba en Authenticator: {numero}",
+                f"La descarga de la ruta ({hora}) esta esperando tu aprobacion.\n\n"
+                f"Abre la notificacion de Microsoft Authenticator en el movil y escribe: {numero}\n\n"
+                f"Tienes unos 2 minutos.",
+            )
+        else:
+            enviar_aviso(
+                "Aprueba el inicio de sesion en Authenticator",
+                f"La descarga de la ruta ({hora}) esta esperando tu aprobacion en Microsoft Authenticator.",
+            )
+
+        limite = time.time() + MFA_ESPERA_SEG
+        while time.time() < limite:
+            if not es_pagina_microsoft(page):
+                return  # ya volvio a la consola de OFS
+            # "¿Quiere mantener la sesion iniciada?" -> Si
+            if _visible(page, "#KmsiCheckboxField") or _visible(page, "text=mantener la sesión iniciada") \
+                    or _visible(page, "text=Stay signed in"):
+                _clic_si_visible(page, "#idSIButton9")
+                continue
+            if _visible(page, "#idDiv_SAASDS_Title") or _visible(page, "text=Solicitud denegada"):
+                raise RuntimeError("La solicitud de Authenticator fue rechazada")
+            if _visible(page, "#idA_SAASTO_Resend") or _visible(page, "#idDiv_SAASTO_Title"):
+                break  # caduco sin respuesta
+            page.wait_for_timeout(2000)
+        else:
+            if not es_pagina_microsoft(page):
+                return
+
+        if intento < MFA_REENVIOS:
+            print("[diagnostico] la aprobacion caduco -- se pide otra")
+            if not _clic_si_visible(page, "#idA_SAASTO_Resend", "text=Enviar otra solicitud",
+                                    "text=Send another request"):
+                break
+    raise RuntimeError("No se aprobo el inicio de sesion en Microsoft Authenticator a tiempo")
 
 
 def abrir_sesion_ofs(context, page, usuario, clave, archivo_sesion):
