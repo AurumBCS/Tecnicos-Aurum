@@ -93,12 +93,13 @@ def entrar_a_consola(page, correo, clave):
     enlace = "a.global-navigation-item--activities"
     page.wait_for_selector("button[aria-label='Menú']:visible, button[aria-label='Menu']:visible, "
                            + enlace + ":visible, " + SELECTOR_GRUPOS, timeout=90000)
-    if page.locator(SELECTOR_GRUPOS).count() == 0:
+    # (los grupos pueden estar cargados pero ocultos en "Mi ruta": mirar los visibles)
+    if page.locator(SELECTOR_GRUPOS + ":visible").count() == 0:
         if page.locator(enlace + ":visible").count() == 0:
             page.locator("button[aria-label='Menú']:visible, button[aria-label='Menu']:visible").first.click()
             page.wait_for_selector(enlace + ":visible", timeout=15000)
         page.locator(enlace + ":visible").first.click()
-    page.wait_for_selector(SELECTOR_GRUPOS, state="attached", timeout=90000)
+    page.wait_for_selector(SELECTOR_GRUPOS + ":visible", timeout=90000)
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(2000)
 
