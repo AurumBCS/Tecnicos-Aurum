@@ -483,15 +483,6 @@ def iniciar_sesion_microsoft(page, correo, clave):
         ):
             continue
 
-        # Correo
-        campo_correo = page.locator("input[name=loginfmt]")
-        if campo_correo.count() > 0 and campo_correo.first.is_visible() and campo_correo.first.is_editable():
-            correo_enviado += 1
-            if correo_enviado > 3:
-                raise RuntimeError("Microsoft vuelve una y otra vez a pedir el correo (bucle) -- ver pantallas en el log")
-            _escribir_como_persona(page, "input[name=loginfmt]", correo_ms)
-            continue
-
         # Contraseña
         if _visible(page, "input[name=passwd]"):
             if contrasena_enviada >= 3:
@@ -499,6 +490,18 @@ def iniciar_sesion_microsoft(page, correo, clave):
             escrito = _escribir_como_persona(page, "input[name=passwd]", clave)
             print(f"[microsoft] contraseña escrita: {escrito} de {len(clave)} caracteres")
             contrasena_enviada += 1
+            continue
+
+        # Correo. Ojo: la pantalla de CONTRASEÑA tambien trae un campo
+        # loginfmt escondido fuera de la pantalla (.moveOffScreen, para los
+        # gestores de contraseñas) -- por eso la contraseña se mira ANTES y
+        # aqui se excluye ese campo (escribir ahi mandaba la contraseña vacia).
+        campo_correo = page.locator("input[name=loginfmt]:not(.moveOffScreen)")
+        if campo_correo.count() > 0 and campo_correo.first.is_visible() and campo_correo.first.is_editable():
+            correo_enviado += 1
+            if correo_enviado > 3:
+                raise RuntimeError("Microsoft vuelve una y otra vez a pedir el correo (bucle) -- ver pantallas en el log")
+            _escribir_como_persona(page, "input[name=loginfmt]:not(.moveOffScreen)", correo_ms)
             continue
 
         # Pantallas donde hay que elegir otra forma (llave de acceso por defecto,
