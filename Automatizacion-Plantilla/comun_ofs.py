@@ -353,6 +353,23 @@ def _texto_pantalla(page):
         return ""
 
 
+def _escribir_como_persona(page, selector, texto):
+    """Escribe tecla a tecla en el campo VISIBLE (con .fill() la pagina de
+    Microsoft a veces no registraba la contraseña y la mandaba vacia: "Please
+    enter your password", visto en vivo). Devuelve cuantos caracteres quedaron."""
+    campo = page.locator(f"{selector}:visible").first
+    campo.wait_for(state="visible", timeout=10000)
+    page.wait_for_timeout(800)  # animacion de entrada de la pantalla
+    campo.click()
+    campo.fill("")
+    campo.press_sequentially(texto, delay=40)
+    page.wait_for_timeout(300)
+    try:
+        return len(campo.input_value())
+    except Exception:
+        return -1
+
+
 def iniciar_sesion_microsoft(page, correo, clave):
     """
     Completa el inicio de sesion de Microsoft con correo + contraseña y
@@ -410,7 +427,11 @@ def iniciar_sesion_microsoft(page, correo, clave):
         if _visible(page, "#usernameError"):
             raise RuntimeError(f"Microsoft no reconoce el usuario {correo_oculto}")
         if _visible(page, "#passwordError"):
-            raise RuntimeError("Microsoft rechazo la contraseña (revisa ETADIRECT_PASS en la Lambda)")
+            error_txt = page.locator("#passwordError").first.inner_text().strip()
+            # "Please enter your password" = el campo llego vacio (la pagina no
+            # registro lo escrito) -> se reintenta abajo; otro texto = contraseña mala
+            if "enter your password" not in error_txt.lower() and "escriba su contraseña" not in error_txt.lower():
+                raise RuntimeError(f"Microsoft rechazo la contraseña (revisa ETADIRECT_PASS en la Lambda): {error_txt}")
         if _visible(page, "#idDiv_SAASDS_Title"):
             raise RuntimeError("La solicitud de Authenticator fue rechazada")
 
@@ -459,7 +480,7 @@ def iniciar_sesion_microsoft(page, correo, clave):
             correo_enviado += 1
             if correo_enviado > 3:
                 raise RuntimeError("Microsoft vuelve una y otra vez a pedir el correo (bucle) -- ver pantallas en el log")
-            page.fill("input[name=loginfmt]", correo_ms)
+            _escribir_como_persona(page, "input[name=loginfmt]", correo_ms)
             _clic_si_visible(page, "#idSIButton9")
             continue
 
@@ -467,7 +488,8 @@ def iniciar_sesion_microsoft(page, correo, clave):
         if _visible(page, "input[name=passwd]"):
             if contrasena_enviada >= 3:
                 raise RuntimeError("Microsoft sigue pidiendo la contraseña")
-            page.fill("input[name=passwd]", clave)
+            escrito = _escribir_como_persona(page, "input[name=passwd]", clave)
+            print(f"[microsoft] contraseña escrita: {escrito} de {len(clave)} caracteres")
             _clic_si_visible(page, "#idSIButton9")
             contrasena_enviada += 1
             continue
