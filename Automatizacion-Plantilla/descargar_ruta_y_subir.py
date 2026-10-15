@@ -221,7 +221,8 @@ def main():
     enviar_aviso(
         f"✅ Ruta del {fecha_objetivo.strftime('%d/%m/%Y')} subida",
         f"La ruta del {fecha_objetivo.strftime('%d/%m/%Y')} se descargo (modo {modo}) y se subio "
-        f"a confirmaciones-sms.\n{resumen}",
+        f"a confirmaciones-sms.\n{resumen}\n\nAdjunto el Excel descargado.",
+        adjunto=ruta_excel,
     )
 
 

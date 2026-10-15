@@ -282,8 +282,9 @@ def es_pagina_microsoft(page):
         return False
 
 
-def enviar_aviso(asunto, cuerpo, captura=None):
-    """Correo corto a AVISO_EMAIL (numero de aprobacion, errores, resultado)."""
+def enviar_aviso(asunto, cuerpo, captura=None, adjunto=None):
+    """Correo corto a AVISO_EMAIL (numero de aprobacion, errores, resultado).
+    captura: bytes PNG; adjunto: Path de un archivo (ej. el Excel de la ruta)."""
     gmail_user = os.environ.get("GMAIL_USER")
     gmail_pass = os.environ.get("GMAIL_APP_PASSWORD")
     if not gmail_user or not gmail_pass:
@@ -293,6 +294,7 @@ def enviar_aviso(asunto, cuerpo, captura=None):
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
     from email.mime.image import MIMEImage
+    from email.mime.application import MIMEApplication
 
     msg = MIMEMultipart()
     msg["From"] = gmail_user
@@ -304,6 +306,13 @@ def enviar_aviso(asunto, cuerpo, captura=None):
             msg.attach(MIMEImage(captura, name="pantalla.png"))
         except Exception:
             pass
+    if adjunto:
+        try:
+            parte = MIMEApplication(adjunto.read_bytes(), name=adjunto.name)
+            parte["Content-Disposition"] = f'attachment; filename="{adjunto.name}"'
+            msg.attach(parte)
+        except Exception as e:
+            print(f"[aviso] no se pudo adjuntar {adjunto}: {e}")
     try:
         with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
             server.starttls()
