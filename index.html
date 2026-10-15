@@ -4834,16 +4834,21 @@ function cfHoyHTML(){
           <div class="det">${g.tecs.length} técnico${g.tecs.length>1?'s':''} sin fichar</div></div>
         <button class="cf-btn" onclick="cfCopiarHoy(${i})">📋 Copiar</button>
       </div>
-      ${g.tecs.map(t=>`<div class="cf-hoy-fila">
+      ${g.tecs.map(t=>{ const k=cfClaveHoy(t); return `<div class="cf-hoy-fila">
         <div><div class="nom">${cfEsc(t.nombre)}</div>
           <div class="det">${cfEsc(t.matricula)}${t.provincia?' · '+cfEsc(t.provincia):''} · entrada ${cfEsc(t.inicio)}</div></div>
         <div style="text-align:right">${t.formacion?'<span class="cf-tag" style="background:rgba(201,168,76,.15);color:var(--gold2)">Formación</span><br>':''}${t.canarias?'<span class="cf-tag">Canarias −1h</span><br>':''}
-          <span class="cf-retraso">${t.retraso} min</span></div></div>`).join('')}
+          <span class="cf-retraso">${t.retraso} min</span><br>
+          <button class="cf-link" style="margin:2px 0 0" onclick="cfAbrirMarca('${cfEsc(k)}')">✍️ Marcar motivo</button></div></div>
+        ${CF_MARCA_ABIERTA===k?`<div class="cf-rapido" style="margin:0 0 8px">
+          <div class="tit">¿Qué le pasa a ${cfEsc(t.nombre.split(' ')[0])} hoy? Queda marcado hasta que llegue su línea de comunicación:</div>
+          <div class="bts">${cfOpciones().map(m=>`<button class="cf-rb" onclick="cfMarcarHoy(this,'${cfEsc(k)}','${m}')">${CF_OPCIONES[m]||cfEsc(m)}</button>`).join('')}</div>
+        </div>`:''}`; }).join('')}
     </div>`).join('');
   const trasAviso=h.fichadoTrasAviso&&h.fichadoTrasAviso.length?`<details><summary>✅ ${h.fichadoTrasAviso.length} ya han fichado después de salir en la lista</summary>
       ${h.fichadoTrasAviso.map(t=>`<div style="margin-top:4px">${cfEsc(t.nombre)} · en lista desde ${cfEsc(t.aviso)} · fichó ${cfEsc(t.entrada)}</div>`).join('')}</details>`:'';
   const just=h.justificados.length?`<details><summary>${h.justificados.length} sin fichar pero justificados (vacaciones, baja, festivo…)</summary>
-      ${h.justificados.map(t=>`<div style="margin-top:4px">${cfEsc(t.nombre)} · <b>${cfEsc(t.motivo)}</b></div>`).join('')}</details>`:'';
+      ${h.justificados.map(t=>`<div style="margin-top:4px">${cfEsc(t.nombre)} · <b>${cfEsc(t.motivo)}</b>${t.marcado?' · <span style="color:var(--orange)">marcado a mano, falta su línea de comunicación</span>':''}</div>`).join('')}</details>`:'';
   return `<div class="cf-hoy">
     <div style="display:flex;align-items:center;gap:6px">
       <h3>🚨 Hoy · ${h.sinFichar.length} sin fichar</h3>
@@ -4854,6 +4859,22 @@ function cfHoyHTML(){
     ${trasAviso}${just}
   </div>`;
 }
+// Marcar desde "Hoy" qué le pasa a quien no ha fichado (mientras llega su línea de comunicación)
+let CF_MARCA_ABIERTA='';
+function cfClaveHoy(t){ return t.matricula||('N:'+t.nombre); }
+function cfAbrirMarca(k){ CF_MARCA_ABIERTA=CF_MARCA_ABIERTA===k?'':k; cfPintarHoy(); }
+async function cfMarcarHoy(btn,k,motivo){
+  const t=CF.hoy.sinFichar.find(x=>cfClaveHoy(x)===k);
+  if(!t) return;
+  btn.parentElement.querySelectorAll('button').forEach(b=>b.disabled=true);
+  btn.textContent='Guardando…';
+  try{
+    const r=await cfLlamar('fch-marcar',{fecha:CF.hoy.fecha,matricula:t.matricula,nombre:t.nombre,motivo,obs:''});
+    CF.hoy=r; CF_MARCA_ABIERTA='';
+  }catch(e){ alert('No se pudo marcar: '+e.message); }
+  cfPintarHoy();
+}
+
 function cfCopiarHoy(i){
   const h=CF.hoy, g=cfHoyGrupos()[i];
   const txt='Hola '+g.nombre.split(' ')[0]+', estos técnicos de tu equipo todavía no han fichado hoy en Odoo:\n'+
@@ -4993,15 +5014,12 @@ function cfAsisSaltar(){
   cfPintarAsistente();
 }
 
+// En la lista solo salen los que no fichó y no tienen justificación. Para corregir a alguien concreto
+// se le busca por nombre o matrícula (entonces sale aunque ya esté justificado).
 function cfVisible(r){
   const q=CF.busca.trim().toLowerCase();
-  if(q && !(r.nombre.toLowerCase().includes(q)||r.matricula.toLowerCase().includes(q))) return false;
-  const motivo=(CF.cambios[r.fila]||r).motivo;
-  if(CF.motivo) return (motivo||r.estado)===CF.motivo;
-  if(CF.filtro==='nofichan') return r.estado==='Ausente';
-  if(CF.filtro==='pendientes') return r.estado==='Ausente' && ['Pendiente','Ausencia no justificada'].includes(motivo);
-  if(CF.filtro==='operativos') return r.estado==='Operativo'||r.estado==='Formación';
-  return true;
+  if(q) return r.nombre.toLowerCase().includes(q)||r.matricula.toLowerCase().includes(q);
+  return r.estado==='Ausente' && ((CF.cambios[r.fila]||r).motivo==='Pendiente' || !!CF.cambios[r.fila] || CF_EDITAR.has(r.fila));
 }
 
 function cfRender(){
@@ -5012,7 +5030,7 @@ function cfRender(){
   const i=d.fechas.indexOf(d.fecha);
   const opciones=d.fechas.map(f=>`<option value="${f}" ${f===d.fecha?'selected':''}>${cfDDMM(f)}</option>`).join('');
   const kpis=CF_TARJETAS.filter(t=>d.conteo[t[0]]||['Operativo','Pendiente'].includes(t[0]))
-    .map(([k,txt,color])=>`<div class="cf-kpi ${CF.motivo===k?'on':''}" style="--c:${color}" onclick="cfFiltrarMotivo('${k}')">
+    .map(([k,txt,color])=>`<div class="cf-kpi" style="--c:${color};cursor:default">
         <div class="n">${d.conteo[k]||0}</div><div class="t">${cfEsc(txt)}</div></div>`).join('');
   const nombresMes=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   const meses=Array.from(new Set(d.fechas.map(f=>f.slice(0,7))))
@@ -5043,10 +5061,7 @@ function cfRender(){
     </div>
     ${cfPendientes().length?`<button class="cf-pendbtn" onclick="cfAsistente(false)">❓ Justificar ${cfPendientes().length} técnico${cfPendientes().length>1?'s':''} sin fichar y sin comunicar</button>`:''}
     <div class="cf-kpis">${kpis}</div>
-    <div class="cf-chips">
-      ${chip('nofichan','No ficharon')}${chip('pendientes','Sin justificar')}${chip('operativos','Operativos')}${chip('todos','Todos')}
-    </div>
-    <input type="search" class="cf-input" style="width:100%;margin-bottom:10px" placeholder="Buscar técnico o matrícula…" value="${cfEsc(CF.busca)}" oninput="CF.busca=this.value;cfRenderLista()">
+    <input type="search" class="cf-input" style="width:100%;margin-bottom:10px" placeholder="🔎 Buscar a un técnico para ver o corregir su motivo…" value="${cfEsc(CF.busca)}" oninput="CF.busca=this.value;cfRenderLista()">
     <div id="cfLista"></div>`;
   cfRenderLista();
 }
@@ -5058,7 +5073,8 @@ function cfRenderLista(){
   const orden=r=>['Pendiente','Ausencia no justificada'].includes((CF.cambios[r.fila]||r).motivo)&&!r.revisadoPor?0:1;
   const filas=d.filas.filter(cfVisible).sort((a,b)=>orden(a)-orden(b)||b.racha-a.racha||a.nombre.localeCompare(b.nombre));
   if(!filas.length){
-    cont.innerHTML=`<div class="cf-vacio">${d.filas.length?'Nadie en este filtro ✅':'No hay datos para este día.'}</div>`;
+    // sin nadie por justificar no se muestra nada; solo se avisa si se buscó a alguien que no aparece
+    cont.innerHTML=CF.busca.trim()?`<div class="cf-vacio">Nadie con ese nombre o matrícula este día.</div>`:'';
   } else {
     cont.innerHTML=filas.map(r=>{
       const ch=CF.cambios[r.fila]||{}, motivo=ch.motivo??r.motivo, obs=ch.obs??r.obs;
