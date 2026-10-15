@@ -265,6 +265,12 @@ def iniciar_sesion(page, usuario, clave):
 # lo aprueba una persona. La huella / llave de acceso del Mac no se usa
 # (no es posible ni deseable desde un servidor).
 #
+# Recorrido confirmado en vivo con Gustavo (2026-10-15): correo -> "Elegir una
+# forma de inicio de sesion" ([data-test-cred-id='1'] = Usar mi contraseña) ->
+# contraseña (#i0118; en esa pantalla hay ademas un loginfmt .moveOffScreen
+# escondido) -> "Compruebe su identidad" ([data-value=PhoneAppNotification]) ->
+# numero en #idRichContext_DisplaySign -> consola (sin "¿Mantener la sesion?").
+#
 # Selectores de Microsoft (estables desde hace años en login.microsoftonline.com):
 #   input[name=loginfmt]  correo        input[name=passwd]  contraseña
 #   #idSIButton9          Siguiente / Iniciar sesion / "Si" (mantener sesion)
@@ -508,6 +514,9 @@ def iniciar_sesion_microsoft(page, correo, clave):
         # codigo de 6 digitos, etc.) -> "Usar mi contraseña" / "Otra manera"
         if _clic_si_visible(
             page,
+            # "Elegir una forma de inicio de sesion": 1 = Usar mi contraseña,
+            # 7 = llave de acceso/huella (confirmado en vivo 2026-10-15)
+            "[data-test-cred-id='1']",
             "#idA_PWD_SwitchToPassword",
             "text=Use your password", "text=Usar mi contraseña",
             "#signInAnotherWay",
