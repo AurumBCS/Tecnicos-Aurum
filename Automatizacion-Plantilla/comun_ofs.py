@@ -271,15 +271,15 @@ def iniciar_sesion(page, usuario, clave):
 #   [data-value=PhoneAppNotification]   opcion "Aprobar en Authenticator"
 #   #idRichContext_DisplaySign          numero a escribir en el movil
 AVISO_EMAIL = os.environ.get("AVISO_EMAIL", "gustavo.perez@aurumbcs.com")
-MFA_ESPERA_SEG = 150   # lo que Microsoft deja abierta la solicitud (aprox.)
 MFA_REENVIOS = 1       # si no se aprueba a tiempo, se reintenta una vez
 
 
 def es_pagina_microsoft(page):
     try:
-        return "login.microsoftonline.com" in page.url or "login.live.com" in page.url
+        url = page.url
     except Exception:
         return False
+    return any(h in url for h in ("login.microsoftonline.com", "login.microsoft.com", "login.live.com"))
 
 
 def enviar_aviso(asunto, cuerpo, captura=None, adjunto=None):
@@ -343,11 +343,27 @@ def _clic_si_visible(page, *selectores):
     return False
 
 
+MS_TIEMPO_TOTAL_SEG = 6 * 60  # todo el inicio de sesion, incluida la espera de aprobacion
+
+
+def _texto_pantalla(page):
+    try:
+        return " ".join(page.locator("body").inner_text().split())[:160]
+    except Exception:
+        return ""
+
+
 def iniciar_sesion_microsoft(page, correo, clave):
     """
     Completa el inicio de sesion de Microsoft con correo + contraseña y
     aprobacion en Microsoft Authenticator. Lanza RuntimeError con un mensaje
     claro si algo no sale como se espera (el que llama manda la captura).
+
+    Funciona como un bucle "mira la pantalla y haz lo que toque", porque
+    Microsoft cambia el orden de las pantallas segun la cuenta y el dispositivo
+    (visto en vivo: a veces salta directo a la llave de acceso/huella, y al
+    cancelarla vuelve a pedir el correo). Cada pantalla nueva se anota en el
+    log para poder diagnosticar.
     """
     correo_ms = (os.environ.get("MS_EMAIL") or correo).strip()
     # Para diagnosticar sin exponer el dato completo en el log: "gus***@verisure.es"
@@ -355,119 +371,124 @@ def iniciar_sesion_microsoft(page, correo, clave):
     correo_oculto = f"{usuario[:3]}***@{dominio}" if dominio else f"{correo_ms[:3]}*** (sin @, ¿no es un correo?)"
     print(f"[microsoft] usuario: {correo_oculto} ({len(correo_ms)} caracteres)")
 
-    # 1) Correo
-    page.wait_for_selector("input[name=loginfmt], input[name=passwd], #idRichContext_DisplaySign", timeout=30000)
-    if _visible(page, "input[name=loginfmt]"):
-        page.fill("input[name=loginfmt]", correo_ms)
-        page.click("#idSIButton9")
-        page.wait_for_timeout(2500)
-        if _visible(page, "#usernameError"):
-            raise RuntimeError(
-                f"Microsoft no reconoce el usuario {correo_oculto} -- revisa MS_EMAIL en la Lambda "
-                "(si no existe se usa gustavoa.perez@verisure.es)"
-            )
+    limite = time.time() + MS_TIEMPO_TOTAL_SEG
+    ultima_pantalla = None
+    numero_avisado = None
+    aviso_sin_numero = False
+    reenvios = 0
+    contrasena_enviada = 0
 
-    # 2) Contraseña. Microsoft puede ofrecer primero la llave de acceso /
-    #    huella: se elige "Usar mi contraseña" (a veces tras "Otras formas").
-    for _ in range(5):
-        if _visible(page, "input[name=passwd]"):
-            break
-        # Microsoft puede saltar directo a la llave de acceso / huella
-        # ("Face, fingerprint, PIN or security key", /bridge/fido). En un
-        # navegador sin pantalla eso nunca se completa: se cancela con la
-        # cancelUrl que trae la propia direccion, que vuelve a la eleccion de
-        # metodo ("Usar mi contraseña").
+    while time.time() < limite:
+        page.wait_for_timeout(2000)
+        if not es_pagina_microsoft(page):
+            print("[microsoft] inicio de sesion completado")
+            return
+
+        pantalla = _texto_pantalla(page)
+        if pantalla != ultima_pantalla:
+            host = page.url.split("/")[2] if "//" in page.url else page.url
+            print(f"[microsoft] pantalla ({host}): {pantalla!r}")
+            ultima_pantalla = pantalla
+
+        # Llave de acceso / huella: no es posible en un servidor -> cancelar
         if "/bridge/fido" in page.url:
             from urllib.parse import urlparse, parse_qs
             cancel = parse_qs(urlparse(page.url).query).get("cancelUrl", [""])[0]
-            print("[microsoft] salto a llave de acceso/huella -- se cancela para usar contraseña")
+            print("[microsoft] llave de acceso/huella -- se cancela")
             if cancel:
                 page.goto(cancel, wait_until="domcontentloaded")
             else:
                 page.go_back()
-            page.wait_for_timeout(3000)
             continue
-        _clic_si_visible(
-            page,
-            "#idA_PWD_SwitchToPassword",
-            "text=Usar mi contraseña", "text=Use your password",
-            "text=Otras formas de iniciar sesión", "text=Other ways to sign in",
-            "text=Iniciar sesión de otra manera", "text=Sign in another way",
-        )
-        page.wait_for_timeout(1500)
-    if not _visible(page, "input[name=passwd]"):
-        raise RuntimeError("Microsoft no mostro el campo de contraseña")
-    page.fill("input[name=passwd]", clave)
-    page.click("#idSIButton9")
-    page.wait_for_timeout(3000)
-    if _visible(page, "#passwordError"):
-        raise RuntimeError("Microsoft rechazo la contraseña (revisa ETADIRECT_PASS en la Lambda)")
 
-    # 3) Segundo paso: elegir "Aprobar una solicitud en Microsoft Authenticator"
-    for _ in range(3):
+        # Errores claros
+        if _visible(page, "#usernameError"):
+            raise RuntimeError(f"Microsoft no reconoce el usuario {correo_oculto}")
+        if _visible(page, "#passwordError"):
+            raise RuntimeError("Microsoft rechazo la contraseña (revisa ETADIRECT_PASS en la Lambda)")
+        if _visible(page, "#idDiv_SAASDS_Title"):
+            raise RuntimeError("La solicitud de Authenticator fue rechazada")
+
+        # "¿Mantener la sesion iniciada?" -> Si
+        if _visible(page, "#KmsiCheckboxField") or _visible(page, "#KmsiDescription"):
+            _clic_si_visible(page, "#idSIButton9")
+            continue
+
+        # Numero de aprobacion en pantalla -> avisar por correo (una vez por numero)
         if _visible(page, "#idRichContext_DisplaySign"):
-            break
+            numero = page.locator("#idRichContext_DisplaySign").first.inner_text().strip()
+            if numero and numero != numero_avisado:
+                numero_avisado = numero
+                enviar_aviso(
+                    f"Aprueba en Authenticator: {numero}",
+                    f"La descarga de la ruta ({datetime.now().strftime('%H:%M')}) esta esperando tu aprobacion.\n\n"
+                    f"Abre la notificacion de Microsoft Authenticator en el movil y escribe: {numero}\n\n"
+                    "Tienes unos 2 minutos.",
+                )
+            continue
+
+        # La solicitud caduco sin respuesta -> pedir otra (una vez)
+        if _visible(page, "#idA_SAASTO_Resend") or _visible(page, "#idDiv_SAASTO_Title"):
+            if reenvios >= MFA_REENVIOS:
+                raise RuntimeError("No se aprobo el inicio de sesion en Microsoft Authenticator a tiempo")
+            reenvios += 1
+            numero_avisado = None
+            print("[microsoft] la aprobacion caduco -- se pide otra")
+            if not _clic_si_visible(page, "#idA_SAASTO_Resend", "text=Send another request",
+                                    "text=Enviar otra solicitud"):
+                raise RuntimeError("La aprobacion caduco y no aparecio el boton para pedir otra")
+            continue
+
+        # Lista de metodos: elegir "Aprobar en Microsoft Authenticator"
         if _clic_si_visible(
             page,
             "[data-value=PhoneAppNotification]",
-            "text=Aprobar una solicitud en la aplicación Microsoft Authenticator",
             "text=Approve a request on my Microsoft Authenticator app",
+            "text=Aprobar una solicitud en la aplicación Microsoft Authenticator",
         ):
             continue
-        _clic_si_visible(
-            page,
-            "#signInAnotherWay",
-            "text=Iniciar sesión de otra manera", "text=Sign in another way",
-            "text=Otras formas de iniciar sesión",
-        )
-        page.wait_for_timeout(1500)
 
-    # 4) Numero → correo → esperar a que Gustavo apruebe en el movil
-    for intento in range(1 + MFA_REENVIOS):
-        numero = ""
-        try:
-            page.wait_for_selector("#idRichContext_DisplaySign", timeout=15000)
-            numero = page.locator("#idRichContext_DisplaySign").inner_text().strip()
-        except Exception:
-            pass  # algunas cuentas aprueban sin numero
-        hora = datetime.now().strftime("%H:%M")
-        if numero:
-            enviar_aviso(
-                f"Aprueba en Authenticator: {numero}",
-                f"La descarga de la ruta ({hora}) esta esperando tu aprobacion.\n\n"
-                f"Abre la notificacion de Microsoft Authenticator en el movil y escribe: {numero}\n\n"
-                f"Tienes unos 2 minutos.",
-            )
-        else:
+        # Correo
+        campo_correo = page.locator("input[name=loginfmt]")
+        if campo_correo.count() > 0 and campo_correo.first.is_visible() and campo_correo.first.is_editable():
+            page.fill("input[name=loginfmt]", correo_ms)
+            _clic_si_visible(page, "#idSIButton9")
+            continue
+
+        # Contraseña
+        if _visible(page, "input[name=passwd]"):
+            if contrasena_enviada >= 3:
+                raise RuntimeError("Microsoft sigue pidiendo la contraseña")
+            page.fill("input[name=passwd]", clave)
+            _clic_si_visible(page, "#idSIButton9")
+            contrasena_enviada += 1
+            continue
+
+        # Pantallas donde hay que elegir otra forma (llave de acceso por defecto,
+        # codigo de 6 digitos, etc.) -> "Usar mi contraseña" / "Otra manera"
+        if _clic_si_visible(
+            page,
+            "#idA_PWD_SwitchToPassword",
+            "text=Use your password", "text=Usar mi contraseña",
+            "#signInAnotherWay",
+            "text=Sign in another way", "text=Iniciar sesión de otra manera",
+            "text=Other ways to sign in", "text=Otras formas de iniciar sesión",
+            "text=I can't use my Microsoft Authenticator app right now",
+        ):
+            continue
+
+        # Aprobacion pendiente sin numero visible -> avisar una vez
+        if contrasena_enviada and not aviso_sin_numero and numero_avisado is None \
+                and ("Authenticator" in pantalla or "approve" in pantalla.lower() or "aprob" in pantalla.lower()):
+            aviso_sin_numero = True
             enviar_aviso(
                 "Aprueba el inicio de sesion en Authenticator",
-                f"La descarga de la ruta ({hora}) esta esperando tu aprobacion en Microsoft Authenticator.",
+                "La descarga de la ruta esta esperando tu aprobacion en Microsoft Authenticator.\n\n"
+                f"Pantalla actual: {pantalla}",
+                page.screenshot(),
             )
 
-        limite = time.time() + MFA_ESPERA_SEG
-        while time.time() < limite:
-            if not es_pagina_microsoft(page):
-                return  # ya volvio a la consola de OFS
-            # "¿Quiere mantener la sesion iniciada?" -> Si
-            if _visible(page, "#KmsiCheckboxField") or _visible(page, "text=mantener la sesión iniciada") \
-                    or _visible(page, "text=Stay signed in"):
-                _clic_si_visible(page, "#idSIButton9")
-                continue
-            if _visible(page, "#idDiv_SAASDS_Title") or _visible(page, "text=Solicitud denegada"):
-                raise RuntimeError("La solicitud de Authenticator fue rechazada")
-            if _visible(page, "#idA_SAASTO_Resend") or _visible(page, "#idDiv_SAASTO_Title"):
-                break  # caduco sin respuesta
-            page.wait_for_timeout(2000)
-        else:
-            if not es_pagina_microsoft(page):
-                return
-
-        if intento < MFA_REENVIOS:
-            print("[diagnostico] la aprobacion caduco -- se pide otra")
-            if not _clic_si_visible(page, "#idA_SAASTO_Resend", "text=Enviar otra solicitud",
-                                    "text=Send another request"):
-                break
-    raise RuntimeError("No se aprobo el inicio de sesion en Microsoft Authenticator a tiempo")
+    raise RuntimeError(f"El inicio de sesion de Microsoft no termino a tiempo. Ultima pantalla: {ultima_pantalla!r}")
 
 
 def abrir_sesion_ofs(context, page, usuario, clave, archivo_sesion):
