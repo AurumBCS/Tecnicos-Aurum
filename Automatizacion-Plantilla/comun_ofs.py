@@ -398,10 +398,10 @@ def iniciar_sesion_microsoft(page, correo, clave):
     log para poder diagnosticar.
     """
     correo_ms = (os.environ.get("MS_EMAIL") or correo).strip()
-    # Para diagnosticar sin exponer el dato completo en el log: "gus***@verisure.es"
-    usuario, _, dominio = correo_ms.partition("@")
-    correo_oculto = f"{usuario[:3]}***@{dominio}" if dominio else f"{correo_ms[:3]}*** (sin @, ¿no es un correo?)"
-    print(f"[microsoft] usuario: {correo_oculto} ({len(correo_ms)} caracteres)")
+    # El correo se muestra completo en el log (a peticion de Gustavo); la
+    # contraseña nunca se muestra.
+    correo_oculto = correo_ms
+    print(f"[microsoft] usuario: {correo_ms} ({len(correo_ms)} caracteres)")
 
     limite = time.time() + MS_TIEMPO_TOTAL_SEG
     ultima_pantalla = None
