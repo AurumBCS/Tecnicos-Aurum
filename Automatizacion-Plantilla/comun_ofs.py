@@ -369,9 +369,24 @@ def iniciar_sesion_microsoft(page, correo, clave):
 
     # 2) Contraseña. Microsoft puede ofrecer primero la llave de acceso /
     #    huella: se elige "Usar mi contraseña" (a veces tras "Otras formas").
-    for _ in range(3):
+    for _ in range(5):
         if _visible(page, "input[name=passwd]"):
             break
+        # Microsoft puede saltar directo a la llave de acceso / huella
+        # ("Face, fingerprint, PIN or security key", /bridge/fido). En un
+        # navegador sin pantalla eso nunca se completa: se cancela con la
+        # cancelUrl que trae la propia direccion, que vuelve a la eleccion de
+        # metodo ("Usar mi contraseña").
+        if "/bridge/fido" in page.url:
+            from urllib.parse import urlparse, parse_qs
+            cancel = parse_qs(urlparse(page.url).query).get("cancelUrl", [""])[0]
+            print("[microsoft] salto a llave de acceso/huella -- se cancela para usar contraseña")
+            if cancel:
+                page.goto(cancel, wait_until="domcontentloaded")
+            else:
+                page.go_back()
+            page.wait_for_timeout(3000)
+            continue
         _clic_si_visible(
             page,
             "#idA_PWD_SwitchToPassword",
