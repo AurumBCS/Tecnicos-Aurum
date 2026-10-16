@@ -90,14 +90,42 @@ def entrar_a_consola(page, correo, clave):
     # (no depende del idioma).
     enlace = "a.global-navigation-item--activities"
     page.wait_for_selector("button[aria-label='Menú']:visible, button[aria-label='Menu']:visible, "
-                           + enlace + ":visible, " + SELECTOR_GRUPOS, timeout=90000)
-    # (los grupos pueden estar cargados pero ocultos en "Mi ruta": mirar los visibles)
-    if page.locator(SELECTOR_GRUPOS + ":visible").count() == 0:
+                           + enlace + ":visible, " + SELECTOR_GRUPOS + ":visible", timeout=90000)
+    # Dejar que "Mi ruta" termine de cargar: un clic demasiado pronto se ignora
+    # (visto en vivo 2026-10-16: se quedo en "Lista de actividades").
+    try:
+        page.wait_for_load_state("networkidle", timeout=30000)
+    except Exception:
+        pass
+    page.wait_for_timeout(3000)
+
+    for intento in range(1, 4):
+        # (los grupos pueden estar cargados pero ocultos en "Mi ruta": mirar los visibles)
+        if page.locator(SELECTOR_GRUPOS + ":visible").count() > 0:
+            break
+        print(f"[consola] abriendo Actividades (intento {intento})")
         if page.locator(enlace + ":visible").count() == 0:
-            page.locator("button[aria-label='Menú']:visible, button[aria-label='Menu']:visible").first.click()
-            page.wait_for_selector(enlace + ":visible", timeout=15000)
-        page.locator(enlace + ":visible").first.click()
-    page.wait_for_selector(SELECTOR_GRUPOS + ":visible", timeout=90000)
+            boton_menu = page.locator("button[aria-label='Menú']:visible, button[aria-label='Menu']:visible").first
+            try:
+                boton_menu.click(timeout=5000)
+            except Exception:
+                boton_menu.dispatch_event("click")
+            page.wait_for_timeout(1500)
+        # Clic directo sobre el elemento (como se probo en vivo con exito)
+        page.evaluate(
+            """sel => {
+                const a = [...document.querySelectorAll(sel)].find(e => e.getBoundingClientRect().width > 0)
+                          || document.querySelector(sel);
+                if (a) a.click();
+            }""",
+            enlace,
+        )
+        try:
+            page.wait_for_selector(SELECTOR_GRUPOS + ":visible", timeout=25000)
+            break
+        except Exception:
+            print(f"[consola] Actividades no se abrio todavia (titulo: {page.title()!r})")
+    page.wait_for_selector(SELECTOR_GRUPOS + ":visible", timeout=30000)
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(2000)
 
