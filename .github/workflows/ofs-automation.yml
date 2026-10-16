@@ -1,6 +1,6 @@
 name: Automatizacion OFS
 
-# Las 3 tareas (capturas+correo matutino, ruta mediodia, ruta tarde) corren
+# Las 2 tareas (ruta del dia siguiente a las 14:00 y a las 17:30) corren
 # exclusivamente en AWS Lambda + EventBridge Scheduler -- ver
 # Automatizacion-Plantilla/README.md. Este workflow ya no tiene triggers
 # `schedule:` (se retiraron una vez confirmado que Lambda es estable, para
@@ -18,10 +18,9 @@ on:
         required: true
         type: choice
         options:
-          - manana
           - mediodia
           - tarde
-        default: manana
+        default: tarde
 
 jobs:
   correr:
@@ -30,10 +29,7 @@ jobs:
       run:
         working-directory: Automatizacion-Plantilla
     env:
-      ETADIRECT_USER: ${{ secrets.ETADIRECT_USER }}
-      ETADIRECT_PASS: ${{ secrets.ETADIRECT_PASS }}
-      ETADIRECT_USER_CAPTURAS: ${{ secrets.ETADIRECT_USER_CAPTURAS }}
-      ETADIRECT_PASS_CAPTURAS: ${{ secrets.ETADIRECT_PASS_CAPTURAS }}
+      ETADIRECT_PASS: ${{ secrets.ETADIRECT_PASS }}  # contraseña de Microsoft (cuenta de Verisure)
       GMAIL_USER: ${{ secrets.GMAIL_USER }}
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
     steps:
@@ -48,12 +44,6 @@ jobs:
           pip install -r requirements.txt
           playwright install --with-deps chromium
 
-      - name: Manana — capturas + correo a Mercedes
-        if: inputs.tarea == 'manana'
-        run: |
-          python tomar_capturas.py
-          python enviar_correo_matutino.py
-
       - name: Mediodia/Tarde — descargar ruta y subir a confirmaciones
         if: inputs.tarea == 'mediodia' || inputs.tarea == 'tarde'
         run: python descargar_ruta_y_subir.py
@@ -64,7 +54,6 @@ jobs:
         with:
           name: resultado-${{ github.run_number }}
           path: |
-            Automatizacion-Plantilla/capturas/
             Automatizacion-Plantilla/descargas/
             Automatizacion-Plantilla/automatizacion.log
           retention-days: 7

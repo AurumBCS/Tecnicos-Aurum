@@ -7,9 +7,8 @@ Recorrido confirmado en vivo con Gustavo el 2026-10-15:
   1. Sign in with SSO -> Microsoft (correo, contraseña, Authenticator).
   2. Se abre en "Mi ruta"; menu (☰) -> "Actividades" = Consola de despacho.
   3. Panel izquierdo:
-     - Arriba, con estrella, los FAVORITOS (un equipo por JE + "AURUM" +
-       "Tenerife"). Para el correo de la mañana se hace clic en cada uno
-       (menos "AURUM") y se toma una captura, con la fecha de HOY.
+     - Arriba, con estrella, los FAVORITOS (un equipo por JE). No se usan
+       (el correo de la mañana con capturas se retiro el 2026-10-16).
      - Abajo, los grupos/buckets. Los que tienen tecnicos son los de icono
        de personas (res-type 2 o 3) cuyo nombre lleva "Aurum" (los de
        Viatek y Smart NO se sacan). Bolsas / Pendiente de Agendar no tienen
@@ -31,7 +30,6 @@ import io
 import os
 import random
 import string
-from pathlib import Path
 
 from comun_ofs import (
     es_pagina_microsoft,
@@ -185,40 +183,3 @@ def unir_csv_en_xlsx(csvs, ruta_final):
         raise RuntimeError("Ningun CSV traia datos para armar el Excel")
     wb.save(str(ruta_final))
     return filas
-
-
-def favoritos_para_capturas(page):
-    """Nombres de los equipos favoritos (estrella), sin "AURUM"."""
-    nombres = page.evaluate(
-        """() => {
-            const out = [];
-            for (const b of document.querySelectorAll('.edt-favorites-root .edt-favorite-item .edt-group-name')) {
-                if (!b.getBoundingClientRect().width) continue;
-                const t = b.innerText.trim();
-                if (t && !out.includes(t)) out.push(t);
-            }
-            return out;
-        }"""
-    )
-    return [n for n in nombres if n.strip().upper() != "AURUM"]
-
-
-def capturar_favoritos(page, carpeta, prefijo):
-    """Clic en cada favorito (menos AURUM) y captura de pantalla. Devuelve las rutas."""
-    carpeta = Path(carpeta)
-    carpeta.mkdir(parents=True, exist_ok=True)
-    rutas = []
-    for numero, nombre in enumerate(favoritos_para_capturas(page), start=1):
-        boton = page.locator(".edt-favorites-root .edt-favorite-item .edt-group-name:visible").filter(has_text=nombre)
-        try:
-            boton.first.scroll_into_view_if_needed()
-            boton.first.click()
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(2500)
-            ruta = carpeta / f"{prefijo}_{numero}.png"
-            page.screenshot(path=str(ruta))
-            rutas.append(ruta)
-        except Exception as e:
-            registrar_error("consola_sso", f"no se pudo capturar '{nombre}': {e}")
-    print(f"[consola] capturas: {len(rutas)}")
-    return rutas

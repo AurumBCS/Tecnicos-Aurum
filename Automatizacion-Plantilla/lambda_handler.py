@@ -5,22 +5,14 @@ correr, replicando el mismo dispatch que ya tenia
 .github/workflows/ofs-automation.yml segun github.event.schedule.
 
 Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
-  {"tarea": "manana"}    -> equivalente al cron de las 6:03am
-  {"tarea": "mediodia"}  -> equivalente al cron de la 1:58pm
-  {"tarea": "tarde"}     -> equivalente al cron de las 5:53pm
-
-"manana" corre tomar_capturas.main() y enviar_correo_matutino.main() EN EL
-MISMO proceso/invocacion (no en dos Lambdas separadas): enviar_correo_matutino
-necesita leer de disco las capturas que dejo tomar_capturas, y /tmp solo esta
-garantizado compartido dentro de una misma invocacion -- si Lambda arranca un
-contenedor nuevo (cold start) para una segunda invocacion, /tmp puede llegar
-vacio. Juntarlas aqui evita depender de que el mismo contenedor se reutilice.
+  {"tarea": "mediodia"}  -> 14:00, ruta del dia siguiente
+  {"tarea": "tarde"}     -> 17:30, ruta del dia siguiente
+(El correo de la mañana con capturas a Mercedes se retiro el 2026-10-16.)
 
 IMPORTANTE sobre reintentos (configurar en la consola, ver README): EventBridge
 Scheduler invoca Lambda de forma asincrona, y por defecto Lambda reintenta
-automaticamente una invocacion asincrona que falla. Un reintento de "manana"
-volveria a enviar el correo a Mercedes, y uno de "mediodia"/"tarde" volveria a
-subir el Excel a confirmaciones-sms -- ninguna de las dos cosas es idempotente.
+automaticamente una invocacion asincrona que falla. Un reintento de
+"mediodia"/"tarde" volveria a pedir aprobacion en Authenticator y a subir el Excel.
 Por eso cada "schedule" en EventBridge Scheduler debe tener su target con
 "Retry policy" -> "Maximum retry attempts" = 0.
 """
@@ -45,30 +37,19 @@ def _correr(fn, nombre):
 
 def handler(event, context):
     tarea = (event or {}).get("tarea")
-    if tarea not in ("manana", "manana_sso", "mediodia", "tarde", "listar_buckets", "correo"):
+    if tarea not in ("mediodia", "tarde", "listar_buckets"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (manana/manana_sso/mediodia/tarde/listar_buckets/correo): {event}"
+            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets): {event}"
         )
 
-    if tarea in ("manana", "manana_sso"):
-        # Consola nueva con la cuenta de Verisure (SSO + Authenticator): un solo
-        # inicio de sesion para capturas + Excel del dia + correo a Mercedes.
-        # (El usuario de "capturas" de la consola vieja ya no se usa.)
-        import correo_matutino_sso
-
-        _correr(correo_matutino_sso.main, "correo_matutino_sso")
-    elif tarea == "correo":
-        # Solo el correo (sin volver a tomar capturas) -- para probar la
-        # exportacion por buckets sin esperar los ~2 min de capturas.
-        import enviar_correo_matutino
-
-        _correr(enviar_correo_matutino.main, "enviar_correo_matutino")
-    elif tarea == "listar_buckets":
+    if tarea == "listar_buckets":
         # Diagnostico de una sola vez -- ver listar_buckets.py.
         import listar_buckets
 
         _correr(listar_buckets.main, "listar_buckets")
     else:
+        # "mediodia" (14:00) y "tarde" (17:30) hacen lo mismo: descargar la ruta
+        # del dia siguiente y subirla a confirmaciones-sms.
         import descargar_ruta_y_subir
 
         _correr(descargar_ruta_y_subir.main, "descargar_ruta_y_subir")
