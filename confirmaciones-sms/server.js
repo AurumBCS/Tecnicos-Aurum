@@ -165,12 +165,18 @@ function postAppsScript(url, bodyObj) {
   });
 }
 
-async function guardarCitasEnSheet() {
-  try {
-    await postAppsScript(CITAS_SHEET_URL, { action: 'guardarTodo', citas: appointments });
-  } catch (e) {
-    console.error('[Sheet] Error al guardar citas:', e.message);
-  }
+// Los guardados se encadenan (uno detrás de otro) y cada uno manda la foto de
+// las citas EN ESE MOMENTO. Antes eran "dispara y olvida" en paralelo: si dos
+// salían casi a la vez (p. ej. al arrancar: guardar las cargadas y luego las
+// purgadas), el más lento podía llegar el último y dejar en la hoja una
+// versión vieja (visto en vivo: 795 citas de ayer que no se borraban).
+let colaGuardado = Promise.resolve();
+function guardarCitasEnSheet() {
+  const foto = appointments.slice();
+  colaGuardado = colaGuardado
+    .then(() => postAppsScript(CITAS_SHEET_URL, { action: 'guardarTodo', citas: foto }))
+    .catch(e => console.error('[Sheet] Error al guardar citas:', e.message));
+  return colaGuardado;
 }
 
 async function cargarCitasDesdeSheet() {
@@ -219,9 +225,11 @@ async function iniciarPersistencia() {
   if (appointments.length === 0) {
     cargarSesion(); // respaldo local si el Sheet no tenia nada o fallo la carga
   }
-  // Si alguna cita se completo al cargar (matricula sacada de "Técnico"),
-  // guardar ya la version corregida en la hoja.
-  if (appointments.some(a => a.matricula)) guardarSesion();
+  // Quitar las de hoy o anteriores y guardar UNA sola vez la version final
+  // (con la matricula ya completada por normalizarCita).
+  purgarCitasPasadas();
+  guardarSesion();
+  broadcast({ type: 'update', appointments });
 }
 
 let appointments  = [];
@@ -1086,7 +1094,7 @@ setInterval(cargarJerarquia, 60 * 60 * 1000);
 cargarAuth();
 setInterval(cargarAuth, 60 * 60 * 1000);
 // Al arrancar (Render reinicia el servicio a menudo) y luego cada hora
-iniciarPersistencia().then(purgarYGuardar);
+iniciarPersistencia();
 setInterval(purgarYGuardar, 60 * 60 * 1000);
 programarLimpiezaMedianoche();
 
