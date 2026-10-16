@@ -184,7 +184,15 @@ function postAppsScript(url, bodyObj) {
 // purgadas), el más lento podía llegar el último y dejar en la hoja una
 // versión vieja (visto en vivo: 795 citas de ayer que no se borraban).
 let colaGuardado = Promise.resolve();
+// La hoja NO se toca hasta que se haya leido bien al arrancar. Si la lectura
+// falla y el servidor arranca vacio, guardar sobreescribiria la hoja buena con
+// una lista vacia (paso en vivo el 2026-10-16: se perdieron 987 citas).
+let hojaLeidaOk = false;
 function guardarCitasEnSheet() {
+  if (!hojaLeidaOk) {
+    console.warn('[Sheet] guardado omitido: la hoja aun no se pudo leer al arrancar');
+    return colaGuardado;
+  }
   const foto = appointments.slice();
   colaGuardado = colaGuardado
     .then(() => postAppsScript(CITAS_SHEET_URL, { action: 'guardarTodo', citas: foto }))
@@ -192,16 +200,26 @@ function guardarCitasEnSheet() {
   return colaGuardado;
 }
 
+// Devuelve true si la hoja se leyo bien (aunque estuviera vacia).
 async function cargarCitasDesdeSheet() {
   try {
     const raw  = await fetchCSV(CITAS_SHEET_URL + '?action=cargar');
     const data = JSON.parse(raw);
-    if (data.ok && data.citas.length > 0) {
-      appointments = data.citas.map(normalizarCita);
-      console.log(`  Citas restauradas desde Google Sheets: ${appointments.length}`);
-    }
+    if (!data.ok || !Array.isArray(data.citas)) throw new Error('respuesta inesperada de la hoja');
+    // Se combinan con las que ya hubiera en memoria (p. ej. un Excel subido
+    // mientras se leia la hoja), sin perder ninguna.
+    const enMemoria = appointments;
+    appointments = data.citas.map(normalizarCita);
+    const ids = new Set(appointments.map(a => a.numMantenimiento || a.id));
+    let maxId = appointments.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0);
+    enMemoria.forEach(a => {
+      if (!ids.has(a.numMantenimiento || a.id)) { a.id = ++maxId; appointments.push(a); }
+    });
+    console.log(`  Citas restauradas desde Google Sheets: ${data.citas.length}`);
+    return true;
   } catch (e) {
-    console.error('[Sheet] Error al cargar citas:', e.message, '— se intenta respaldo local');
+    console.error('[Sheet] Error al cargar citas:', e.message);
+    return false;
   }
 }
 
@@ -234,9 +252,15 @@ function cargarSesion() {
 }
 
 async function iniciarPersistencia() {
-  await cargarCitasDesdeSheet();
-  if (appointments.length === 0) {
-    cargarSesion(); // respaldo local si el Sheet no tenia nada o fallo la carga
+  // Reintentar la lectura de la hoja (Google a veces tarda o falla al primer
+  // intento). Mientras no se lea bien, la hoja no se sobreescribe.
+  for (let intento = 1; intento <= 10 && !hojaLeidaOk; intento++) {
+    hojaLeidaOk = await cargarCitasDesdeSheet();
+    if (!hojaLeidaOk) await new Promise(r => setTimeout(r, Math.min(60000, 5000 * intento)));
+  }
+  if (!hojaLeidaOk) {
+    console.error('[Sheet] No se pudo leer la hoja tras varios intentos -- NO se guardara en ella hasta reiniciar');
+    if (appointments.length === 0) cargarSesion(); // respaldo local del contenedor, si existe
   }
   // Quitar las de hoy o anteriores y guardar UNA sola vez la version final
   // (con la matricula ya completada por normalizarCita).
