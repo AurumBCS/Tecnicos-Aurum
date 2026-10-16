@@ -249,7 +249,8 @@ de Gustavo: `ov_comun.py` usa el mismo login de Microsoft + Authenticator (el n�
 | Tarea | Horario | Qué hace |
 |---|---|---|
 | `{"tarea": "ov_prueba"}` | manual | Entra y manda un correo con captura y menús |
-| `{"tarea": "recuentos_semanal"}` | `ofs-recuentos`: `cron(0 10 ? * MON *)`, Europe/Madrid, desde el 26/10/2026 | `ov_recuentos.py`: descarga Counts → Ver Conteos (Excel), el cuadrante, genera el informe con `recuentos_por_jefe.py` y manda el correo de cada jefe al Apps Script |
+| `{"tarea": "recuentos_semanal"}` | `ofs-recuentos`: `cron(0 10 ? * TUE *)`, Europe/Madrid, desde el 27/10/2026 | `ov_recuentos.py`: descarga Counts → Ver Conteos (Excel), el cuadrante, genera el informe con `recuentos_por_jefe.py` y manda el correo de cada jefe al Apps Script |
+| `{"tarea": "recuentos_semanal", "respaldo": true}` | `ofs-recuentos-respaldo`: `cron(0 12 ? * TUE *)`, Europe/Madrid, desde el 27/10/2026 | Pregunta al Apps Script si hoy ya se hizo; si no, lo hace (por si a las 10:00 no se pudo aprobar Authenticator) |
 
 Variables de entorno extra (valores en `config_recuentos.json` y `recuentos_clave.txt` de la carpeta
 "Correo Recuentos" del Mac — no pegarlos en el chat):

@@ -8,7 +8,8 @@ Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "mediodia"}  -> 14:00, ruta del dia siguiente
   {"tarea": "tarde"}     -> 17:30, ruta del dia siguiente
   {"tarea": "ov_prueba"} -> prueba de entrada a la app OV de inventario (manual, sin horario)
-  {"tarea": "recuentos_semanal"} -> lunes 10:00, control de recuentos por jefe (ver ov_recuentos.py)
+  {"tarea": "recuentos_semanal"} -> martes 10:00, control de recuentos por jefe (ver ov_recuentos.py)
+  {"tarea": "recuentos_semanal", "respaldo": true} -> martes 12:00, solo si el de las 10:00 no salio
 (El correo de la mañana con capturas a Mercedes se retiro el 2026-10-16.)
 
 IMPORTANTE sobre reintentos (configurar en la consola, ver README): EventBridge
@@ -58,7 +59,7 @@ def handler(event, context):
         # Descarga Ver Conteos de la app OV y prepara/envia el correo de cada jefe -- ver ov_recuentos.py.
         import ov_recuentos
 
-        _correr(ov_recuentos.main, "ov_recuentos")
+        _correr(lambda: ov_recuentos.main(respaldo=bool(event.get("respaldo"))), "ov_recuentos")
     else:
         # "mediodia" (14:00) y "tarde" (17:30) hacen lo mismo: descargar la ruta
         # del dia siguiente y subirla a confirmaciones-sms.

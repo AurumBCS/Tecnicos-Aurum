@@ -17,6 +17,10 @@ Control semanal de recuentos por jefe de equipo (lunes 10:00, tarea
        prueba     -> solo comprueba a quien iria cada correo
   5. Manda a Gustavo un correo con el resultado y el Excel general.
 
+Respaldo ({"tarea": "recuentos_semanal", "respaldo": true}, martes 12:00): pregunta
+antes al Apps Script (modo "estado") si hoy ya se hizo; si es asi termina sin entrar
+a OV (no pide Authenticator). Si no, lo hace todo igual que el de las 10:00.
+
 Variables de entorno: RECUENTOS_SCRIPT_URL, RECUENTOS_APP_TOKEN, RECUENTOS_KEY,
 RECUENTOS_MODO (opcional), y las del login (ETADIRECT_PASS, GMAIL_*).
 
@@ -93,9 +97,8 @@ def descargar_cuadrante(destino):
     print(f"[recuentos] cuadrante: {csv.count(chr(10))} filas")
 
 
-def mandar_correos(carpeta_correos, modo):
-    jefes = json.loads((carpeta_correos / "correos.json").read_text(encoding="utf-8"))
-    datos = {"key": _entorno("RECUENTOS_KEY"), "modo": modo, "jefes": jefes}
+def _apps_script(datos):
+    datos = dict(datos, key=_entorno("RECUENTOS_KEY"))
     req = urllib.request.Request(_entorno("RECUENTOS_SCRIPT_URL") + "?type=recuentos-borradores",
                                  data=json.dumps(datos).encode(), headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=300) as r:
@@ -106,6 +109,22 @@ def mandar_correos(carpeta_correos, modo):
         raise RuntimeError("El Apps Script no devolvio JSON: " + texto[:300])
     if not res.get("ok"):
         raise RuntimeError("Error del Apps Script: " + str(res.get("error")))
+    return res
+
+
+def ya_hecho(hoy):
+    """True si el Apps Script dice que hoy ya se crearon/enviaron los correos."""
+    res = _apps_script({"modo": "estado", "jefes": []})
+    if "ultimo" not in res:
+        raise RuntimeError("El Apps Script no responde al modo 'estado': falta pegar la version nueva de "
+                           "apps-script-borradores.gs. El respaldo no se ejecuta para no duplicar correos.")
+    print(f"[recuentos] ultimo dia hecho segun el Apps Script: {res['ultimo'] or '(ninguno)'}")
+    return res["ultimo"] == hoy
+
+
+def mandar_correos(carpeta_correos, modo, hoy):
+    jefes = json.loads((carpeta_correos / "correos.json").read_text(encoding="utf-8"))
+    res = _apps_script({"modo": modo, "fecha": hoy, "jefes": jefes})
     nombres = {j["jde"]: j["nombre"] for j in jefes}
     lineas = [f"[{'OK ' if r['ok'] else 'ERR'}] {nombres.get(r['jde'], r['jde'])} -> {r.get('para', '')} {r.get('error', '')}"
               for r in res["resultado"]]
@@ -113,7 +132,8 @@ def mandar_correos(carpeta_correos, modo):
     return res, lineas
 
 
-def main():
+def main(respaldo=False):
+    respaldo = respaldo or "--respaldo" in sys.argv
     hoy = datetime.now(ZoneInfo("Europe/Madrid")).date().isoformat()
     modo = (_arg("--modo") or os.environ.get("RECUENTOS_MODO") or "borradores").strip()
     if modo not in MODOS:
@@ -121,6 +141,9 @@ def main():
     carpeta = CARPETA_BASE / "recuentos" / hoy
     carpeta.mkdir(parents=True, exist_ok=True)
     try:
+        if respaldo and ya_hecho(hoy):
+            print("[recuentos] respaldo: hoy ya se hizo -- no se hace nada")
+            return
         conteos = Path(_arg("--conteos")) if _arg("--conteos") else carpeta / "Tabla Ver Conteos.xlsx"
         filas = "Excel local" if _arg("--conteos") else descargar_conteos(conteos)
         cuadrante = carpeta / "cuadrante.csv"
@@ -134,7 +157,7 @@ def main():
         if r.returncode:
             raise RuntimeError("recuentos_por_jefe.py fallo:\n" + r.stderr[-1500:])
 
-        res, lineas = mandar_correos(carpeta / f"correos_{hoy}", modo)
+        res, lineas = mandar_correos(carpeta / f"correos_{hoy}", modo, hoy)
         errores = sum(1 for x in res["resultado"] if not x["ok"])
         que = {"borradores": "Borradores creados en Gmail (revisalos y envialos)",
                "enviar": "Correos ENVIADOS a los jefes", "prueba": "Modo prueba: no se creo ni envio nada"}[modo]
@@ -147,7 +170,10 @@ def main():
             sys.exit(1)
     except Exception as e:
         registrar_error("ov_recuentos", str(e))
-        enviar_aviso(f"Recuentos {hoy}: fallo", f"El control semanal de recuentos fallo:\n\n{e}")
+        siguiente = ("Lanzalo a mano desde Lambda -> Test con {\"tarea\": \"recuentos_semanal\"}." if respaldo
+                     else "A las 12:00 el respaldo lo intenta otra vez solo.")
+        enviar_aviso(f"Recuentos {hoy}: fallo" + (" (respaldo)" if respaldo else ""),
+                     f"El control semanal de recuentos fallo:\n\n{e}\n\n{siguiente}")
         raise
 
 
