@@ -61,9 +61,9 @@ def descargar_conteos(destino):
     with sync_playwright() as p:
         browser, context, page = abrir_ov(p, ver="--ver" in sys.argv)
         try:
-            # El enlace del menu lleva la suma de control (cs) que exige la app: se toma del propio menu
-            enlace = page.locator("a[href*='view-counts']").first.get_attribute("href")
-            page.goto(urllib.parse.urljoin(URL_OV, enlace), wait_until="domcontentloaded")
+            # Directo a la pagina con la sesion actual (el enlace del menu no se carga si Counts esta plegado)
+            sesion = page.evaluate("apex.env.APP_SESSION")
+            page.goto(f"{URL_OV}view-counts?session={sesion}", wait_until="domcontentloaded")
             page.wait_for_selector("#Counts_ig .a-GV-table", timeout=60000)
             page.wait_for_load_state("networkidle")
             rango = page.locator("#Counts_ig .a-GV-pageRange")
