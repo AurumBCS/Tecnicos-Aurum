@@ -278,6 +278,9 @@ def iniciar_sesion(page, usuario, clave):
 #   #idRichContext_DisplaySign          numero a escribir en el movil
 AVISO_EMAIL = os.environ.get("AVISO_EMAIL", "gustavo.perez@aurumbcs.com")
 MFA_REENVIOS = 1       # si no se aprueba a tiempo, se reintenta una vez
+# Que esta esperando la aprobacion (texto de los avisos). Cada tarea puede cambiarlo,
+# p. ej. ov_comun.py pone "La entrada a la app OV".
+MOTIVO_AVISO = "La descarga de la ruta"
 
 
 def es_pagina_microsoft(page):
@@ -508,7 +511,7 @@ def iniciar_sesion_microsoft(page, correo, clave):
                 numero_avisado = numero
                 enviar_aviso(
                     f"Aprueba en Authenticator: {numero}",
-                    f"La descarga de la ruta ({datetime.now().strftime('%H:%M')}) esta esperando tu aprobacion.\n\n"
+                    f"{MOTIVO_AVISO} ({datetime.now().strftime('%H:%M')}) esta esperando tu aprobacion.\n\n"
                     f"Abre la notificacion de Microsoft Authenticator en el movil y escribe: {numero}\n\n"
                     "Tienes unos 2 minutos.",
                 )
@@ -580,7 +583,7 @@ def iniciar_sesion_microsoft(page, correo, clave):
             aviso_sin_numero = True
             enviar_aviso(
                 "Aprueba el inicio de sesion en Authenticator",
-                "La descarga de la ruta esta esperando tu aprobacion en Microsoft Authenticator.\n\n"
+                f"{MOTIVO_AVISO} esta esperando tu aprobacion en Microsoft Authenticator.\n\n"
                 f"Pantalla actual: {pantalla}",
                 page.screenshot(),
             )

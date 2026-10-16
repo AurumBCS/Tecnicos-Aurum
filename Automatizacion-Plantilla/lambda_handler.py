@@ -7,6 +7,7 @@ correr, replicando el mismo dispatch que ya tenia
 Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "mediodia"}  -> 14:00, ruta del dia siguiente
   {"tarea": "tarde"}     -> 17:30, ruta del dia siguiente
+  {"tarea": "ov_prueba"} -> prueba de entrada a la app OV de inventario (manual, sin horario)
 (El correo de la mañana con capturas a Mercedes se retiro el 2026-10-16.)
 
 IMPORTANTE sobre reintentos (configurar en la consola, ver README): EventBridge
@@ -37,9 +38,9 @@ def _correr(fn, nombre):
 
 def handler(event, context):
     tarea = (event or {}).get("tarea")
-    if tarea not in ("mediodia", "tarde", "listar_buckets"):
+    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets): {event}"
+            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba): {event}"
         )
 
     if tarea == "listar_buckets":
@@ -47,6 +48,11 @@ def handler(event, context):
         import listar_buckets
 
         _correr(listar_buckets.main, "listar_buckets")
+    elif tarea == "ov_prueba":
+        # Entrada a la app OV de inventario -- ver ov_prueba.py.
+        import ov_prueba
+
+        _correr(ov_prueba.main, "ov_prueba")
     else:
         # "mediodia" (14:00) y "tarde" (17:30) hacen lo mismo: descargar la ruta
         # del dia siguiente y subirla a confirmaciones-sms.
