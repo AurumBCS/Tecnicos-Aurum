@@ -241,6 +241,25 @@ Para cada uno, en el asistente:
 retiraron los triggers `schedule:` de `.github/workflows/ofs-automation.yml`
 (queda solo `workflow_dispatch` como respaldo manual).
 
+## App OV de inventario (recuentos)
+
+La misma Lambda entra también a la app **Order Validation** (OV, inventario) con la cuenta de Verisure
+de Gustavo: `ov_comun.py` usa el mismo login de Microsoft + Authenticator (el número llega por correo).
+
+| Tarea | Horario | Qué hace |
+|---|---|---|
+| `{"tarea": "ov_prueba"}` | manual | Entra y manda un correo con captura y menús |
+| `{"tarea": "recuentos_semanal"}` | `ofs-recuentos`: `cron(0 10 ? * MON *)`, Europe/Madrid, desde el 26/10/2026 | `ov_recuentos.py`: descarga Counts → Ver Conteos (Excel), el cuadrante, genera el informe con `recuentos_por_jefe.py` y manda el correo de cada jefe al Apps Script |
+
+Variables de entorno extra (valores en `config_recuentos.json` y `recuentos_clave.txt` de la carpeta
+"Correo Recuentos" del Mac — no pegarlos en el chat):
+
+- `RECUENTOS_SCRIPT_URL` (= `script_url`), `RECUENTOS_APP_TOKEN` (= `app_token`), `RECUENTOS_KEY` (= `recuentos_clave.txt`)
+- `RECUENTOS_MODO`: `borradores` (por defecto: borradores en Gmail para revisar), `enviar` (envío directo
+  con copia a José Luis Osorio y César Trujillo, fijada en el Apps Script) o `prueba` (solo comprueba destinatarios).
+
+**Timeout** de la función: mínimo **10 min** (espera de Authenticator + descarga + 12 correos).
+
 ## Los 3 scripts
 
 1. **`tomar_capturas.py`** (~7:15am, usuario capturas) — entra a la
