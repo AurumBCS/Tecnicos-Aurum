@@ -7,8 +7,8 @@ Entra en la consola nueva con la cuenta de Verisure (SSO de Microsoft +
 aprobacion en Authenticator) y descarga el CSV de cada grupo Aurum -- ver
 consola_sso.py. Se manda un correo a AVISO_EMAIL con el resultado.
 
-Regla de fecha: SIEMPRE se descarga la ruta del dia SIGUIENTE a hoy, excepto
-que ese dia siguiente caiga domingo, en cuyo caso se salta al lunes. La fecha
+Regla de fecha (ver calcular_fechas_objetivo): de lunes a jueves, la ruta del
+dia siguiente; el viernes, la del sabado Y la del lunes juntas. La fecha
 va directamente en la peticion de exportacion (no hace falta tocar las flechas).
 
 Credenciales: se leen SIEMPRE de variables de entorno (ver README.md).
@@ -46,13 +46,22 @@ URL_SUBIDA = "https://tecnicos-aurum.onrender.com/upload"
 MATRICULA_SUBIDA = "GD5381"  # uploader autorizado sin filtro (Gustavo Perez)
 
 
-def calcular_fecha_objetivo():
-    """Siempre el dia siguiente a hoy; si ese dia es domingo, salta al lunes."""
-    hoy = datetime.now(ZoneInfo("Europe/Madrid")).date()  # Lambda corre en UTC
-    objetivo = hoy + timedelta(days=1)
-    if objetivo.weekday() == 6:  # 6 = domingo
-        objetivo += timedelta(days=1)
-    return objetivo
+def calcular_fechas_objetivo(hoy=None):
+    """Dias cuya ruta se carga hoy. Solo se corre de lunes a viernes:
+    - lunes a jueves: el dia siguiente.
+    - viernes: el SABADO y el LUNES, en la misma ejecucion (una sola
+      aprobacion), porque el sabado no se corre nada.
+    (Si se lanzara a mano un sabado/domingo: el lunes.)
+    """
+    hoy = hoy or datetime.now(ZoneInfo("Europe/Madrid")).date()  # Lambda corre en UTC
+    dia = hoy.weekday()  # 0 = lunes ... 4 = viernes, 5 = sabado, 6 = domingo
+    if dia == 4:
+        return [hoy + timedelta(days=1), hoy + timedelta(days=3)]
+    if dia == 5:
+        return [hoy + timedelta(days=2)]
+    if dia == 6:
+        return [hoy + timedelta(days=1)]
+    return [hoy + timedelta(days=1)]
 
 
 def subir_excel(ruta_excel):
@@ -76,10 +85,11 @@ def main():
     """
     import consola_sso
 
-    fecha_objetivo = calcular_fecha_objetivo()
-    fecha_txt = fecha_objetivo.strftime("%d/%m/%Y")
+    fechas = calcular_fechas_objetivo()
+    fecha_txt = " y ".join(f.strftime("%d/%m/%Y") for f in fechas)
     CARPETA_DESCARGAS.mkdir(exist_ok=True)
-    ruta_excel = CARPETA_DESCARGAS / f"ruta_{fecha_objetivo.isoformat()}.xlsx"
+    ruta_excel = CARPETA_DESCARGAS / f"ruta_{'_'.join(f.isoformat() for f in fechas)}.xlsx"
+    print(f"[ruta] dias a cargar: {fecha_txt}")
 
     try:
         correo, clave = consola_sso.leer_credenciales_sso()
@@ -94,7 +104,9 @@ def main():
         page = context.new_page()
         try:
             consola_sso.entrar_a_consola(page, correo, clave)
-            csvs = consola_sso.descargar_csv_grupos(page, fecha_objetivo.isoformat())
+            csvs = []
+            for fecha in fechas:
+                csvs += consola_sso.descargar_csv_grupos(page, fecha.isoformat())
             filas = consola_sso.unir_csv_en_xlsx(csvs, ruta_excel)
             print(f"[ruta] {len(csvs)} grupos, {filas} filas -> {ruta_excel}")
         except Exception as e:
@@ -139,10 +151,10 @@ def main():
                    f"{d.get('count', '?')} en total en confirmaciones-sms.")
     except Exception:
         pass
-    print(f"Listo: ruta del {fecha_objetivo.isoformat()} subida (matricula {MATRICULA_SUBIDA}). {resumen}")
+    print(f"Listo: ruta del {fecha_txt} subida (matricula {MATRICULA_SUBIDA}). {resumen}")
     enviar_aviso(
         f"✅ Ruta del {fecha_txt} subida",
-        f"La ruta del {fecha_txt} se descargo de {len(csvs)} grupos Aurum ({filas} filas) y se subio "
+        f"La ruta del {fecha_txt} se descargo ({len(csvs)} descargas de grupos Aurum, {filas} filas) y se subio "
         f"a confirmaciones-sms.\n{resumen}\n\nAdjunto el Excel descargado.",
         adjunto=ruta_excel,
     )
