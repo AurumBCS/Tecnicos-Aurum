@@ -119,6 +119,19 @@ async function cargarAuth() {
   }
 }
 
+// Si el DNI no coincide, puede ser que el cuadrante haya cambiado desde la
+// ultima carga (se recarga cada hora): se vuelve a pedir, como mucho cada 2 min,
+// antes de rechazar. Visto en vivo: tras cambiar de cuadrante, un tecnico no
+// podia entrar con su DNI hasta la siguiente recarga.
+let ultimaRecargaAuth = 0;
+async function verificarDNIConRecarga(matricula, dni) {
+  if (verificarDNI(matricula, dni)) return true;
+  if (Date.now() - ultimaRecargaAuth < 2 * 60 * 1000) return false;
+  ultimaRecargaAuth = Date.now();
+  await cargarAuth();
+  return verificarDNI(matricula, dni);
+}
+
 function verificarDNI(matricula, dni) {
   const mat = String(matricula || '').trim().toUpperCase();
   const d   = String(dni || '').trim().toUpperCase();
@@ -913,12 +926,12 @@ app.post('/reset', (req, res) => {
 // ── Vista móvil para técnicos (envío por SMS desde su propio teléfono) ────────
 // El técnico abre /tecnico.html, ve solo sus citas y manda el SMS con el
 // enlace nativo sms: — el servidor nunca envía el SMS, solo guarda el estado.
-app.get('/mis-citas', (req, res) => {
+app.get('/mis-citas', async (req, res) => {
   purgarYGuardar();
   const matricula = String(req.query.matricula || '').trim().toUpperCase();
   const dni       = String(req.query.dni || '').trim();
   if (!matricula || !dni) return res.json({ ok: false, error: 'Falta matrícula o DNI' });
-  if (!verificarDNI(matricula, dni)) {
+  if (!(await verificarDNIConRecarga(matricula, dni))) {
     return res.json({ ok: false, error: 'Matrícula o DNI incorrectos' });
   }
   // Todas las citas cargadas del técnico, igual que ve su JE. Antes solo se
@@ -934,12 +947,12 @@ app.get('/mis-citas', (req, res) => {
 // ── Vista móvil para JE: todo el equipo, agrupado por técnico ────────────────
 // Usa la misma jerarquía en vivo (Google Sheets) que ya carga el servidor,
 // así que funciona con cualquier matrícula de JE sin tener que tocar código.
-app.get('/mis-citas-equipo', (req, res) => {
+app.get('/mis-citas-equipo', async (req, res) => {
   purgarYGuardar();
   const matricula = String(req.query.matricula || '').trim().toUpperCase();
   const dni       = String(req.query.dni || '').trim();
   if (!matricula || !dni) return res.json({ ok: false, error: 'Falta matrícula o DNI' });
-  if (!verificarDNI(matricula, dni)) {
+  if (!(await verificarDNIConRecarga(matricula, dni))) {
     return res.json({ ok: false, error: 'Matrícula o DNI incorrectos' });
   }
 
