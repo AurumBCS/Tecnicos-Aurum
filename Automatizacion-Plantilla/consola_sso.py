@@ -125,7 +125,9 @@ def entrar_a_consola(page, correo, clave):
             break
         except Exception:
             print(f"[consola] Actividades no se abrio todavia (titulo: {page.title()!r})")
-    page.wait_for_selector(SELECTOR_GRUPOS + ":visible", timeout=30000)
+    # Ultimo recurso: para descargar solo hacen falta los identificadores de los
+    # grupos, que estan en la pagina aunque el panel no se vea.
+    page.wait_for_selector(SELECTOR_GRUPOS, state="attached", timeout=30000)
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(2000)
 
