@@ -346,6 +346,14 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .cf-rb:hover{border-color:var(--gold);color:var(--gold2)}
 .cf-rb:disabled{opacity:.5;cursor:default}
 .cf-pendbtn{width:100%;margin-bottom:12px;padding:11px;border-radius:10px;background:rgba(212,131,26,.12);border:1px solid var(--orange);color:var(--orange);font-family:var(--font);font-size:.78rem;font-weight:800;cursor:pointer}
+#cfCorreo{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:14px}
+#cfCorreo .caja{background:var(--s1);border:1px solid var(--gold3);border-radius:16px;width:100%;max-width:640px;max-height:92vh;overflow:auto;padding:16px}
+#cfCorreo h3{margin:0 0 4px;font-size:.95rem;color:var(--gold2)}
+#cfCorreo .pasos{font-size:.7rem;color:var(--muted);margin:0 0 10px;padding-left:18px}
+#cfCorreo .asunto{font-size:.72rem;color:var(--text);margin-bottom:6px}
+#cfCorreo .vista{background:#fff;color:#000;border-radius:10px;padding:12px;max-height:46vh;overflow:auto;font-size:13px}
+#cfCorreo .bts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+#cfCorreo .bts .cf-btn{flex:1 1 180px;padding:10px}
 #cfAsis{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:14px}
 #cfAsis .caja{background:var(--s1);border:1px solid var(--gold3);border-radius:16px;width:100%;max-width:440px;max-height:92vh;overflow:auto;padding:16px;position:relative}
 #cfAsis .caja::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold2),transparent)}
@@ -5180,9 +5188,53 @@ async function cfInformeDia(){
       return;
     }
     const bytes=Uint8Array.from(atob(r.excel),ch=>ch.charCodeAt(0));
-    cfDescargar(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),r.nombre||('Informe_Fichajes_'+d.fecha+'.xlsx'));
+    CF_CORREO={blob:new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
+      nombre:r.nombre||('Informe_Fichajes_'+d.fecha+'.xlsx'),asunto:r.asunto||'',texto:r.texto||'',html:r.html||''};
+    cfDescargar(CF_CORREO.blob,CF_CORREO.nombre);
+    if(CF_CORREO.texto) cfMostrarCorreo();
   }catch(e){ alert('No se pudo generar el informe: '+e.message); }
   finally{ aviso.remove(); }
+}
+
+// Correo diario para dirección: Anna lo copia, lo pega en un correo nuevo y adjunta el Excel descargado.
+let CF_CORREO=null;
+function cfMostrarCorreo(){
+  const c=CF_CORREO; if(!c) return;
+  let el=document.getElementById('cfCorreo');
+  if(!el){ el=document.createElement('div'); el.id='cfCorreo'; document.body.appendChild(el); }
+  el.innerHTML=`<div class="caja">
+    <h3>✉️ Correo del informe</h3>
+    <ol class="pasos">
+      <li>El Excel <b>${cfEsc(c.nombre)}</b> ya se ha descargado.</li>
+      <li>Pulsa <b>📋 Copiar correo</b>, abre un correo nuevo y pega el texto (Ctrl+V / Cmd+V).</li>
+      <li>Adjunta el Excel descargado y envíalo.</li>
+    </ol>
+    <div class="asunto"><b>Asunto:</b> ${cfEsc(c.asunto)}</div>
+    <div class="vista">${c.html}</div>
+    <div class="bts">
+      <button class="cf-btn prim" id="cfCopiarCorreo" onclick="cfCopiarCorreo()">📋 Copiar correo</button>
+      <button class="cf-btn" onclick="cfCopiarAsunto()">📋 Copiar asunto</button>
+      <button class="cf-btn" onclick="cfDescargar(CF_CORREO.blob,CF_CORREO.nombre)">📥 Descargar el Excel otra vez</button>
+      <button class="cf-btn" onclick="document.getElementById('cfCorreo').remove()">Cerrar</button>
+    </div></div>`;
+}
+async function cfCopiarCorreo(){
+  const c=CF_CORREO, b=document.getElementById('cfCopiarCorreo');
+  try{
+    if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){
+      await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([c.html],{type:'text/html'}),'text/plain':new Blob([c.texto],{type:'text/plain'})})]);
+    }else await navigator.clipboard.writeText(c.texto);
+  }catch(e){
+    // respaldo: seleccionar la vista previa y copiarla
+    const v=document.querySelector('#cfCorreo .vista'), sel=window.getSelection(), rg=document.createRange();
+    rg.selectNodeContents(v); sel.removeAllRanges(); sel.addRange(rg);
+    try{ document.execCommand('copy'); }catch(_){}
+    sel.removeAllRanges();
+  }
+  if(b){ b.textContent='✅ Copiado: pégalo en el correo'; setTimeout(()=>{ if(b.isConnected) b.textContent='📋 Copiar correo'; },3000); }
+}
+async function cfCopiarAsunto(){
+  try{ await navigator.clipboard.writeText(CF_CORREO.asunto); }catch(e){ prompt('Copia el asunto:',CF_CORREO.asunto); }
 }
 
 function cfDescargarDia(){
