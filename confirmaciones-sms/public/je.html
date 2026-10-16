@@ -94,6 +94,13 @@
     .card-actions { display:flex; gap:6px; align-items:center; }
     .chk-envio { width:18px; height:18px; accent-color: var(--gold); flex-shrink:0; cursor:pointer; }
 
+    .filtro-fechas { display:none; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+    .chip-fecha {
+      flex:1; min-width:80px; padding:9px 8px; border-radius:10px; cursor:pointer;
+      background: var(--dim); border:1.5px solid var(--border2); color: var(--text);
+      font-family: var(--font); font-size:.78rem; font-weight:700;
+    }
+    .chip-fecha.activa { border-color: var(--gold); color: var(--gold2); background: rgba(201,168,76,.12); }
     #filtro-tecnico {
       width: 100%; background: var(--dim); border: 1.5px solid var(--border2); color: var(--text);
       border-radius: 10px; padding: 11px 12px; font-size: .9rem; font-family: var(--font); outline: none;
@@ -153,6 +160,7 @@
   </div>
 
   <div id="content" style="display:none">
+    <div id="filtro-fechas" class="filtro-fechas"></div>
     <select id="filtro-tecnico" onchange="cambiarFiltroTecnico(this.value)">
       <option value="">👥 Todos los técnicos</option>
     </select>
@@ -223,19 +231,56 @@
       .catch(() => {});
   }
 
-  // Citas visibles según el técnico elegido en el desplegable
+  // ── Filtro por fecha (p. ej. el viernes se cargan sábado y lunes) ─────
+  let filtroFecha = ''; // '' = todas
+  function fechaISO(f) {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(String(f || '').trim());
+    if (!m) return String(f || '');
+    return (m[3].length === 2 ? '20' + m[3] : m[3]) + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  }
+  function etiquetaFecha(f) {
+    const iso = fechaISO(f);
+    const d = new Date(iso + 'T12:00:00');
+    if (isNaN(d)) return f;
+    const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    return dias[d.getDay()] + ' ' + iso.slice(8, 10) + '/' + iso.slice(5, 7);
+  }
+  function renderFiltroFecha() {
+    const cont = document.getElementById('filtro-fechas');
+    const fechas = [...new Set(citas.map(c => c.fecha))].sort((a, b) => fechaISO(a) < fechaISO(b) ? -1 : 1);
+    if (filtroFecha && !fechas.includes(filtroFecha)) filtroFecha = '';
+    if (fechas.length < 2) { cont.style.display = 'none'; cont.innerHTML = ''; filtroFecha = ''; return; }
+    cont.style.display = 'flex';
+    cont.innerHTML = ['<button class="chip-fecha' + (filtroFecha === '' ? ' activa' : '') + '" onclick="cambiarFiltroFecha(\'\')">📅 Todas (' + citas.length + ')</button>']
+      .concat(fechas.map(f => '<button class="chip-fecha' + (filtroFecha === f ? ' activa' : '') + '" onclick="cambiarFiltroFecha(\'' + esc(f) + '\')">'
+        + etiquetaFecha(f) + ' (' + citas.filter(c => c.fecha === f).length + ')</button>')).join('');
+  }
+  function cambiarFiltroFecha(f) {
+    filtroFecha = f;
+    seleccionados.clear(); // no enviar SMS a citas de otro día que no se ven
+    render();
+  }
+
+  // Citas del día elegido (todas si no hay filtro de fecha)
+  function citasDelDia() {
+    return filtroFecha ? citas.filter(c => c.fecha === filtroFecha) : citas;
+  }
+
+  // Citas visibles según el día y el técnico elegidos
   function citasVisibles() {
-    return filtroTecnico ? citas.filter(c => c.tecnico === filtroTecnico) : citas;
+    const delDia = citasDelDia();
+    return filtroTecnico ? delDia.filter(c => c.tecnico === filtroTecnico) : delDia;
   }
 
   function renderFiltroTecnico() {
     const sel = document.getElementById('filtro-tecnico');
-    const tecnicos = [...new Set(citas.map(c => c.tecnico))].sort();
+    const base = citasDelDia();
+    const tecnicos = [...new Set(base.map(c => c.tecnico))].sort();
     // Si el técnico elegido ya no tiene citas, volver a "Todos"
     if (filtroTecnico && !tecnicos.includes(filtroTecnico)) filtroTecnico = '';
-    const html = '<option value="">👥 Todos los técnicos (' + citas.length + ')</option>' +
+    const html = '<option value="">👥 Todos los técnicos (' + base.length + ')</option>' +
       tecnicos.map(t => {
-        const lista = citas.filter(c => c.tecnico === t);
+        const lista = base.filter(c => c.tecnico === t);
         const pend = lista.filter(c => c.status === 'pendiente').length;
         return '<option value="' + esc(t) + '">' + esc(t) + ' — ' + lista.length + (pend ? ' (' + pend + ' pend.)' : '') + '</option>';
       }).join('');
@@ -253,6 +298,7 @@
   }
 
   function render() {
+    renderFiltroFecha();
     renderFiltroTecnico();
     const citasAll = citas;
     const citas_ = citasVisibles();

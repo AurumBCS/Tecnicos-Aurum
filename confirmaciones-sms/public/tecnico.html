@@ -92,6 +92,13 @@
     }
 
     .stats { display:flex; gap:8px; margin-bottom:14px; }
+    .filtro-fechas { display:none; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+    .chip-fecha {
+      flex:1; min-width:80px; padding:9px 8px; border-radius:10px; cursor:pointer;
+      background: var(--dim); border:1.5px solid var(--border2); color: var(--text);
+      font-family: var(--font); font-size:.78rem; font-weight:700;
+    }
+    .chip-fecha.activa { border-color: var(--gold); color: var(--gold2); background: rgba(201,168,76,.12); }
     .stat { flex:1; background:var(--dim); border:1px solid var(--border); border-radius:10px; padding:10px 6px; text-align:center; }
     .stat b { display:block; font-size:1.3rem; color:var(--gold2); }
     .stat span { font-size:.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
@@ -161,6 +168,7 @@
 
   <div id="content" style="display:none">
     <div class="sub" id="fecha-titulo" style="text-align:center; margin-bottom:10px; color:var(--gold3); font-size:.78rem; font-weight:700;"></div>
+    <div id="filtro-fechas" class="filtro-fechas"></div>
     <div class="stats">
       <div class="stat"><b id="st-total">0</b><span>Total</span></div>
       <div class="stat"><b id="st-pend">0</b><span>Pend.</span></div>
@@ -222,11 +230,40 @@
       .catch(() => {});
   }
 
+  // ── Filtro por fecha (p. ej. el viernes se cargan sábado y lunes) ─────
+  let filtroFecha = ''; // '' = todas
+  function fechaISO(f) {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(String(f || '').trim());
+    if (!m) return String(f || '');
+    return (m[3].length === 2 ? '20' + m[3] : m[3]) + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  }
+  function etiquetaFecha(f) {
+    const iso = fechaISO(f);
+    const d = new Date(iso + 'T12:00:00');
+    if (isNaN(d)) return f;
+    const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    return dias[d.getDay()] + ' ' + iso.slice(8, 10) + '/' + iso.slice(5, 7);
+  }
+  function renderFiltroFecha() {
+    const cont = document.getElementById('filtro-fechas');
+    const fechas = [...new Set(citas.map(c => c.fecha))].sort((a, b) => fechaISO(a) < fechaISO(b) ? -1 : 1);
+    if (filtroFecha && !fechas.includes(filtroFecha)) filtroFecha = '';
+    if (fechas.length < 2) { cont.style.display = 'none'; cont.innerHTML = ''; filtroFecha = ''; return; }
+    cont.style.display = 'flex';
+    cont.innerHTML = ['<button class="chip-fecha' + (filtroFecha === '' ? ' activa' : '') + '" onclick="cambiarFiltroFecha(\'\')">📅 Todas (' + citas.length + ')</button>']
+      .concat(fechas.map(f => '<button class="chip-fecha' + (filtroFecha === f ? ' activa' : '') + '" onclick="cambiarFiltroFecha(\'' + esc(f) + '\')">'
+        + etiquetaFecha(f) + ' (' + citas.filter(c => c.fecha === f).length + ')</button>')).join('');
+  }
+  function cambiarFiltroFecha(f) { filtroFecha = f; render(); }
+
   function render() {
-    const total = citas.filter(c => c.status !== 'sin_telefono').length;
-    const pend  = citas.filter(c => c.status === 'pendiente').length;
-    const conf  = citas.filter(c => c.status === 'confirmado').length;
-    const noconf= citas.filter(c => c.status === 'no_confirmado').length;
+    renderFiltroFecha();
+    const todas = citas;
+    const citasDia = filtroFecha ? todas.filter(c => c.fecha === filtroFecha) : todas;
+    const total = citasDia.filter(c => c.status !== 'sin_telefono').length;
+    const pend  = citasDia.filter(c => c.status === 'pendiente').length;
+    const conf  = citasDia.filter(c => c.status === 'confirmado').length;
+    const noconf= citasDia.filter(c => c.status === 'no_confirmado').length;
     document.getElementById('st-total').textContent = total;
     document.getElementById('st-pend').textContent  = pend;
     document.getElementById('st-conf').textContent  = conf;
@@ -234,10 +271,10 @@
 
     const lista = document.getElementById('lista');
     const empty = document.getElementById('empty');
-    if (citas.length === 0) { lista.innerHTML = ''; empty.style.display = ''; return; }
+    if (citasDia.length === 0) { lista.innerHTML = ''; empty.style.display = ''; return; }
     empty.style.display = 'none';
 
-    lista.innerHTML = citas.map(c => {
+    lista.innerHTML = citasDia.map(c => {
       const labels = {
         pendiente: '⏳ Pendiente', enviado: '📨 Enviado', confirmado: '✅ Confirmado',
         no_confirmado: '❌ No confirma', sin_telefono: '📵 Sin teléfono'
