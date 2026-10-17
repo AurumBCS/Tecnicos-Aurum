@@ -6,8 +6,11 @@ entrada a la app, a las 11:00). Uso local:
   python recepciones_por_jefe.py <tos.xlsx|csv> <cuadrante.csv> <carpeta> [AAAA-MM-DD]
 
 Reglas (acordadas con Gustavo, 2026-10-17):
-  - Entran las ordenes con 3 dias o mas desde "Enviado" (antes el transporte puede no
-    haber llegado). Mas de 7 dias = urgente.
+  - Entran las ordenes con 3 dias o mas desde "Enviado" (piden el lunes, envian el martes y
+    el miercoles ya esta para retirar). Mas de 7 dias = urgente.
+  - Tenerife (organizacion PESIAT, envio maritimo): se cuenta desde el pedido ("Solicitada"),
+    porque tarda ~11 dias en estar para retirar (pedido el lunes 19 -> se retira el 30).
+    Entran con 11 dias o mas desde el pedido; mas de 15 = urgente.
   - Un correo por jefe con la lista de su equipo (solo jefes con algo pendiente).
   - El tecnico es "Entregar a" (matricula); si no esta en el cuadrante se busca por
     "Nombre Trabajador". Lo que no se encuentra va a "Fuera del control".
@@ -25,12 +28,14 @@ from openpyxl import Workbook
 
 from devoluciones_por_jefe import COLORES, _fecha, _fmt, _tabla, escribir, leer_cuadrante
 
-MIN_DIAS, URGENTE_DIAS = 3, 7
-URGENTE = f"Más de {URGENTE_DIAS} días sin recibir"
-PENDIENTE = f"Entre {MIN_DIAS} y {URGENTE_DIAS} días sin recibir"
+MIN_DIAS, URGENTE_DIAS = 3, 7                 # desde "Enviado"
+TENERIFE_ORG, TF_MIN_DIAS, TF_URGENTE_DIAS = "PESIAT", 11, 15   # desde "Solicitada"
+URGENTE = "Urgente: recibir ya"
+PENDIENTE = "Pendiente de recibir"
 COLORES.update({URGENTE: "F8CBAD", PENDIENTE: "FFE699"})
 NOTA = (f"Material enviado por el almacén y sin recibir en la app (Recibir TOs). Entran las órdenes con "
-        f"{MIN_DIAS} días o más desde el envío; más de {URGENTE_DIAS} = urgente.")
+        f"{MIN_DIAS} días o más desde el envío (urgente con más de {URGENTE_DIAS}); en Tenerife, con "
+        f"{TF_MIN_DIAS} días o más desde el pedido (urgente con más de {TF_URGENTE_DIAS}).")
 
 
 def _norm(s):
@@ -54,6 +59,8 @@ def leer_tos(ruta):
         "Trabajador": df["Nombre Trabajador"].astype(str).str.strip(),
         "Almacén": df["Nombre Almacén"].astype(str).str.replace("Global Warehouse ", "", regex=False).str.strip(),
         "Transporte": df["Shipping Method"].astype(str).str.strip(),
+        "Organización": df["Organización"].astype(str).str.strip() if "Organización" in df else "",
+        "Solicitada": df["Solicitada"].map(_fecha) if "Solicitada" in df else None,
         "Enviado": df["Enviado"].map(_fecha),
         "Líneas": pd.to_numeric(df["Líneas"], errors="coerce"),
     })
@@ -80,16 +87,24 @@ def generar(ruta_tos, cuadrante, carpeta, hoy):
     """Devuelve (Excel general, carpeta correos, resumen). Solo crea correo para jefes con pendientes."""
     activos, nombres = leer_cuadrante(cuadrante, exigir_toa=False)
     tos = asignar(leer_tos(ruta_tos), activos)
-    tos["Días"] = tos["Enviado"].map(lambda f: (hoy - f).days if f else None)
-    tos = tos[tos["Días"] >= MIN_DIAS].copy()
-    tos["Estado"] = tos["Días"].map(lambda d: URGENTE if d > URGENTE_DIAS else PENDIENTE)
+    def plazo(r):  # (zona, fecha desde la que se cuenta, minimo, urgente)
+        if r["Organización"] == TENERIFE_ORG:
+            return "Tenerife", r["Solicitada"] or r["Enviado"], TF_MIN_DIAS, TF_URGENTE_DIAS
+        return "Península", r["Enviado"], MIN_DIAS, URGENTE_DIAS
+
+    p = tos.apply(plazo, axis=1, result_type="expand")
+    tos["Zona"] = p[0]
+    tos["Días"] = p[1].map(lambda f: (hoy - f).days if f else None)
+    tos["Contado desde"] = tos["Zona"].map({"Tenerife": "pedido", "Península": "envío"})
+    tos = tos[tos["Días"].notna() & (tos["Días"] >= p[2])].copy()
+    tos["Estado"] = [URGENTE if d > u else PENDIENTE for d, u in zip(tos["Días"], p.loc[tos.index, 3])]
     jde = activos.set_index("Matricula")["JDE"].to_dict()
     nombre = activos.set_index("Matricula")["Nombre"].to_dict()
     fuera = tos[tos["Matrícula"].isna()].drop(columns=["Matrícula"])
     tos = tos[tos["Matrícula"].notna()].copy()
     tos.insert(0, "JDE", tos["Matrícula"].map(jde))
     tos.insert(2, "Técnico", tos["Matrícula"].map(nombre))
-    tos = tos.drop(columns=["Entregar a", "Trabajador"]).sort_values(["JDE", "Días", "Técnico"], ascending=[True, False, True])
+    tos = tos.drop(columns=["Entregar a", "Trabajador", "Organización"]).sort_values(["JDE", "Días", "Técnico"], ascending=[True, False, True])
 
     os.makedirs(carpeta, exist_ok=True)
     general = os.path.join(carpeta, f"Recepciones_por_Jefe_{hoy:%Y-%m-%d}.xlsx")
@@ -105,8 +120,9 @@ def generar(ruta_tos, cuadrante, carpeta, hoy):
 
     dir_correos = os.path.join(carpeta, f"correos_recepciones_{hoy:%Y-%m-%d}")
     os.makedirs(dir_correos, exist_ok=True)
-    cols = [("Orden", lambda t: t["TO"]), ("Enviado", lambda t: _fmt(t["Enviado"])),
-            ("Días", lambda t: str(int(t["Días"]))), ("Almacén / transporte", lambda t: f"{t['Almacén']} · {t['Transporte']}"),
+    cols = [("Orden", lambda t: t["TO"]), ("Pedido", lambda t: _fmt(t["Solicitada"])),
+            ("Enviado", lambda t: _fmt(t["Enviado"])),
+            ("Días", lambda t: f"{int(t['Días'])} (desde {t['Contado desde']})"), ("Almacén / transporte", lambda t: f"{t['Almacén']} · {t['Transporte']}"),
             ("Líneas", lambda t: "" if pd.isna(t["Líneas"]) else str(int(t["Líneas"])))]
     manifiesto = []
     for j, g in tos.groupby("JDE"):
@@ -117,18 +133,22 @@ def generar(ruta_tos, cuadrante, carpeta, hoy):
         escribir(wbj.active, g.drop(columns="JDE"), f"Jefe de equipo: {nom} ({j})", hoy, NOTA)
         ruta = os.path.join(dir_correos, archivo)
         wbj.save(ruta)
-        secciones = [(f"{URGENTE} – recibir ya", "#FDECEA", "#C0392B", g[g.Estado == URGENTE]),
+        secciones = [(URGENTE, "#FDECEA", "#C0392B", g[g.Estado == URGENTE]),
                      (PENDIENTE, "#FFF8E1", "#E0A800", g[g.Estado == PENDIENTE])]
         cajas = "".join(
             f'<td align="center" style="padding:8px 4px;background:{fondo};border-top:3px solid {borde}">'
             f'<div style="font-size:22px;font-weight:bold;color:{borde}">{len(sub)}</div>'
-            f'<div style="font-size:11px;color:#555">{_html.escape(t.split(" –")[0])}</div></td>'
+            f'<div style="font-size:11px;color:#555">{_html.escape(t.split(":")[0])}</div></td>'
             for t, fondo, borde, sub in secciones)
         bloques = "".join(_tabla(sub, t, fondo, borde, cols) for t, fondo, borde, sub in secciones if len(sub))
+        tenerife = (f" En Tenerife se cuenta desde el pedido, porque el envío tarda unos {TF_MIN_DIAS} días en estar para "
+                    f"retirar: aparecen a partir de {TF_MIN_DIAS} días (urgente con más de {TF_URGENTE_DIAS})."
+                    if (g.Zona == "Tenerife").any() else "")
         cuerpo = f"""<div style="font-family:Arial,Helvetica,sans-serif;color:#222;max-width:680px">
 <p style="font-size:14px">Hola {_html.escape(nom.split()[0])},</p>
 <p style="font-size:14px">Te paso el material que el almacén ya ha enviado a tu equipo y que <b>todavía no está recibido en la app</b>
-(Recibir TOs), a fecha <b>{hoy:%d/%m/%Y}</b>. Solo aparecen las órdenes enviadas hace {MIN_DIAS} días o más.
+(Recibir TOs), a fecha <b>{hoy:%d/%m/%Y}</b>. Solo aparecen las órdenes enviadas hace {MIN_DIAS} días o más
+(urgente con más de {URGENTE_DIAS}).{tenerife}
 En cuanto el técnico tenga el material tiene que recibirlo en digital; si no le ha llegado, que lo avise para reclamarlo.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="4" style="margin:10px 0"><tr>{cajas}</tr></table>
 {bloques}
@@ -150,7 +170,7 @@ En cuanto el técnico tenga el material tiene que recibirlo en digital; si no le
                      f'<body style="margin:0;padding:16px;background:#fff">{cuerpo}</body></html>')
     with open(os.path.join(dir_correos, "correos.json"), "w", encoding="utf-8") as fh:
         json.dump(manifiesto, fh, ensure_ascii=False)
-    resumen = (f"Órdenes con {MIN_DIAS}+ días sin recibir: {len(tos)} (urgentes: {int((tos.Estado == URGENTE).sum())})"
+    resumen = (f"Órdenes sin recibir que entran en el aviso: {len(tos)} (Tenerife: {int((tos.Zona == 'Tenerife').sum())}) (urgentes: {int((tos.Estado == URGENTE).sum())})"
                f"\nFuera del control: {len(fuera)}\n\n" + (res.drop(columns="JDE").to_string(index=False) if len(res) else ""))
     return general, dir_correos, resumen
 
