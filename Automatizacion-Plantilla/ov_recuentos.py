@@ -40,6 +40,11 @@ from zoneinfo import ZoneInfo
 
 from comun_ofs import CARPETA_BASE, enviar_aviso, registrar_error
 
+
+def _entrada():
+    import ov_comun
+    return ov_comun.resumen_entrada()
+
 AQUI = Path(__file__).parent
 MODOS = ("borradores", "enviar", "prueba")
 
@@ -166,7 +171,7 @@ def main(respaldo=False):
                "enviar": "Correos ENVIADOS a los jefes", "prueba": "Modo prueba: no se creo ni envio nada"}[modo]
         enviar_aviso(
             f"Recuentos {hoy}: {que.split(' (')[0].lower()}" + (f" -- {errores} con error" if errores else ""),
-            f"{que}.\n\nVer Conteos: {filas}\n\n" + "\n".join(lineas)
+            _entrada() + f"{que}.\n\nVer Conteos: {filas}\n\n" + "\n".join(lineas)
             + f"\n\nResumen:\n{r.stdout.strip()[:3000]}\n\nAdjunto el Excel general.",
             adjunto=general)
         if errores:

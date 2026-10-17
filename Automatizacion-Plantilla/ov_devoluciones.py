@@ -30,6 +30,11 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from comun_ofs import CARPETA_BASE, enviar_aviso, registrar_error
+
+
+def _entrada():
+    import ov_comun
+    return ov_comun.resumen_entrada()
 from ov_recuentos import MODOS, _arg, descargar_cuadrante, mandar_correos, ya_hecho
 
 TIPO = "devoluciones"
@@ -87,7 +92,7 @@ def main(respaldo=False):
                "enviar": "Correos ENVIADOS a los jefes", "prueba": "Modo prueba: no se creo ni envio nada"}[modo]
         enviar_aviso(
             f"Devoluciones {hoy}: {que.split(' (')[0].lower()}" + (f" -- {errores} con error" if errores else ""),
-            f"{que}.\n\nListas descargadas: " + ", ".join(f"{k}: {v}" for k, v in filas.items()) + "\n\n"
+            _entrada() + f"{que}.\n\nListas descargadas: " + ", ".join(f"{k}: {v}" for k, v in filas.items()) + "\n\n"
             + "\n".join(lineas) + f"\n\nResumen:\n{resumen[:3000]}\n\nAdjunto el Excel general.",
             adjunto=Path(general))
         if errores:

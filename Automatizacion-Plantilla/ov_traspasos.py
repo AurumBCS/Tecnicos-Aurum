@@ -26,6 +26,11 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from comun_ofs import CARPETA_BASE, enviar_aviso, registrar_error
+
+
+def _entrada():
+    import ov_comun
+    return ov_comun.resumen_entrada()
 from ov_recuentos import MODOS, _apps_script, _arg, ya_hecho
 
 TIPO = "traspasos"
@@ -163,7 +168,7 @@ def main(respaldo=False):
             que = {"borradores": "Borradores creados en Gmail", "enviar": "Avisos ENVIADOS",
                    "prueba": "Modo prueba: no se creo ni envio nada"}[modo]
             enviar_aviso(f"Traspasos {hoy:%d/%m}: {len(items)} sin completar" + (f" -- {errores} con error" if errores else ""),
-                         f"{que}.\n\n" + "\n".join(lineas))
+                         _entrada() + f"{que}.\n\n" + "\n".join(lineas))
         if errores:
             sys.exit(1)
     except Exception as e:

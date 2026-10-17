@@ -27,7 +27,7 @@ def main():
                 ".map(e => e.textContent.trim()).filter(Boolean)")
             print("[ov] menus:", menus)
             enviar_aviso("App OV: entrada correcta",
-                         "Se entro a la app OV de inventario.\n\nMenus:\n- " + "\n- ".join(menus),
+                         "Se entro a la app OV de inventario.\n\n" + __import__("ov_comun").resumen_entrada() + "Menus:\n- " + "\n- ".join(menus),
                          captura=page.screenshot(full_page=False))
         except Exception as e:
             registrar_error("ov_prueba", str(e))
