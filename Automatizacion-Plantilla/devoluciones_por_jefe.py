@@ -186,7 +186,7 @@ MES = f"Devoluciones este mes (objetivo {OBJETIVO_MES})"
 
 
 def _secciones(g, b, p):
-    sin = [("Última devolución", lambda t: _fmt(t["Última devolución"]) or "Ninguna desde febrero"),
+    sin = [("Última devolución", lambda t: _fmt(t["Última devolución"]) or f"Ninguna (Inicio TOA {_fmt(t['Inicio TOA'])})"),
            ("Días sin devolver", lambda t: str(t["Días sin devolver"])),
            ("Este mes", lambda t: f"{t[MES]} de {OBJETIVO_MES}")]
     return [  # (título, corto, fondo, borde, filas, columnas)
