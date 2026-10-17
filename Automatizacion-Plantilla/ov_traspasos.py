@@ -164,11 +164,13 @@ def main(respaldo=False):
                   for r in res["resultado"]]
         print("\n".join(lineas))
         errores = sum(1 for r in res["resultado"] if not r["ok"])
-        if items or errores:
-            que = {"borradores": "Borradores creados en Gmail", "enviar": "Avisos ENVIADOS",
-                   "prueba": "Modo prueba: no se creo ni envio nada"}[modo]
-            enviar_aviso(f"Traspasos {hoy:%d/%m}: {len(items)} sin completar" + (f" -- {errores} con error" if errores else ""),
-                         _entrada() + f"{que}.\n\n" + "\n".join(lineas))
+        # Confirmacion a Gustavo siempre, tambien sin traspasos pendientes (para saber que se ejecuto)
+        que = {"borradores": "Borradores creados en Gmail", "enviar": "Avisos ENVIADOS",
+               "prueba": "Modo prueba: no se creo ni envio nada"}[modo]
+        if not items:
+            que = "No hay traspasos de dias anteriores sin completar: no se envio nada"
+        enviar_aviso(f"Traspasos {hoy:%d/%m}: {len(items)} sin completar" + (f" -- {errores} con error" if errores else ""),
+                     _entrada() + f"{que}.\n\n" + "\n".join(lineas))
         if errores:
             sys.exit(1)
     except Exception as e:
