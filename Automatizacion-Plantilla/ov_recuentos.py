@@ -97,8 +97,11 @@ def descargar_cuadrante(destino):
     print(f"[recuentos] cuadrante: {csv.count(chr(10))} filas")
 
 
-def _apps_script(datos):
+def _apps_script(datos, tipo="recuentos"):
+    """POST al Apps Script de la app. tipo separa el estado (dia hecho) de cada control."""
     datos = dict(datos, key=_entorno("RECUENTOS_KEY"))
+    if tipo != "recuentos":
+        datos["tipo"] = tipo
     req = urllib.request.Request(_entorno("RECUENTOS_SCRIPT_URL") + "?type=recuentos-borradores",
                                  data=json.dumps(datos).encode(), headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=300) as r:
@@ -112,19 +115,19 @@ def _apps_script(datos):
     return res
 
 
-def ya_hecho(hoy):
-    """True si el Apps Script dice que hoy ya se crearon/enviaron los correos."""
-    res = _apps_script({"modo": "estado", "jefes": []})
-    if "ultimo" not in res:
-        raise RuntimeError("El Apps Script no responde al modo 'estado': falta pegar la version nueva de "
-                           "apps-script-borradores.gs. El respaldo no se ejecuta para no duplicar correos.")
-    print(f"[recuentos] ultimo dia hecho segun el Apps Script: {res['ultimo'] or '(ninguno)'}")
+def ya_hecho(hoy, tipo="recuentos"):
+    """True si el Apps Script dice que hoy ya se crearon/enviaron los correos de este tipo."""
+    res = _apps_script({"modo": "estado", "jefes": []}, tipo)
+    if "ultimo" not in res or (tipo != "recuentos" and res.get("tipo") != tipo):
+        raise RuntimeError(f"El Apps Script no responde al modo 'estado' ({tipo}): falta pegar la version nueva de "
+                           "apps-script-borradores.gs. No se sigue para no duplicar ni mezclar correos.")
+    print(f"[{tipo}] ultimo dia hecho segun el Apps Script: {res['ultimo'] or '(ninguno)'}")
     return res["ultimo"] == hoy
 
 
-def mandar_correos(carpeta_correos, modo, hoy):
+def mandar_correos(carpeta_correos, modo, hoy, tipo="recuentos"):
     jefes = json.loads((carpeta_correos / "correos.json").read_text(encoding="utf-8"))
-    res = _apps_script({"modo": modo, "fecha": hoy, "jefes": jefes})
+    res = _apps_script({"modo": modo, "fecha": hoy, "jefes": jefes}, tipo)
     nombres = {j["jde"]: j["nombre"] for j in jefes}
     lineas = [f"[{'OK ' if r['ok'] else 'ERR'}] {nombres.get(r['jde'], r['jde'])} -> {r.get('para', '')} {r.get('error', '')}"
               for r in res["resultado"]]

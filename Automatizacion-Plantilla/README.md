@@ -251,6 +251,8 @@ de Gustavo: `ov_comun.py` usa el mismo login de Microsoft + Authenticator (el n�
 | `{"tarea": "ov_prueba"}` | manual | Entra y manda un correo con captura y menús |
 | `{"tarea": "recuentos_semanal"}` | `ofs-recuentos`: `cron(0 10 ? * TUE *)`, Europe/Madrid, desde el 27/10/2026 | `ov_recuentos.py`: descarga Counts → Ver Conteos (Excel), el cuadrante, genera el informe con `recuentos_por_jefe.py` y manda el correo de cada jefe al Apps Script |
 | `{"tarea": "recuentos_semanal", "respaldo": true}` | `ofs-recuentos-respaldo`: `cron(0 12 ? * TUE *)`, Europe/Madrid, desde el 27/10/2026 | Pregunta al Apps Script si hoy ya se hizo; si no, lo hace (por si a las 10:00 no se pudo aprobar Authenticator) |
+| `{"tarea": "devoluciones_diario"}` | `ofs-devoluciones`: `cron(0 11 ? * MON-FRI *)`, Europe/Madrid | `ov_devoluciones.py`: descarga Inventario Transacciones → Devoluciones al almacén (Borrador, Completado, Recibo Pendiente), genera el informe con `devoluciones_por_jefe.py` (reglas en su cabecera) y manda el correo de cada jefe al Apps Script |
+| `{"tarea": "devoluciones_diario", "respaldo": true}` | `ofs-devoluciones-respaldo`: `cron(0 13 ? * MON-FRI *)`, Europe/Madrid | Igual que el respaldo de recuentos |
 
 Variables de entorno extra (valores en `config_recuentos.json` y `recuentos_clave.txt` de la carpeta
 "Correo Recuentos" del Mac — no pegarlos en el chat):
@@ -258,6 +260,7 @@ Variables de entorno extra (valores en `config_recuentos.json` y `recuentos_clav
 - `RECUENTOS_SCRIPT_URL` (= `script_url`), `RECUENTOS_APP_TOKEN` (= `app_token`), `RECUENTOS_KEY` (= `recuentos_clave.txt`)
 - `RECUENTOS_MODO`: `borradores` (por defecto: borradores en Gmail para revisar), `enviar` (envío directo
   con copia a José Luis Osorio y César Trujillo, fijada en el Apps Script) o `prueba` (solo comprueba destinatarios).
+- `DEVOLUCIONES_MODO`: lo mismo para el correo diario de devoluciones.
 
 **Timeout** de la función: mínimo **10 min** (espera de Authenticator + descarga + 12 correos).
 

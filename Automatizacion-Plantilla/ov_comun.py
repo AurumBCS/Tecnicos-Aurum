@@ -69,3 +69,25 @@ def abrir_ov(p, ver=False):
     os.chmod(ARCHIVO_SESION, 0o600)
     print(f"[ov] dentro: {page.title()}")
     return browser, context, page
+
+
+def descargar_ig(page, ruta, destino):
+    """Abre una pagina de la app (ruta relativa a URL_OV, sin la sesion) y descarga en Excel su
+    tabla interactiva (Acciones -> Descargar -> Excel). Devuelve el rango de filas que muestra."""
+    sesion = page.evaluate("apex.env.APP_SESSION")
+    union = "&" if "?" in ruta else "?"
+    page.goto(f"{URL_OV}{ruta}{union}session={sesion}", wait_until="domcontentloaded")
+    page.wait_for_selector(".a-IG .a-GV-table", timeout=60000)
+    page.wait_for_load_state("networkidle")
+    rango = page.locator(".a-IG .a-GV-pageRange")
+    filas = rango.first.inner_text().strip() if rango.count() else "sin filas"
+    # La region no tiene id estatico: se toma el de la tabla de la pagina
+    region = page.evaluate("document.querySelector('.a-IG').id.replace(/_ig$/, '')")
+    page.evaluate(f"apex.region('{region}').call('getActions').invoke('show-download-dialog')")
+    dialogo = page.locator(".ui-dialog:visible").last
+    dialogo.locator("[data-value='XLSX']").first.click()
+    with page.expect_download(timeout=120000) as descarga:
+        dialogo.get_by_role("button", name="Descargar").click()
+    descarga.value.save_as(str(destino))
+    print(f"[ov] {ruta.split('?')[0]}: {filas} -> {destino.name} ({destino.stat().st_size} bytes)")
+    return filas
