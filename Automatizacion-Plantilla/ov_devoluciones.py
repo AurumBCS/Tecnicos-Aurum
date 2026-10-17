@@ -12,15 +12,20 @@ Control diario de devoluciones al almacen por jefe de equipo (lunes a viernes
      borradores (por defecto) / enviar (con la copia fija del Apps Script) / prueba.
   5. Manda a Gustavo un correo con el resultado y el Excel general.
 
+En la misma entrada a la app hace tambien el correo de RECEPCIONES (material enviado por
+el almacen y sin recibir en la app: Inventario Transacciones -> Recibir TOs), ver
+recepciones_por_jefe.py. Se manda ANTES que devoluciones y sin apuntar el dia como hecho,
+para que si algo falla el respaldo repita los dos. Modo: RECEPCIONES_MODO (por defecto prueba).
+
 Antes de nada comprueba que el Apps Script ya separa el estado de recuentos y de
 devoluciones (si no, para: se pisarian el "dia hecho" de los dos controles).
 Respaldo ({"tarea": "devoluciones_diario", "respaldo": true}): si hoy ya se hizo, no hace nada.
 
 Variables de entorno: las de recuentos (RECUENTOS_SCRIPT_URL, RECUENTOS_APP_TOKEN,
-RECUENTOS_KEY) y DEVOLUCIONES_MODO (opcional).
+RECUENTOS_KEY), DEVOLUCIONES_MODO y RECEPCIONES_MODO (opcionales).
 
 Uso local (sin entrar a OV, con las 3 listas ya descargadas):
-  python ov_devoluciones.py --borrador B.xlsx --completado C.xlsx --pendiente P.xlsx [--modo prueba] [--respaldo]
+  python ov_devoluciones.py --borrador B.xlsx --completado C.xlsx --pendiente P.xlsx --tos T.xlsx [--modo prueba] [--respaldo]
 """
 
 import os
@@ -39,6 +44,7 @@ from ov_recuentos import MODOS, _arg, descargar_cuadrante, mandar_correos, ya_he
 
 TIPO = "devoluciones"
 LISTAS = {"D": ("Borrador", "--borrador"), "C": ("Completado", "--completado"), "P": ("Recibo Pendiente", "--pendiente")}
+TOS = "view-tos?p297_qf_process_status=P&clear=CR,297"  # Recibir TOs (ordenes en Recibo Pendiente)
 
 
 def descargar_devoluciones(carpeta):
@@ -54,6 +60,8 @@ def descargar_devoluciones(carpeta):
                 rutas[estado] = carpeta / f"Devoluciones {nombre}.xlsx"
                 filas[nombre] = descargar_ig(
                     page, f"view-returns?p291_qf_process_status={estado}&request=IG_505517&clear=CR,291", rutas[estado])
+            rutas["TOS"] = carpeta / "Recibir TOs.xlsx"
+            filas["Recibir TOs"] = descargar_ig(page, TOS, rutas["TOS"])
         finally:
             browser.close()
     return rutas, filas
@@ -61,6 +69,7 @@ def descargar_devoluciones(carpeta):
 
 def main(respaldo=False):
     import devoluciones_por_jefe
+    import recepciones_por_jefe
 
     respaldo = respaldo or "--respaldo" in sys.argv
     ahora = datetime.now(ZoneInfo("Europe/Madrid"))
@@ -68,6 +77,9 @@ def main(respaldo=False):
     modo = (_arg("--modo") or os.environ.get("DEVOLUCIONES_MODO") or "borradores").strip()
     if modo not in MODOS:
         raise RuntimeError(f"DEVOLUCIONES_MODO no valido: {modo} (usa {'/'.join(MODOS)})")
+    modo_recep = (_arg("--modo") or os.environ.get("RECEPCIONES_MODO") or "prueba").strip()
+    if modo_recep not in MODOS:
+        raise RuntimeError(f"RECEPCIONES_MODO no valido: {modo_recep} (usa {'/'.join(MODOS)})")
     carpeta = CARPETA_BASE / "devoluciones" / hoy
     carpeta.mkdir(parents=True, exist_ok=True)
     try:
@@ -77,11 +89,23 @@ def main(respaldo=False):
             return
         if _arg("--borrador"):
             rutas = {k: Path(_arg(flag)) for k, (_, flag) in LISTAS.items()}
+            rutas["TOS"] = Path(_arg("--tos"))
             filas = {"origen": "Excel local"}
         else:
             rutas, filas = descargar_devoluciones(carpeta)
         cuadrante = carpeta / "cuadrante.csv"
         descargar_cuadrante(cuadrante)
+
+        # Recepciones primero (sin apuntar el dia: lo apunta devoluciones al final)
+        g_rec, d_rec, r_rec = recepciones_por_jefe.generar(rutas["TOS"], cuadrante, carpeta, ahora.date())
+        print(r_rec)
+        res_rec, lin_rec = mandar_correos(Path(d_rec), modo_recep, hoy, TIPO, marcar=False)
+        err_rec = sum(1 for x in res_rec["resultado"] if not x["ok"])
+        que_rec = {"borradores": "Borradores creados en Gmail", "enviar": "Correos ENVIADOS a los jefes",
+                   "prueba": "Modo prueba: no se creo ni envio nada"}[modo_recep]
+        enviar_aviso(f"Recepciones {hoy}: {que_rec.lower()}" + (f" -- {err_rec} con error" if err_rec else ""),
+                     _entrada() + f"{que_rec}.\n\n" + ("\n".join(lin_rec) or "Ningún jefe con material pendiente de recibir.")
+                     + f"\n\nResumen:\n{r_rec[:3000]}\n\nAdjunto el Excel general.", adjunto=Path(g_rec))
 
         general, dir_correos, resumen = devoluciones_por_jefe.generar(rutas, cuadrante, carpeta, ahora.date())
         print(resumen)

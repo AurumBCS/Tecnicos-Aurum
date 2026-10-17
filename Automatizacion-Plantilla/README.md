@@ -264,6 +264,8 @@ Variables de entorno extra (valores en `config_recuentos.json` y `recuentos_clav
   con copia a José Luis Osorio y César Trujillo, fijada en el Apps Script) o `prueba` (solo comprueba destinatarios).
 - `DEVOLUCIONES_MODO`: lo mismo para el correo diario de devoluciones.
 - `TRASPASOS_MODO`: lo mismo para el aviso de traspasos (`enviar` para envío directo).
+- `RECEPCIONES_MODO`: correo de material sin recibir en la app (Recibir TOs), que va en la misma tarea que
+  devoluciones (11:00). Por defecto `prueba`; `enviar` para envío directo. Reglas en `recepciones_por_jefe.py`.
 - `SESION_BUCKET` = `aurum-ofs-sesion`: bucket S3 privado donde se guarda la sesión de la app OV entre
   ejecuciones (`sesion_ov.json`), para entrar sin Authenticator mientras Microsoft la acepte. El rol de la
   Lambda tiene una política inline (`sesion-ov-s3`) que solo permite GetObject/PutObject de ese archivo.

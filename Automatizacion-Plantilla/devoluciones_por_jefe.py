@@ -70,7 +70,7 @@ def leer_devoluciones(ruta):
     })
 
 
-def leer_cuadrante(ruta):
+def leer_cuadrante(ruta, exigir_toa=True):
     """CSV del endpoint ?type=recuentos -> (tecnicos activos, nombres por matricula)."""
     c = pd.read_csv(ruta, dtype=str).apply(lambda s: s.str.strip()).replace("", pd.NA)
     c["Fila"] = pd.to_numeric(c["Fila"]) if "Fila" in c else range(3, 3 + len(c))
@@ -84,7 +84,9 @@ def leer_cuadrante(ruta):
     c["JDE"] = c["JDE"].astype(str).str.strip().str.upper().str.replace(r"\.0$", "", regex=True).replace(REASIGNAR_JDE)
     c["Nombre"] = (c["Nombre(S)"].str.strip() + " " + c["Apellidos(S)"].fillna("").str.strip()).str.strip()
     nombres = c.set_index("Matricula")["Nombre"].to_dict()
-    activos = c[(c["Fila"] > 24) & (c["Jerarquia"] == "5 TEC") & c["F Baja"].isna() & c["TOA"].notna()]
+    activos = c[(c["Fila"] > 24) & (c["Jerarquia"] == "5 TEC") & c["F Baja"].isna()]
+    if exigir_toa:
+        activos = activos[activos["TOA"].notna()]
     return activos, nombres
 
 
@@ -134,10 +136,11 @@ HDR = PatternFill("solid", fgColor="1F3864")
 COLORES = {GRAVE: "F8CBAD", AVISO: "FFE699", OK: "C6EFCE"}
 
 
-def escribir(ws, data, titulo, hoy):
+def escribir(ws, data, titulo, hoy, nota=None):
     ws.cell(1, 1, titulo).font = Font(bold=True, size=13)
-    ws.cell(2, 1, f"Fecha del informe: {hoy:%d/%m/%Y} · Objetivo: {OBJETIVO_MES} devoluciones al mes. "
-                  f"Más de {AVISO_DIAS} días sin devolver = aviso; más de {GRAVE_DIAS} = hacerla ya.").font = Font(italic=True, size=9)
+    nota = nota or (f"Objetivo: {OBJETIVO_MES} devoluciones al mes. "
+                    f"Más de {AVISO_DIAS} días sin devolver = aviso; más de {GRAVE_DIAS} = hacerla ya.")
+    ws.cell(2, 1, f"Fecha del informe: {hoy:%d/%m/%Y} · {nota}").font = Font(italic=True, size=9)
     cols = list(data.columns)
     for j, col in enumerate(cols, 1):
         cell = ws.cell(4, j, col)

@@ -130,9 +130,13 @@ def ya_hecho(hoy, tipo="recuentos"):
     return res["ultimo"] == hoy
 
 
-def mandar_correos(carpeta_correos, modo, hoy, tipo="recuentos"):
+def mandar_correos(carpeta_correos, modo, hoy, tipo="recuentos", marcar=True):
+    """marcar=False: no apunta el dia como hecho (para un correo extra dentro de la misma tarea)."""
     jefes = json.loads((carpeta_correos / "correos.json").read_text(encoding="utf-8"))
-    res = _apps_script({"modo": modo, "fecha": hoy, "jefes": jefes}, tipo)
+    datos = {"modo": modo, "jefes": jefes}
+    if marcar:
+        datos["fecha"] = hoy
+    res = _apps_script(datos, tipo)
     nombres = {j["jde"]: j["nombre"] for j in jefes}
     lineas = [f"[{'OK ' if r['ok'] else 'ERR'}] {nombres.get(r['jde'], r['jde'])} -> {r.get('para', '')} {r.get('error', '')}"
               for r in res["resultado"]]
