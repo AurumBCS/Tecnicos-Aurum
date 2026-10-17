@@ -289,7 +289,8 @@ Cada técnico debe tener <b>2 recuentos al año</b> (auditoría o periódico). S
 {''.join(bloques)}
 <p style="font-size:14px;margin-top:20px">Te adjunto el Excel con el detalle completo. Por favor, organiza los recuentos
 urgentes y avísame si algún dato no cuadra.</p>
-<p style="font-size:14px">Un saludo,</p></div>"""
+<p style="font-size:14px">Un saludo,</p>
+<p style="font-size:14px;margin-top:4px">Gustavo Perez<br>Aurum BC Security SL</p></div>"""
     texto = f"Control de recuentos de tu equipo a {HOY:%d/%m/%Y}. Recuento urgente: {urgentes} técnicos. Detalle en el Excel adjunto."
     manifiesto.append({
         "jde": jde, "nombre": nombre, "asunto": f"Control de recuentos de tu equipo - {HOY:%d/%m/%Y}",

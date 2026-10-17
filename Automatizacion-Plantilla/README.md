@@ -253,6 +253,8 @@ de Gustavo: `ov_comun.py` usa el mismo login de Microsoft + Authenticator (el n�
 | `{"tarea": "recuentos_semanal", "respaldo": true}` | `ofs-recuentos-respaldo`: `cron(0 12 ? * TUE *)`, Europe/Madrid, desde el 27/10/2026 | Pregunta al Apps Script si hoy ya se hizo; si no, lo hace (por si a las 10:00 no se pudo aprobar Authenticator) |
 | `{"tarea": "devoluciones_diario"}` | `ofs-devoluciones`: `cron(0 11 ? * MON-FRI *)`, Europe/Madrid | `ov_devoluciones.py`: descarga Inventario Transacciones → Devoluciones al almacén (Borrador, Completado, Recibo Pendiente), genera el informe con `devoluciones_por_jefe.py` (reglas en su cabecera) y manda el correo de cada jefe al Apps Script |
 | `{"tarea": "devoluciones_diario", "respaldo": true}` | `ofs-devoluciones-respaldo`: `cron(0 13 ? * MON-FRI *)`, Europe/Madrid | Igual que el respaldo de recuentos |
+| `{"tarea": "traspasos_diario"}` | `ofs-traspasos`: `cron(0 8 ? * MON-FRI *)`, Europe/Madrid | `ov_traspasos.py`: Transferencia InterWorker "A la espera Aceptación" de días anteriores → un correo por traspaso con la captura de su ficha; Para los dos técnicos, CC sus jefes, CCO José Luis y César (todo resuelto en el Apps Script desde el cuadrante) |
+| `{"tarea": "traspasos_diario", "respaldo": true}` | `ofs-traspasos-respaldo`: `cron(30 9 ? * MON-FRI *)`, Europe/Madrid | Igual que los otros respaldos |
 
 Variables de entorno extra (valores en `config_recuentos.json` y `recuentos_clave.txt` de la carpeta
 "Correo Recuentos" del Mac — no pegarlos en el chat):
@@ -261,6 +263,7 @@ Variables de entorno extra (valores en `config_recuentos.json` y `recuentos_clav
 - `RECUENTOS_MODO`: `borradores` (por defecto: borradores en Gmail para revisar), `enviar` (envío directo
   con copia a José Luis Osorio y César Trujillo, fijada en el Apps Script) o `prueba` (solo comprueba destinatarios).
 - `DEVOLUCIONES_MODO`: lo mismo para el correo diario de devoluciones.
+- `TRASPASOS_MODO`: lo mismo para el aviso de traspasos (`enviar` para envío directo).
 
 **Timeout** de la función: mínimo **10 min** (espera de Authenticator + descarga + 12 correos).
 

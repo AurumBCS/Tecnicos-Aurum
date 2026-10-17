@@ -12,6 +12,8 @@ Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "recuentos_semanal", "respaldo": true} -> martes 12:00, solo si el de las 10:00 no salio
   {"tarea": "devoluciones_diario"} -> L-V 11:00, control de devoluciones por jefe (ver ov_devoluciones.py)
   {"tarea": "devoluciones_diario", "respaldo": true} -> L-V 13:00, solo si el de las 11:00 no salio
+  {"tarea": "traspasos_diario"} -> L-V 8:00, aviso de traspasos InterWorker sin completar (ver ov_traspasos.py)
+  {"tarea": "traspasos_diario", "respaldo": true} -> L-V 9:30, solo si el de las 8:00 no salio
 (El correo de la mañana con capturas a Mercedes se retiro el 2026-10-16.)
 
 IMPORTANTE sobre reintentos (configurar en la consola, ver README): EventBridge
@@ -42,9 +44,9 @@ def _correr(fn, nombre):
 
 def handler(event, context):
     tarea = (event or {}).get("tarea")
-    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario"):
+    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario): {event}"
+            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario): {event}"
         )
 
     if tarea == "listar_buckets":
@@ -67,6 +69,11 @@ def handler(event, context):
         import ov_devoluciones
 
         _correr(lambda: ov_devoluciones.main(respaldo=bool(event.get("respaldo"))), "ov_devoluciones")
+    elif tarea == "traspasos_diario":
+        # Avisa de los traspasos InterWorker de dias anteriores sin aceptar (tecnicos + jefes).
+        import ov_traspasos
+
+        _correr(lambda: ov_traspasos.main(respaldo=bool(event.get("respaldo"))), "ov_traspasos")
     else:
         # "mediodia" (14:00) y "tarde" (17:30) hacen lo mismo: descargar la ruta
         # del dia siguiente y subirla a confirmaciones-sms.

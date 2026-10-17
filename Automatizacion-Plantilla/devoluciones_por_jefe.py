@@ -258,7 +258,8 @@ o borrarlos y crear otro cuando toque.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="4" style="margin:10px 0"><tr>{''.join(cajas)}</tr></table>
 {''.join(bloques)}
 <p style="font-size:14px;margin-top:20px">Te adjunto el Excel con el detalle completo. Avísame si algún dato no cuadra.</p>
-<p style="font-size:14px">Un saludo,</p></div>"""
+<p style="font-size:14px">Un saludo,</p>
+<p style="font-size:14px;margin-top:4px">Gustavo Perez<br>Aurum BC Security SL</p></div>"""
         graves = int((g.Estado == GRAVE).sum())
         manifiesto.append({
             "jde": jde, "nombre": nombre, "asunto": f"Control de devoluciones de tu equipo - {hoy:%d/%m/%Y}",
