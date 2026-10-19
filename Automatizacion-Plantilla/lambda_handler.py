@@ -14,6 +14,7 @@ Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "devoluciones_diario", "respaldo": true} -> L-V 13:00, solo si el de las 11:00 no salio
   {"tarea": "traspasos_diario"} -> L-V 8:00, aviso de traspasos InterWorker sin completar (ver ov_traspasos.py)
   {"tarea": "traspasos_diario", "respaldo": true} -> L-V 9:30, solo si el de las 8:00 no salio
+  {"tarea": "ofs_rm_prueba"} -> prueba (manual): buscar mantenimientos repetidos en Oracle (ver ofs_rm_prueba.py)
 (El correo de la mañana con capturas a Mercedes se retiro el 2026-10-16.)
 
 IMPORTANTE sobre reintentos (configurar en la consola, ver README): EventBridge
@@ -44,9 +45,9 @@ def _correr(fn, nombre):
 
 def handler(event, context):
     tarea = (event or {}).get("tarea")
-    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario"):
+    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "ofs_rm_prueba"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario): {event}"
+            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/ofs_rm_prueba): {event}"
         )
 
     if tarea == "listar_buckets":
@@ -74,6 +75,11 @@ def handler(event, context):
         import ov_traspasos
 
         _correr(lambda: ov_traspasos.main(respaldo=bool(event.get("respaldo"))), "ov_traspasos")
+    elif tarea == "ofs_rm_prueba":
+        # Busca unos mantenimientos repetidos en Oracle y manda capturas/observaciones/historial.
+        import ofs_rm_prueba
+
+        _correr(lambda: ofs_rm_prueba.main(event.get("parejas")), "ofs_rm_prueba")
     else:
         # "mediodia" (14:00) y "tarde" (17:30) hacen lo mismo: descargar la ruta
         # del dia siguiente y subirla a confirmaciones-sms.

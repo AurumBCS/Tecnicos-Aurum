@@ -292,9 +292,10 @@ def es_pagina_microsoft(page):
     return dominio.endswith("microsoftonline.com") or dominio.endswith("microsoft.com") or dominio.endswith("live.com")
 
 
-def enviar_aviso(asunto, cuerpo, captura=None, adjunto=None):
+def enviar_aviso(asunto, cuerpo, captura=None, adjunto=None, capturas=None):
     """Correo corto a AVISO_EMAIL (numero de aprobacion, errores, resultado).
-    captura: bytes PNG; adjunto: Path de un archivo (ej. el Excel de la ruta)."""
+    captura: bytes PNG; adjunto: Path de un archivo (ej. el Excel de la ruta);
+    capturas: lista de (nombre, bytes PNG) para mandar varias pantallas."""
     gmail_user = os.environ.get("GMAIL_USER")
     gmail_pass = os.environ.get("GMAIL_APP_PASSWORD")
     if not gmail_user or not gmail_pass:
@@ -314,6 +315,11 @@ def enviar_aviso(asunto, cuerpo, captura=None, adjunto=None):
     if captura:
         try:
             msg.attach(MIMEImage(captura, name="pantalla.png"))
+        except Exception:
+            pass
+    for nombre, png in capturas or []:
+        try:
+            msg.attach(MIMEImage(png, name=f"{nombre}.png"))
         except Exception:
             pass
     if adjunto:
