@@ -472,6 +472,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <div class="tabs-bar" id="tabsBarJR" style="display:none">
     <button class="tab-btn active" id="tabJEs" onclick="switchTab(&#39;jes&#39;)">Jefes de equipo</button>
     <button class="tab-btn" id="tabUso" onclick="switchTab(&#39;uso&#39;)">Uso de la app</button>
+    <button class="tab-btn" id="tabUsoSms" style="display:none" onclick="switchTab(&#39;usoSms&#39;)">📲 Uso confirmaciones</button>
   </div>
 
   <!-- Panel técnico normal -->
@@ -614,6 +615,20 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <option value="">Total (todo el histórico)</option>
     </select>
     <div id="usageContent"><div style="text-align:center;color:var(--text2);padding:40px 0">Cargando datos de uso…</div></div>
+  </div>
+
+  <!-- Panel uso de confirmaciones SMS (solo GD5381) -->
+  <div id="usoSmsPanel" style="display:none;padding:14px 13px 48px;max-width:680px;margin:0 auto">
+    <div class="data-banner" style="margin-bottom:14px">
+      <div class="sync-dot"></div>
+      Quién entra en Confirmaciones SMS, envía los SMS y marca las respuestas
+    </div>
+    <select id="periodoUsoSms" onchange="renderUsoSmsPanel(true)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+      <option value="hoy">Hoy</option>
+      <option value="7">Últimos 7 días</option>
+      <option value="mes">Este mes</option>
+    </select>
+    <div id="usoSmsContent"><div style="text-align:center;color:var(--text2);padding:40px 0">Cargando…</div></div>
   </div>
 
   <!-- Panel detalle KPI (técnico individual) -->
@@ -1231,7 +1246,7 @@ async function cambiarMes(mes){
 //  PANELS VISIBILITY
 // ══════════════════════════════════════════════
 function hideAllPanels(){
-  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','usagePanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel','historicoPanel']
+  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','usagePanel','usoSmsPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel','historicoPanel']
     .forEach(id=>document.getElementById(id).style.display='none');
 }
 function showPanel(id){
@@ -1292,7 +1307,9 @@ function switchTab(tab){
   } else if(CURRENT_USER_TYPE==='jr'){
     document.getElementById('tabJEs').classList.toggle('active', tab==='jes');
     document.getElementById('tabUso').classList.toggle('active', tab==='uso');
+    document.getElementById('tabUsoSms').classList.toggle('active', tab==='usoSms');
     if(tab==='uso'){ showPanel('usagePanel'); renderUsagePanel(); }
+    else if(tab==='usoSms'){ showPanel('usoSmsPanel'); renderUsoSmsPanel(); }
     else { showPanel('jrPanel'); }
   }
 }
@@ -3424,6 +3441,143 @@ function renderUsagePanel(mesSeleccionado){
 }
 
 // ════════════════════════════════════════════════════════
+//  USO DE CONFIRMACIONES SMS (pestaña solo para GD5381)
+//  Datos: GET {SMS_CONFIRMACIONES_URL}/uso -> eventos (entrada / sms /
+//  confirmado / no_confirmado) + citas cargadas ahora por técnico.
+// ════════════════════════════════════════════════════════
+let USO_SMS_DATA = null;
+let USO_SMS_PERIODO = null;
+
+function desdeUsoSms(periodo){
+  const hoy = new Date();
+  const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(periodo==='7'){ const d=new Date(hoy); d.setDate(d.getDate()-6); return iso(d); }
+  if(periodo==='mes') return iso(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+  return iso(hoy);
+}
+
+function horaUsoSms(ts){
+  const d = new Date(ts);
+  if(isNaN(d)) return '—';
+  return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+' '+
+         String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+async function renderUsoSmsPanel(recargar){
+  const el = document.getElementById('usoSmsContent');
+  const periodo = document.getElementById('periodoUsoSms').value;
+  if(recargar || !USO_SMS_DATA || USO_SMS_PERIODO!==periodo){
+    el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px 0">Cargando…<br><span style="font-size:.75rem">(si el servidor estaba dormido puede tardar hasta 1 minuto)</span></div>';
+    try{
+      const url = SMS_CONFIRMACIONES_URL.replace(/\/$/,'')+'/uso?token='+encodeURIComponent(APP_TOKEN)+'&desde='+desdeUsoSms(periodo)+'&t='+Date.now();
+      const res = await fetch(url, {cache:'no-store'});
+      USO_SMS_DATA = await res.json();
+      USO_SMS_PERIODO = periodo;
+      if(!USO_SMS_DATA.ok) throw new Error(USO_SMS_DATA.error||'error');
+    }catch(e){
+      USO_SMS_DATA = null;
+      el.innerHTML = '<div style="text-align:center;color:var(--red);padding:30px 0">No se pudieron cargar los datos ('+e.message+').</div>'+
+        '<button onclick="renderUsoSmsPanel(true)" style="width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);cursor:pointer">↻ Reintentar</button>';
+      return;
+    }
+  }
+  const d = USO_SMS_DATA;
+  const nombre = m => ROSTER_NOMBRES[m] || JE_NAMES[m] || m;
+
+  // Agregado por matrícula de lo que HIZO cada uno en el periodo
+  const por = {};
+  const fila = m => por[m] || (por[m] = {entradas:0, sms:0, conf:0, noconf:0, ultimo:''});
+  d.eventos.forEach(ev=>{
+    const r = fila(ev.mat);
+    if(ev.accion==='entrada'){ r.entradas++; if(ev.ts>r.ultimo) r.ultimo=ev.ts; }
+    else if(ev.accion==='sms') r.sms++;
+    else if(ev.accion==='confirmado') r.conf++;
+    else if(ev.accion==='no_confirmado') r.noconf++;
+  });
+
+  // Con citas cargadas ahora y sin actividad desde la última carga
+  const desdeCarga = d.ultimaCarga || (desdeUsoSms('hoy')+'T00:00:00');
+  const activos = new Set();
+  d.eventos.forEach(ev=>{
+    if(ev.ts < desdeCarga) return;
+    if(ev.accion==='entrada' && ev.rol==='tecnico') activos.add(ev.mat);
+    if(ev.accion!=='entrada' && ev.citaMat) activos.add(ev.citaMat); // su JE ya le movió citas
+  });
+  const sinEntrar = Object.keys(d.citas).filter(m => d.citas[m].pendientes>0 && !activos.has(m));
+
+  // Equipos: JE -> técnicos (jerarquía del servidor, ya con el JE dentro)
+  const jer = d.jerarquia || {};
+  const jeDe = {};
+  Object.keys(jer).forEach(je => (jer[je]||[]).forEach(m => { if(m!==je) jeDe[m]=je; }));
+
+  const tecnicosQueEntraron = new Set(d.eventos.filter(e=>e.accion==='entrada'&&e.rol==='tecnico').map(e=>e.mat));
+  const jesQueEntraron = new Set(d.eventos.filter(e=>e.accion==='entrada'&&e.rol==='je').map(e=>e.mat));
+  const total = a => d.eventos.filter(e=>e.accion===a).length;
+
+  const tarjeta = (valor, texto, color) => `
+    <div style="flex:1;min-width:90px;background:var(--s1);border-radius:12px;padding:10px 8px;border:1px solid var(--border2);text-align:center">
+      <div style="font-size:1.4rem;font-weight:800;color:${color}">${valor}</div>
+      <div style="font-size:.7rem;color:var(--text2)">${texto}</div>
+    </div>`;
+
+  // Bloque "sin entrar", agrupado por JE
+  const sinPorJE = {};
+  sinEntrar.forEach(m => (sinPorJE[jeDe[m]||'—'] = sinPorJE[jeDe[m]||'—'] || []).push(m));
+  const bloqueSin = sinEntrar.length ? `
+    <div style="background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.35);border-radius:12px;padding:12px 14px;margin-bottom:16px">
+      <div style="font-weight:800;color:#e05a4a;margin-bottom:6px">⚠️ Con citas pendientes y sin entrar (${sinEntrar.length})</div>
+      <div style="font-size:.72rem;color:var(--text2);margin-bottom:8px">Desde la última carga de citas${d.ultimaCarga?' ('+horaUsoSms(d.ultimaCarga)+')':''}. Ni el técnico ni su JE han movido sus citas.</div>
+      ${Object.keys(sinPorJE).sort().map(je=>`
+        <div style="font-size:.74rem;color:var(--gold2);font-weight:700;margin-top:6px">${je==='—'?'Sin equipo':'Equipo de '+nombre(je)}</div>
+        ${sinPorJE[je].sort((a,b)=>nombre(a).localeCompare(nombre(b))).map(m=>`
+          <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:3px 0">
+            <span>${nombre(m)} <span style="color:var(--text2)">(${m})</span></span>
+            <span style="color:#e05a4a;font-weight:700">${d.citas[m].pendientes} pend.</span>
+          </div>`).join('')}`).join('')}
+    </div>` : `
+    <div style="background:rgba(61,170,110,.08);border:1px solid rgba(61,170,110,.35);border-radius:12px;padding:12px 14px;margin-bottom:16px;color:var(--green);font-weight:700">
+      ✅ Todos los técnicos con citas pendientes han entrado (o su JE las está gestionando).
+    </div>`;
+
+  // Tabla por equipo
+  const celda = (v, color) => `<td style="padding:6px 6px;text-align:center;${v?'font-weight:700;color:'+color:'color:var(--text2)'}">${v||'·'}</td>`;
+  const filaTec = (m, esJE) => {
+    const r = por[m] || {entradas:0,sms:0,conf:0,noconf:0,ultimo:''};
+    const c = d.citas[m];
+    return `<tr style="border-top:1px solid var(--border2)">
+      <td style="padding:6px 8px;font-size:.8rem">${esJE?'⭐ ':''}${nombre(m)}<div style="font-size:.68rem;color:var(--text2)">${m}${r.ultimo?' · '+horaUsoSms(r.ultimo):''}</div></td>
+      ${celda(r.entradas,'var(--gold2)')}${celda(r.sms,'#3498db')}${celda(r.conf,'var(--green)')}${celda(r.noconf,'#e05a4a')}
+      <td style="padding:6px 6px;text-align:center;font-size:.75rem;color:${c&&c.pendientes?'#e05a4a':'var(--text2)'}">${c?c.pendientes+'/'+c.total:'—'}</td>
+    </tr>`;
+  };
+  const cab = `<tr style="background:var(--s2);color:var(--text2);font-size:.66rem;text-transform:uppercase;letter-spacing:.04em">
+      <th style="padding:6px 8px;text-align:left">Persona</th><th style="padding:6px 4px">Entr.</th><th style="padding:6px 4px">SMS</th><th style="padding:6px 4px">✅</th><th style="padding:6px 4px">❌</th><th style="padding:6px 4px">Pend.</th></tr>`;
+  const equipos = Object.keys(jer).sort((a,b)=>nombre(a).localeCompare(nombre(b)));
+  const tablas = equipos.map(je=>{
+    const tecs = (jer[je]||[]).filter(m=>m!==je).sort((a,b)=>nombre(a).localeCompare(nombre(b)));
+    const relevantes = tecs.filter(m=>por[m]||d.citas[m]);
+    if(!relevantes.length && !por[je]) return '';
+    return `<div style="margin-bottom:14px;border:1px solid var(--border2);border-radius:12px;overflow:hidden">
+      <div style="background:var(--s1);padding:8px 10px;font-weight:800;color:var(--gold2);font-size:.85rem">Equipo de ${nombre(je)}</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.8rem">${cab}${filaTec(je,true)}${relevantes.map(m=>filaTec(m,false)).join('')}</table></div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      ${tarjeta(tecnicosQueEntraron.size,'Técnicos que entraron','var(--gold2)')}
+      ${tarjeta(jesQueEntraron.size,'JEs que entraron','var(--gold2)')}
+      ${tarjeta(total('sms'),'SMS enviados','#3498db')}
+      ${tarjeta(total('confirmado'),'Confirmadas','var(--green)')}
+      ${tarjeta(total('no_confirmado'),'No confirman','#e05a4a')}
+    </div>
+    ${bloqueSin}
+    ${tablas || '<div style="text-align:center;color:var(--text2);padding:20px 0">Sin actividad en este periodo.</div>'}
+    <div style="font-size:.7rem;color:var(--text2);margin:6px 0 10px">Entr. (entradas), SMS, ✅ y ❌: lo que hizo cada persona en el periodo elegido. Pend.: citas pendientes / citas cargadas ahora mismo. ⭐ = jefe de equipo.</div>
+    <button onclick="renderUsoSmsPanel(true)" style="width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.85rem;cursor:pointer">↻ Actualizar datos</button>`;
+}
+
+// ════════════════════════════════════════════════════════
 //  CARGAR RM (CSV dinámico)
 // ════════════════════════════════════════════════════════
 async function loadRM(){
@@ -5545,6 +5699,7 @@ async function doLogin(){
     document.getElementById('tabsBarJR').style.display='flex';
     document.getElementById('tabsBar').style.display='none';
     document.getElementById('btnEquipoTF').style.display = found.id==='GD5381' ? 'block' : 'none';
+    document.getElementById('tabUsoSms').style.display = found.id==='GD5381' ? '' : 'none';
     renderJRPanel();
     Promise.all([loadMedialiaCoord(), loadMedaliaDetalle()]).then(()=>renderMedialiaCoord());
     showPanel('jrPanel');

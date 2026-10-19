@@ -7,7 +7,12 @@
  *   - cargar      -> devuelve todas las citas guardadas
  *   - guardarTodo -> reemplaza todas las citas por las que llegan en el body
  *   - borrarTodo  -> limpia todas las citas (usado en la limpieza de medianoche)
+ *   - registrarUso -> añade filas al registro de uso (pestaña "Uso"): quién entra,
+ *                     envía SMS y marca Sí/No. Body: { eventos: [ {...}, ... ] }
+ *   - leerUso      -> devuelve el registro de uso desde una fecha (?desde=AAAA-MM-DD)
  */
+
+var COLUMNAS_USO = ['ts','fecha','mat','rol','accion','citaMat','citaFecha'];
 
 var COLUMNAS = ['id','tecnico','matricula','cliente','telefono','numMantenimiento',
                 'timeslot','tipo','fecha','status','respuesta','horaRespuesta','sentAt'];
@@ -42,6 +47,17 @@ function manejarSolicitud(e) {
     var citas = body.citas || [];
     escribirCitas(hoja, citas);
     return respuestaJSON({ ok: true, guardadas: citas.length });
+  }
+
+  if (accion === 'registrarUso') {
+    var bodyUso = JSON.parse(e.postData.contents);
+    var n = registrarUso(bodyUso.eventos || []);
+    return respuestaJSON({ ok: true, guardados: n });
+  }
+
+  if (accion === 'leerUso') {
+    var desde = String(e.parameter.desde || '');
+    return respuestaJSON({ ok: true, eventos: leerUso(desde) });
   }
 
   if (accion === 'borrarTodo') {
@@ -89,6 +105,55 @@ function escribirCitas(hoja, citas) {
     return COLUMNAS.map(function(col) { return (c[col] !== undefined && c[col] !== null) ? String(c[col]) : ''; });
   });
   rango.setValues(datos);
+}
+
+// ── Registro de uso ─────────────────────────────────────────────────────────
+function hojaUso() {
+  var ss = SpreadsheetApp.getActive();
+  var hoja = ss.getSheetByName('Uso');
+  if (!hoja) {
+    hoja = ss.insertSheet('Uso');
+    hoja.appendRow(COLUMNAS_USO);
+    hoja.setFrozenRows(1);
+    hoja.getRange('A:G').setNumberFormat('@'); // texto plano (fechas/matriculas tal cual)
+  }
+  return hoja;
+}
+
+function registrarUso(eventos) {
+  if (!eventos || !eventos.length) return 0;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var hoja = hojaUso();
+    var filas = eventos.map(function(ev) {
+      return COLUMNAS_USO.map(function(col) { return ev[col] !== undefined && ev[col] !== null ? String(ev[col]) : ''; });
+    });
+    var rango = hoja.getRange(hoja.getLastRow() + 1, 1, filas.length, COLUMNAS_USO.length);
+    rango.setNumberFormat('@');
+    rango.setValues(filas);
+    return filas.length;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function leerUso(desde) {
+  var hoja = hojaUso();
+  var datos = hoja.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < datos.length; i++) {
+    var ev = {};
+    for (var c = 0; c < COLUMNAS_USO.length; c++) {
+      var v = datos[i][c];
+      if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), c === 1 ? 'yyyy-MM-dd' : "yyyy-MM-dd'T'HH:mm:ss");
+      ev[COLUMNAS_USO[c]] = String(v);
+    }
+    if (!ev.mat) continue;
+    if (desde && ev.fecha < desde) continue;
+    out.push(ev);
+  }
+  return out;
 }
 
 function respuestaJSON(obj) {

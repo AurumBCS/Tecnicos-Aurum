@@ -211,7 +211,7 @@
     localStorage.setItem('mi_matricula_je', mat);
     localStorage.setItem('mi_dni_je', dni);
 
-    fetch('/mis-citas-equipo?matricula=' + encodeURIComponent(mat) + '&dni=' + encodeURIComponent(dni))
+    fetch('/mis-citas-equipo?matricula=' + encodeURIComponent(mat) + '&dni=' + encodeURIComponent(dni) + '&entrada=1')
       .then(r => r.json())
       .then(d => {
         if (!d.ok) { showToast(d.error || 'Error', 'error'); return; }
@@ -454,7 +454,7 @@
     fetch('/marcar-respuesta', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status })
+      body: JSON.stringify({ id, status, quien: document.getElementById('matricula').value.trim().toUpperCase(), rol: 'je' }) // quien: para el registro de uso
     })
       .then(r => r.json())
       .then(d => {

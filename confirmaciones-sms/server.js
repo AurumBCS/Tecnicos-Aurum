@@ -223,6 +223,48 @@ async function cargarCitasDesdeSheet() {
   }
 }
 
+// ── Registro de uso (quién entra, envía SMS y marca respuestas) ─────────────
+// Se acumula en memoria y se manda a la pestaña "Uso" de la hoja de citas cada
+// 30 s (acción "registrarUso" del Apps Script de la hoja). Lo lee el portal
+// (pestaña "Uso confirmaciones" de GD5381) por GET /uso.
+let usoPendiente = [];
+let ultimaCargaCitas = null; // ISO de la última subida de Excel (para "con citas y sin entrar")
+let colaUso = Promise.resolve();
+
+function registrarUso(mat, rol, accion, cita) {
+  const ahora = new Date();
+  usoPendiente.push({
+    ts: ahora.toISOString(),
+    fecha: hoyMadridISO(),
+    mat: String(mat || '').trim().toUpperCase(),
+    rol,
+    accion,
+    citaMat: cita ? String(cita.matricula || '').toUpperCase() : '',
+    citaFecha: cita ? String(cita.fecha || '') : ''
+  });
+}
+
+function enviarUsoPendiente() {
+  if (!usoPendiente.length) return colaUso;
+  const lote = usoPendiente;
+  usoPendiente = [];
+  colaUso = colaUso
+    .then(() => postAppsScript(CITAS_SHEET_URL, { action: 'registrarUso', eventos: lote }))
+    .then(raw => {
+      // Apps Script ejecuta el POST y responde con una redireccion (no JSON):
+      // eso cuenta como guardado. Solo un {"ok":false} explicito es un fallo.
+      let r = null;
+      try { r = JSON.parse(raw); } catch (e) {}
+      if (r && r.ok === false) throw new Error(r.error || 'respuesta ok:false');
+    })
+    .catch(e => {
+      console.error('[Uso] No se pudo guardar el registro, se reintentará:', e.message);
+      usoPendiente = lote.concat(usoPendiente); // no perder eventos
+    });
+  return colaUso;
+}
+setInterval(enviarUsoPendiente, 30 * 1000);
+
 function guardarSesion() {
   try {
     fs.writeFileSync(SESSION_FILE, JSON.stringify({ appointments, currentJE, dailyStats }, null, 2));
@@ -607,6 +649,7 @@ app.post('/upload', upload.single('excel'), (req, res) => {
       updated++;
     });
 
+    ultimaCargaCitas = new Date().toISOString();
     guardarSesion();
     broadcast({ type: 'update', appointments });
     broadcast({ type: 'je', je: currentJE });
@@ -958,6 +1001,7 @@ app.get('/mis-citas', async (req, res) => {
   if (!(await verificarDNIConRecarga(matricula, dni))) {
     return res.json({ ok: false, error: 'Matrícula o DNI incorrectos' });
   }
+  if (req.query.entrada === '1') registrarUso(matricula, 'tecnico', 'entrada');
   // Todas las citas cargadas del técnico, igual que ve su JE. Antes solo se
   // devolvían las de "mañana", y se quedaban fuera (p. ej. un sábado se carga la
   // ruta del lunes, o el Excel trae la fecha en otro formato que dd/mm/aa).
@@ -984,6 +1028,7 @@ app.get('/mis-citas-equipo', async (req, res) => {
   if (!tecnicos) {
     return res.json({ ok: false, error: 'Esa matrícula no es de un jefe de equipo reconocido' });
   }
+  if (req.query.entrada === '1') registrarUso(matricula, 'je', 'entrada');
 
   const delEquipo = appointments
     .filter(a => tecnicos.includes(String(a.matricula || '').trim().toUpperCase()))
@@ -991,8 +1036,42 @@ app.get('/mis-citas-equipo', async (req, res) => {
   res.json({ ok: true, citas: delEquipo, nombre: JE_NAMES[matricula] || matricula, totalTecnicos: tecnicos.length });
 });
 
+// ── Estadística de uso para el portal (pestaña de GD5381) ───────────────────
+// GET /uso?token=...&desde=AAAA-MM-DD  -> eventos desde esa fecha + resumen de
+// las citas cargadas ahora por técnico. Protegido con el mismo token que usa el
+// portal para el Apps Script.
+app.get('/uso', async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  if (String(req.query.token || '') !== APP_TOKEN) return res.status(403).json({ ok: false, error: 'No autorizado' });
+  const desde = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.desde || '')) ? req.query.desde : hoyMadridISO();
+  let eventos = [];
+  try {
+    const raw = await fetchCSV(CITAS_SHEET_URL + '?action=leerUso&desde=' + encodeURIComponent(desde));
+    const d = JSON.parse(raw);
+    if (d.ok && Array.isArray(d.eventos)) eventos = d.eventos;
+  } catch (e) {
+    console.error('[Uso] Error al leer el registro:', e.message);
+  }
+  eventos = eventos.concat(usoPendiente.filter(e => e.fecha >= desde)); // aún sin guardar
+
+  purgarYGuardar();
+  const citas = {};
+  appointments.forEach(a => {
+    const m = String(a.matricula || '').toUpperCase();
+    if (!m) return;
+    const c = citas[m] || (citas[m] = { total: 0, pendientes: 0, enviadas: 0, confirmadas: 0, noConfirma: 0, sinTelefono: 0 });
+    c.total++;
+    if (a.status === 'pendiente') c.pendientes++;
+    else if (a.status === 'enviado') c.enviadas++;
+    else if (a.status === 'confirmado') c.confirmadas++;
+    else if (a.status === 'no_confirmado') c.noConfirma++;
+    else if (a.status === 'sin_telefono') c.sinTelefono++;
+  });
+  res.json({ ok: true, desde, eventos, citas, ultimaCarga: ultimaCargaCitas, jerarquia: JERARQUIA });
+});
+
 app.post('/marcar-respuesta', (req, res) => {
-  const { id, status } = req.body;
+  const { id, status, quien, rol } = req.body;
   const estadosValidos = ['enviado', 'confirmado', 'no_confirmado', 'pendiente'];
   if (!estadosValidos.includes(status)) {
     return res.json({ ok: false, error: 'Estado inválido' });
@@ -1006,6 +1085,9 @@ app.post('/marcar-respuesta', (req, res) => {
   else if (status === 'enviado')  { apt.respuesta = ''; apt.sentAt = Date.now(); }
   else apt.respuesta = '';
   apt.horaRespuesta = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  if (quien && status !== 'pendiente') {
+    registrarUso(quien, rol === 'je' ? 'je' : 'tecnico', status === 'enviado' ? 'sms' : status, apt);
+  }
 
   guardarSesion();
   broadcast({ type: 'update', appointments });
