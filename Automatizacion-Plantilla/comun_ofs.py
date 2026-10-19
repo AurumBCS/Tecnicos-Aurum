@@ -443,6 +443,7 @@ def iniciar_sesion_microsoft(page, correo, clave):
     contrasena_enviada = 0
     correo_enviado = 0
     cancelaciones_fido = 0
+    selecciones_cuenta = 0
 
     while time.time() < limite:
         page.wait_for_timeout(2000)
@@ -489,6 +490,18 @@ def iniciar_sesion_microsoft(page, correo, clave):
                 raise RuntimeError(f"Microsoft rechazo la contraseña (revisa ETADIRECT_PASS en la Lambda): {error_txt}")
         if _visible(page, "#idDiv_SAASDS_Title"):
             raise RuntimeError("La solicitud de Authenticator fue rechazada")
+
+        # "Selección de la cuenta" / "Pick an account": aparece cuando se reutiliza una sesion
+        # guardada que Microsoft ya no da por buena pero recuerda la cuenta (visto en vivo
+        # 2026-10-19 con la app OV). Se pulsa la cuenta; si se repite, "Usar otra cuenta".
+        if _visible(page, "#tilesHolder") or any(t in pantalla for t in ("Selección de la cuenta", "Pick an account", "Elegir una cuenta")):
+            selecciones_cuenta += 1
+            print(f"[microsoft] seleccion de cuenta (vez {selecciones_cuenta})")
+            if selecciones_cuenta <= 2 and _clic_si_visible(page, f"[data-test-id='{correo_ms}']", f"text={correo_ms}"):
+                continue
+            if _clic_si_visible(page, "#otherTile", "text=Usar otra cuenta", "text=Use another account"):
+                continue
+            raise RuntimeError("Microsoft muestra la seleccion de cuenta y no se pudo elegir la cuenta")
 
         # "Let's keep your account secure" (Microsoft propone registrar otro
         # metodo de verificacion) -> "Not now" / "Ahora no" (confirmado en vivo)
