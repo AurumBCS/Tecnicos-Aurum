@@ -5414,28 +5414,40 @@ function cfPintarSabado(){
     ${anul.length?`<details><summary>🚫 Anulados (${anul.length})</summary>${lista(anul)}</details>`:''}
     ${si.length?`<details><summary>✅ Ficharon (${si.length})</summary>${lista(si)}</details>`:''}
     <div class="pie">
+      ${CF_SAB_GUARDANDO?`<div class="aviso" style="color:var(--muted)">💾 Guardando ${CF_SAB_GUARDANDO}…</div>`:''}
       ${d.pendientes?`<div class="aviso">Falta indicar qué pasó con ${d.pendientes} persona${d.pendientes>1?'s':''} para poder generar la asistencia.</div>`:''}
       <button class="cf-btn prim" ${d.pendientes?'disabled style="opacity:.5"':''} onclick="cfSabInforme()">📥 Generar asistencia del sábado</button>
       <button class="cf-btn" style="margin-top:8px" onclick="document.getElementById('cfSab').remove()">Cerrar</button>
     </div></div>`;
   el.querySelector('.caja').scrollTop=top;
 }
-async function cfSabMarcar(i,motivo){
-  const x=CF_SAB.filas[i]; if(!x) return;
+// Marcar es inmediato en pantalla; se guarda por detrás, de uno en uno y en orden.
+let CF_SAB_COLA=Promise.resolve(), CF_SAB_GUARDANDO=0;
+function cfSabMarcar(i,motivo){
+  const d=CF_SAB, x=d&&d.filas[i]; if(!x) return;
   let nota='';
   if(motivo==='Otro'||motivo==='Cambiado a otro día'){
     nota=prompt(motivo==='Otro'?'Explica brevemente qué pasó:':'¿A qué día se cambió? (opcional)',x.fuente==='Revisado'?x.nota:'');
     if(nota===null) return;
   }
-  try{
-    CF_SAB=await cfLlamar('fch-sabado-marcar',{fecha:CF_SAB.fecha,clave:x.clave,nombre:x.nombre,matricula:x.matricula,
-      tipo:x.estado==='extra'?'extra':'programado',motivo,nota});
-    cfPintarSabado();
-  }catch(e){ alert('No se pudo guardar: '+e.message); }
+  const antes={motivo:x.motivo,nota:x.nota,fuente:x.fuente};
+  x.motivo=motivo; x.fuente='Revisado'; if(nota) x.nota=nota;
+  d.pendientes=d.filas.filter(f=>f.estado==='no fichó'&&!f.motivo).length;
+  CF_SAB_GUARDANDO++; cfPintarSabado();
+  const fecha=d.fecha;
+  CF_SAB_COLA=CF_SAB_COLA.then(()=>cfLlamar('fch-sabado-marcar',{fecha,clave:x.clave,nombre:x.nombre,matricula:x.matricula,
+      tipo:x.estado==='extra'?'extra':'programado',motivo,nota}))
+    .catch(e=>{
+      Object.assign(x,antes);
+      if(CF_SAB===d) d.pendientes=d.filas.filter(f=>f.estado==='no fichó'&&!f.motivo).length;
+      alert('No se pudo guardar lo de '+x.nombre+': '+e.message);
+    })
+    .finally(()=>{ CF_SAB_GUARDANDO--; if(CF_SAB===d) cfPintarSabado(); });
 }
 async function cfSabInforme(){
   const b=document.querySelector('#cfSab .pie .prim'); if(b){ b.disabled=true; b.textContent='⏳ Preparando el Excel…'; }
   try{
+    await CF_SAB_COLA;                      // que se haya guardado todo lo marcado
     const r=await cfLlamar('fch-sabado-informe',{fecha:CF_SAB.fecha});
     if(r.pendientes){ alert('Todavía falta indicar qué pasó con '+r.pendientes+' persona(s).'); cfSabado(CF_SAB.fecha); return; }
     const bytes=Uint8Array.from(atob(r.excel),ch=>ch.charCodeAt(0));
