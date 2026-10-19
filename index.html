@@ -346,6 +346,24 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .cf-rb:hover{border-color:var(--gold);color:var(--gold2)}
 .cf-rb:disabled{opacity:.5;cursor:default}
 .cf-pendbtn{width:100%;margin-bottom:12px;padding:11px;border-radius:10px;background:rgba(212,131,26,.12);border:1px solid var(--orange);color:var(--orange);font-family:var(--font);font-size:.78rem;font-weight:800;cursor:pointer}
+#cfSab{position:fixed;inset:0;z-index:290;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:14px}
+#cfSab .caja{background:var(--s1);border:1px solid var(--gold3);border-radius:16px;width:100%;max-width:640px;max-height:92vh;overflow:auto;padding:16px}
+#cfSab h3{margin:0 0 6px;font-size:.95rem;color:var(--gold2)}
+#cfSab .nav{display:flex;gap:6px;align-items:center;margin-bottom:10px}
+#cfSab .nav select{flex:1}
+#cfSab .sec{font-size:.72rem;font-weight:800;color:var(--text);margin:14px 0 6px}
+#cfSab .p{background:var(--bg);border:1px solid var(--border2);border-radius:12px;padding:9px 11px;margin-bottom:8px}
+#cfSab .p.pend{border-color:var(--orange)}
+#cfSab .p .n{font-size:.8rem;font-weight:800;color:var(--text)}
+#cfSab .p .d{font-size:.64rem;color:var(--muted);margin-top:2px}
+#cfSab .p .m{font-size:.68rem;font-weight:700;color:var(--gold2);margin-top:5px}
+#cfSab .p .bts{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+#cfSab .p .cf-rb.on{background:var(--gold);color:#0a0a0a;border-color:var(--gold)}
+#cfSab details summary{cursor:pointer;font-size:.72rem;font-weight:800;color:var(--text);margin:14px 0 6px}
+#cfSab .fila{font-size:.66rem;color:var(--text);padding:4px 0;border-bottom:1px solid var(--border2)}
+#cfSab .pie{position:sticky;bottom:-16px;background:var(--s1);padding:10px 0 2px;margin-top:10px}
+#cfSab .pie .cf-btn{width:100%;padding:11px}
+#cfSab .aviso{font-size:.68rem;color:var(--orange);margin-bottom:6px;text-align:center}
 #cfCorreo{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:14px}
 #cfCorreo .caja{background:var(--s1);border:1px solid var(--gold3);border-radius:16px;width:100%;max-width:640px;max-height:92vh;overflow:auto;padding:16px}
 #cfCorreo h3{margin:0 0 4px;font-size:.95rem;color:var(--gold2)}
@@ -5050,6 +5068,7 @@ function cfRender(){
     <div class="cf-bar">
       <button class="cf-btn prim" onclick="cfInformeHoy()" title="Carga los fichajes de hoy y descarga el informe del día por zonas">📥 Informe de hoy</button>
       <button class="cf-btn" onclick="cfAcumulado()" title="Excel con todo lo registrado desde febrero, para filtrar por persona y mes">📚 Excel acumulado</button>
+      <button class="cf-btn" onclick="cfSabado()" title="Quién estaba programado el sábado (Líneas de Comunicación) y si fichó en Odoo">📅 Asistencia del sábado</button>
     </div>
     <div class="section-head">Registro de días</div>
     <div class="cf-bar">
@@ -5194,6 +5213,84 @@ async function cfInformeDia(){
     if(CF_CORREO.texto) cfMostrarCorreo();
   }catch(e){ alert('No se pudo generar el informe: '+e.message); }
   finally{ aviso.remove(); }
+}
+
+// ── Asistencia del sábado: programados (pestaña SABADOS + líneas AS) contra fichajes de Odoo.
+// Primero se revisa (motivo de quien no fichó); después se genera el Excel y el correo.
+let CF_SAB=null;
+async function cfSabado(fecha){
+  let el=document.getElementById('cfSab');
+  if(!el){ el=document.createElement('div'); el.id='cfSab'; document.body.appendChild(el); }
+  el.innerHTML='<div class="caja"><div class="cf-vacio">⏳ Leyendo la lista del sábado y los fichajes de Odoo…</div></div>';
+  try{ CF_SAB=await cfLlamar('fch-sabado',{fecha:fecha||''}); cfPintarSabado(); }
+  catch(e){ el.innerHTML=`<div class="caja"><div class="cf-vacio">❌ ${cfEsc(e.message)}</div>
+    <button class="cf-btn" style="width:100%" onclick="document.getElementById('cfSab').remove()">Cerrar</button></div>`; }
+}
+function cfPintarSabado(){
+  const d=CF_SAB, el=document.getElementById('cfSab'); if(!d||!el) return;
+  const top=el.querySelector('.caja')?el.querySelector('.caja').scrollTop:0;
+  const de=e=>d.filas.filter(x=>x.estado===e);
+  const no=de('no fichó'), extra=de('extra'), anul=de('anulado'), si=de('fichó');
+  const info=x=>[x.matricula,x.zona,x.je?'JDE '+x.je:'',x.horario?'Horario '+x.horario:'',x.entrada?'Entrada '+x.entrada+(x.salida?' · salida '+x.salida:''):''].filter(Boolean).map(cfEsc).join(' · ');
+  const tarjeta=(x,i,tipo)=>{
+    const ops=tipo==='extra'?d.motivosExtra:d.motivos;
+    return `<div class="p ${tipo!=='extra'&&!x.motivo?'pend':''}">
+      <div class="n">${cfEsc(x.nombre)}</div>
+      <div class="d">${info(x)}</div>
+      ${x.comentario?`<div class="d">💬 ${cfEsc(x.comentario)}</div>`:''}
+      ${x.motivo?`<div class="m">${x.fuente==='Línea'?'📄 Según la línea: ':'✔ '}${cfEsc(x.motivo)}${x.nota?' · '+cfEsc(x.nota):''}</div>`:''}
+      <div class="bts">${ops.map(m=>`<button class="cf-rb ${x.motivo===m&&x.fuente==='Revisado'?'on':''}" onclick="cfSabMarcar(${i},'${cfEsc(m).replace(/'/g,"\\'")}')">${cfEsc(m)}</button>`).join('')}</div>
+    </div>`;
+  };
+  const idx=x=>d.filas.indexOf(x);
+  const lista=(l)=>l.map(x=>`<div class="fila">${cfEsc(x.nombre)} <span style="color:var(--muted)">· ${info(x)}${x.nota?' · '+cfEsc(x.nota):''}</span></div>`).join('');
+  const opciones=d.sabados.map(f=>`<option value="${f}" ${f===d.fecha?'selected':''}>Sábado ${cfDDMM(f)}</option>`).join('');
+  el.innerHTML=`<div class="caja">
+    <h3>📅 Asistencia del sábado</h3>
+    <div class="nav"><select class="cf-input" onchange="cfSabado(this.value)">${opciones}</select>
+      <button class="cf-btn" onclick="cfSabado(CF_SAB.fecha)" title="Volver a leer">🔄</button></div>
+    <div class="cf-kpis">
+      <div class="cf-kpi" style="--c:#2E7D32;cursor:default"><div class="n">${si.length}</div><div class="t">Ficharon</div></div>
+      <div class="cf-kpi" style="--c:#C0392B;cursor:default"><div class="n">${no.length}</div><div class="t">No ficharon</div></div>
+      <div class="cf-kpi" style="--c:#E67E22;cursor:default"><div class="n">${extra.length}</div><div class="t">Sin estar en la lista</div></div>
+      <div class="cf-kpi" style="--c:#7F8C8D;cursor:default"><div class="n">${anul.length}</div><div class="t">Anulados</div></div>
+    </div>
+    ${no.length?`<div class="sec">❌ Programados que no ficharon (${no.length}) · ¿qué pasó?</div>${no.map(x=>tarjeta(x,idx(x),'no')).join('')}`:''}
+    ${extra.length?`<div class="sec">⚠️ Ficharon sin estar en la lista (${extra.length})</div>${extra.map(x=>tarjeta(x,idx(x),'extra')).join('')}`:''}
+    ${anul.length?`<details><summary>🚫 Anulados (${anul.length})</summary>${lista(anul)}</details>`:''}
+    ${si.length?`<details><summary>✅ Ficharon (${si.length})</summary>${lista(si)}</details>`:''}
+    <div class="pie">
+      ${d.pendientes?`<div class="aviso">Falta indicar qué pasó con ${d.pendientes} persona${d.pendientes>1?'s':''} para poder generar la asistencia.</div>`:''}
+      <button class="cf-btn prim" ${d.pendientes?'disabled style="opacity:.5"':''} onclick="cfSabInforme()">📥 Generar asistencia del sábado</button>
+      <button class="cf-btn" style="margin-top:8px" onclick="document.getElementById('cfSab').remove()">Cerrar</button>
+    </div></div>`;
+  el.querySelector('.caja').scrollTop=top;
+}
+async function cfSabMarcar(i,motivo){
+  const x=CF_SAB.filas[i]; if(!x) return;
+  let nota='';
+  if(motivo==='Otro'||motivo==='Cambiado a otro día'){
+    nota=prompt(motivo==='Otro'?'Explica brevemente qué pasó:':'¿A qué día se cambió? (opcional)',x.fuente==='Revisado'?x.nota:'');
+    if(nota===null) return;
+  }
+  try{
+    CF_SAB=await cfLlamar('fch-sabado-marcar',{fecha:CF_SAB.fecha,clave:x.clave,nombre:x.nombre,matricula:x.matricula,
+      tipo:x.estado==='extra'?'extra':'programado',motivo,nota});
+    cfPintarSabado();
+  }catch(e){ alert('No se pudo guardar: '+e.message); }
+}
+async function cfSabInforme(){
+  const b=document.querySelector('#cfSab .pie .prim'); if(b){ b.disabled=true; b.textContent='⏳ Preparando el Excel…'; }
+  try{
+    const r=await cfLlamar('fch-sabado-informe',{fecha:CF_SAB.fecha});
+    if(r.pendientes){ alert('Todavía falta indicar qué pasó con '+r.pendientes+' persona(s).'); cfSabado(CF_SAB.fecha); return; }
+    const bytes=Uint8Array.from(atob(r.excel),ch=>ch.charCodeAt(0));
+    CF_CORREO={blob:new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
+      nombre:r.nombre||('Asistencia_Sabado_'+CF_SAB.fecha+'.xlsx'),asunto:r.asunto||'',texto:r.texto||'',html:r.html||''};
+    cfDescargar(CF_CORREO.blob,CF_CORREO.nombre);
+    cfMostrarCorreo();
+  }catch(e){ alert('No se pudo generar la asistencia: '+e.message); }
+  finally{ const b2=document.querySelector('#cfSab .pie .prim'); if(b2){ b2.disabled=false; b2.textContent='📥 Generar asistencia del sábado'; } }
 }
 
 // Correo diario para dirección: Anna lo copia, lo pega en un correo nuevo y adjunta el Excel descargado.
