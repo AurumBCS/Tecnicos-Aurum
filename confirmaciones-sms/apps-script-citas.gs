@@ -10,9 +10,19 @@
  *   - registrarUso -> añade filas al registro de uso (pestaña "Uso"): quién entra,
  *                     envía SMS y marca Sí/No. Body: { eventos: [ {...}, ... ] }
  *   - leerUso      -> devuelve el registro de uso desde una fecha (?desde=AAAA-MM-DD)
+ *   - leerResumen  -> devuelve el resumen diario desde una fecha (?desde=AAAA-MM-DD)
+ *
+ * Resumen diario (pestaña "Resumen diario"): cada dia de lunes a viernes, entre
+ * las 23:00 y las 24:00, generarResumenDiario() guarda por cada tecnico con citas
+ * cargadas si uso o no las confirmaciones ese dia. Se activa UNA vez ejecutando
+ * instalarTriggerResumen() desde el editor.
  */
 
 var COLUMNAS_USO = ['ts','fecha','mat','rol','accion','citaMat','citaFecha'];
+
+var COLUMNAS_RESUMEN = ['fecha','mat','tecnico','citas','pendientes','enviadas','confirmadas',
+                        'noConfirma','entro','accionesTecnico','accionesOtros','estado'];
+var TZ = 'Europe/Madrid';
 
 var COLUMNAS = ['id','tecnico','matricula','cliente','telefono','numMantenimiento',
                 'timeslot','tipo','fecha','status','respuesta','horaRespuesta','sentAt'];
@@ -58,6 +68,10 @@ function manejarSolicitud(e) {
   if (accion === 'leerUso') {
     var desde = String(e.parameter.desde || '');
     return respuestaJSON({ ok: true, eventos: leerUso(desde) });
+  }
+
+  if (accion === 'leerResumen') {
+    return respuestaJSON({ ok: true, resumen: leerResumen(String(e.parameter.desde || '')) });
   }
 
   if (accion === 'borrarTodo') {
@@ -154,6 +168,106 @@ function leerUso(desde) {
     out.push(ev);
   }
   return out;
+}
+
+// ── Resumen diario: quién usó las confirmaciones ────────────────────────────
+// estado: USO     -> el tecnico entro o movio alguna de sus citas
+//         JE      -> el tecnico no entro, pero su jefe de equipo (u otro) movio sus citas
+//         NO_USO  -> nadie toco sus citas ese dia
+function hojaResumen() {
+  var ss = SpreadsheetApp.getActive();
+  var hoja = ss.getSheetByName('Resumen diario');
+  if (!hoja) {
+    hoja = ss.insertSheet('Resumen diario');
+    hoja.appendRow(COLUMNAS_RESUMEN);
+    hoja.setFrozenRows(1);
+    hoja.getRange('A:L').setNumberFormat('@');
+  }
+  return hoja;
+}
+
+function fechaCitaISO_(f) {
+  var m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(String(f || '').trim());
+  if (!m) return '';
+  var anio = m[3].length === 2 ? '20' + m[3] : m[3];
+  return anio + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+}
+
+function generarResumenDiario() {
+  var ahora = new Date();
+  var hoy = Utilities.formatDate(ahora, TZ, 'yyyy-MM-dd');
+  var diaSemana = Number(Utilities.formatDate(ahora, TZ, 'u')); // 1 = lunes ... 7 = domingo
+  if (diaSemana >= 6) return 'fin de semana: no se genera';
+
+  // Citas cargadas para dias posteriores a hoy (las que se confirmaban hoy)
+  var citas = leerCitas(SpreadsheetApp.getActive().getSheetByName('Citas')).filter(function(c) {
+    var f = fechaCitaISO_(c.fecha);
+    return c.matricula && (!f || f > hoy);
+  });
+  var porTec = {};
+  citas.forEach(function(c) {
+    var m = String(c.matricula).toUpperCase();
+    var r = porTec[m] || (porTec[m] = { tecnico: c.tecnico, citas: 0, pendientes: 0, enviadas: 0, confirmadas: 0, noConfirma: 0 });
+    r.citas++;
+    if (c.status === 'pendiente') r.pendientes++;
+    else if (c.status === 'enviado') r.enviadas++;
+    else if (c.status === 'confirmado') r.confirmadas++;
+    else if (c.status === 'no_confirmado') r.noConfirma++;
+  });
+
+  // Actividad de hoy
+  var eventos = leerUso(hoy).filter(function(ev) { return ev.fecha === hoy; });
+  var filas = Object.keys(porTec).sort().map(function(m) {
+    var r = porTec[m];
+    var entro = eventos.some(function(ev) { return ev.mat === m && ev.accion === 'entrada'; });
+    var propias = eventos.filter(function(ev) { return ev.mat === m && ev.accion !== 'entrada'; }).length;
+    var otros = eventos.filter(function(ev) { return ev.citaMat === m && ev.mat !== m && ev.accion !== 'entrada'; }).length;
+    var estado = (entro || propias) ? 'USO' : (otros ? 'JE' : 'NO_USO');
+    return [hoy, m, r.tecnico, r.citas, r.pendientes, r.enviadas, r.confirmadas, r.noConfirma,
+            entro ? 'SI' : 'NO', propias, otros, estado].map(String);
+  });
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var hoja = hojaResumen();
+    // Si se vuelve a generar el mismo dia, reemplazar las filas de ese dia
+    var datos = hoja.getDataRange().getValues();
+    for (var i = datos.length - 1; i >= 1; i--) {
+      if (String(datos[i][0]) === hoy) hoja.deleteRow(i + 1);
+    }
+    if (filas.length) {
+      var rango = hoja.getRange(hoja.getLastRow() + 1, 1, filas.length, COLUMNAS_RESUMEN.length);
+      rango.setNumberFormat('@');
+      rango.setValues(filas);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  return filas.length + ' tecnicos guardados para ' + hoy;
+}
+
+function leerResumen(desde) {
+  var hoja = hojaResumen();
+  var datos = hoja.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < datos.length; i++) {
+    var r = {};
+    for (var c = 0; c < COLUMNAS_RESUMEN.length; c++) r[COLUMNAS_RESUMEN[c]] = String(datos[i][c]);
+    if (!r.mat) continue;
+    if (desde && r.fecha < desde) continue;
+    out.push(r);
+  }
+  return out;
+}
+
+// Ejecutar UNA vez desde el editor (Ejecutar > instalarTriggerResumen) y aceptar permisos.
+function instalarTriggerResumen() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'generarResumenDiario') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('generarResumenDiario').timeBased().everyDays(1).atHour(23).inTimezone(TZ).create();
+  return 'Activado: resumen diario de lunes a viernes entre las 23:00 y las 24:00';
 }
 
 function respuestaJSON(obj) {

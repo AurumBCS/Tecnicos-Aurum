@@ -1054,6 +1054,19 @@ app.get('/uso', async (req, res) => {
   }
   eventos = eventos.concat(usoPendiente.filter(e => e.fecha >= desde)); // aún sin guardar
 
+  // Resumen diario guardado (quién usó / no usó cada día), si se pide
+  let resumen = [];
+  const desdeResumen = String(req.query.resumenDesde || '');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(desdeResumen)) {
+    try {
+      const raw = await fetchCSV(CITAS_SHEET_URL + '?action=leerResumen&desde=' + encodeURIComponent(desdeResumen));
+      const d = JSON.parse(raw);
+      if (d.ok && Array.isArray(d.resumen)) resumen = d.resumen;
+    } catch (e) {
+      console.error('[Uso] Error al leer el resumen diario:', e.message);
+    }
+  }
+
   purgarYGuardar();
   const citas = {};
   appointments.forEach(a => {
@@ -1067,7 +1080,7 @@ app.get('/uso', async (req, res) => {
     else if (a.status === 'no_confirmado') c.noConfirma++;
     else if (a.status === 'sin_telefono') c.sinTelefono++;
   });
-  res.json({ ok: true, desde, eventos, citas, ultimaCarga: ultimaCargaCitas, jerarquia: JERARQUIA });
+  res.json({ ok: true, desde, eventos, citas, ultimaCarga: ultimaCargaCitas, jerarquia: JERARQUIA, resumen });
 });
 
 app.post('/marcar-respuesta', (req, res) => {

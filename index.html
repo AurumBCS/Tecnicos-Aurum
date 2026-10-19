@@ -517,6 +517,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       </select>
       <button onclick="showHistoricoEquipo(CURRENT_JE_ID,'equipoPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico del equipo</button>
 
+      <!-- Uso de Confirmaciones SMS del equipo (hoy en vivo + días anteriores) -->
+      <div id="equipoConfirmaciones" style="margin-bottom:14px"></div>
+
       <!-- Hero métricas promedio -->
       <div class="section-head">Promedios del equipo</div>
       <div class="hero-metrics" id="equipoHero"></div>
@@ -1553,6 +1556,7 @@ function renderEquipoPanel(jeId){
     </a>
   `;
 
+  renderConfirmacionesEquipo(jeId);
   document.getElementById('equipoKpis').innerHTML = kpiHtml;
 
   // ── Rankings del equipo: mantenimientos, ventas, conversión, 20% ──
@@ -3463,17 +3467,131 @@ function horaUsoSms(ts){
          String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 }
 
+function isoDiasAtras(n){
+  const d=new Date(); d.setDate(d.getDate()-n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+async function pedirUsoSms(desde, resumenDesde){
+  const url = SMS_CONFIRMACIONES_URL.replace(/\/$/,'')+'/uso?token='+encodeURIComponent(APP_TOKEN)+'&desde='+desde+
+              (resumenDesde?'&resumenDesde='+resumenDesde:'')+'&t='+Date.now();
+  const res = await fetch(url, {cache:'no-store'});
+  const d = await res.json();
+  if(!d.ok) throw new Error(d.error||'error');
+  return d;
+}
+// Estado de HOY de cada técnico con citas cargadas: USO (entró o movió sus citas),
+// JE (no entró pero alguien movió sus citas) o NO_USO.
+function estadoHoyUsoSms(d){
+  const hoy = isoDiasAtras(0);
+  const ev = d.eventos.filter(e=>e.fecha===hoy);
+  const out = {};
+  Object.keys(d.citas).forEach(m=>{
+    const propio = ev.some(e=>e.mat===m);
+    const otros = ev.some(e=>e.citaMat===m && e.mat!==m && e.accion!=='entrada');
+    out[m] = {estado: propio?'USO':(otros?'JE':'NO_USO'), ...d.citas[m]};
+  });
+  return out;
+}
+function fechaCortaUsoSms(iso){
+  const dias=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const d=new Date(iso+'T12:00:00');
+  return isNaN(d)?iso:dias[d.getDay()]+' '+iso.slice(8,10)+'/'+iso.slice(5,7);
+}
+
+// ── Apartado en "Mi equipo" del JE ─────────────────────────────────────────
+let CONF_EQUIPO_CACHE = {};
+async function renderConfirmacionesEquipo(jeId, recargar){
+  const el = document.getElementById('equipoConfirmaciones');
+  if(!el || !jeId) return;
+  const nombre = m => ROSTER_NOMBRES[m] || JE_NAMES[m] || m;
+  const cab = '<div class="section-head" style="margin-top:0">📲 Confirmaciones SMS del equipo</div>';
+  let d = CONF_EQUIPO_CACHE[jeId];
+  if(recargar || !d){
+    el.innerHTML = cab+'<div style="color:var(--text2);font-size:.78rem;padding:8px 2px">Cargando…</div>';
+    try{ d = await pedirUsoSms(isoDiasAtras(0), isoDiasAtras(14)); CONF_EQUIPO_CACHE[jeId]=d; }
+    catch(e){
+      el.innerHTML = cab+'<div style="color:var(--text2);font-size:.78rem;padding:8px 2px">No se pudieron cargar los datos. <a href="#" onclick="renderConfirmacionesEquipo(\''+jeId+'\',true);return false" style="color:var(--gold2)">Reintentar</a></div>';
+      return;
+    }
+  }
+  const equipo = new Set(((d.jerarquia||{})[jeId] || JERARQUIA[jeId] || []).map(String).filter(m=>m!==jeId));
+  const hoy = estadoHoyUsoSms(d);
+  const delEquipo = Object.keys(hoy).filter(m=>equipo.has(m));
+  const sinUsar = delEquipo.filter(m=>hoy[m].estado==='NO_USO' && hoy[m].pendientes>0)
+                           .sort((a,b)=>nombre(a).localeCompare(nombre(b)));
+  const usaron = delEquipo.filter(m=>hoy[m].estado!=='NO_USO').length;
+
+  const hoyHtml = !delEquipo.length
+    ? '<div style="font-size:.8rem;color:var(--text2)">Hoy no hay citas cargadas para tu equipo.</div>'
+    : `<div style="font-size:.82rem;margin-bottom:6px"><b style="color:var(--green)">${usaron}</b> de <b>${delEquipo.length}</b> técnicos con citas ya las han gestionado hoy.</div>`+
+      (sinUsar.length
+        ? `<div style="font-size:.74rem;color:#e05a4a;font-weight:700;margin:6px 0 4px">Aún sin usar las confirmaciones (${sinUsar.length}):</div>`+
+          sinUsar.map(m=>`<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:3px 0;border-top:1px solid var(--border2)">
+            <span>${nombre(m)} <span style="color:var(--text2)">(${m})</span></span><span style="color:#e05a4a;font-weight:700">${hoy[m].pendientes} pend.</span></div>`).join('')
+        : '<div style="font-size:.8rem;color:var(--green);font-weight:700">✅ Todos los de tu equipo con citas las han gestionado.</div>');
+
+  // Días anteriores (resumen guardado cada noche de lunes a viernes)
+  const porDia = {};
+  (d.resumen||[]).filter(r=>equipo.has(String(r.mat))).forEach(r=>{ (porDia[r.fecha]=porDia[r.fecha]||[]).push(r); });
+  const dias = Object.keys(porDia).sort().reverse().filter(f=>f<isoDiasAtras(0)).slice(0,10);
+  const histHtml = !dias.length
+    ? '<div style="font-size:.75rem;color:var(--text2)">Todavía no hay días guardados (el resumen se guarda cada noche de lunes a viernes).</div>'
+    : dias.map(f=>{
+        const filas = porDia[f];
+        const no = filas.filter(r=>r.estado==='NO_USO');
+        return `<div style="padding:6px 0;border-top:1px solid var(--border2)">
+          <div style="display:flex;justify-content:space-between;font-size:.8rem">
+            <b>${fechaCortaUsoSms(f)}</b>
+            <span>${filas.length-no.length}/${filas.length} usaron${no.length?' · <span style="color:#e05a4a;font-weight:700">'+no.length+' no</span>':''}</span>
+          </div>
+          ${no.length?`<div style="font-size:.72rem;color:var(--text2);margin-top:2px">No usaron: ${no.map(r=>nombre(String(r.mat))).join(', ')}</div>`:''}
+        </div>`;
+      }).join('');
+
+  el.innerHTML = cab + `
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
+      <div style="font-size:.7rem;color:var(--gold2);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Hoy</div>
+      ${hoyHtml}
+      <div style="font-size:.7rem;color:var(--gold2);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 4px">Días anteriores</div>
+      ${histHtml}
+      <button onclick="renderConfirmacionesEquipo('${jeId}',true)" style="margin-top:10px;width:100%;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.78rem;cursor:pointer">↻ Actualizar</button>
+    </div>`;
+}
+
+// Histórico diario (resumen guardado cada noche) para la pestaña de GD5381
+function historicoDiarioUsoSms(d, nombre, jeDe){
+  const porDia = {};
+  (d.resumen||[]).forEach(r=>{ (porDia[r.fecha]=porDia[r.fecha]||[]).push(r); });
+  const dias = Object.keys(porDia).sort().reverse();
+  const cab = '<div style="font-weight:800;color:var(--gold2);margin:18px 0 8px">📅 Histórico por día (últimos 30 días)</div>';
+  if(!dias.length) return cab+'<div style="font-size:.78rem;color:var(--text2);margin-bottom:12px">Todavía no hay días guardados. El resumen se guarda cada noche de lunes a viernes entre las 23:00 y las 24:00.</div>';
+  return cab + dias.map(f=>{
+    const filas = porDia[f];
+    const uso = filas.filter(r=>r.estado==='USO').length;
+    const je  = filas.filter(r=>r.estado==='JE').length;
+    const no  = filas.filter(r=>r.estado==='NO_USO');
+    const porJE = {};
+    no.forEach(r=>{ const j=jeDe[String(r.mat)]||'—'; (porJE[j]=porJE[j]||[]).push(String(r.mat)); });
+    return `<details style="background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:8px 12px;margin-bottom:6px">
+      <summary style="cursor:pointer;font-size:.82rem;display:flex;justify-content:space-between;gap:8px">
+        <b>${fechaCortaUsoSms(f)}</b>
+        <span>${filas.length} con citas · <span style="color:var(--green)">${uso} usaron</span> · <span style="color:var(--gold2)">${je} su JE</span> · <span style="color:#e05a4a;font-weight:700">${no.length} no</span></span>
+      </summary>
+      ${no.length ? Object.keys(porJE).sort().map(j=>`
+        <div style="font-size:.72rem;color:var(--gold2);font-weight:700;margin-top:6px">${j==='—'?'Sin equipo':'Equipo de '+nombre(j)}</div>
+        <div style="font-size:.78rem">${porJE[j].map(m=>nombre(m)).sort().join(', ')}</div>`).join('') : '<div style="font-size:.78rem;color:var(--green);margin-top:6px">Todos usaron las confirmaciones.</div>'}
+    </details>`;
+  }).join('');
+}
+
 async function renderUsoSmsPanel(recargar){
   const el = document.getElementById('usoSmsContent');
   const periodo = document.getElementById('periodoUsoSms').value;
   if(recargar || !USO_SMS_DATA || USO_SMS_PERIODO!==periodo){
     el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px 0">Cargando…<br><span style="font-size:.75rem">(si el servidor estaba dormido puede tardar hasta 1 minuto)</span></div>';
     try{
-      const url = SMS_CONFIRMACIONES_URL.replace(/\/$/,'')+'/uso?token='+encodeURIComponent(APP_TOKEN)+'&desde='+desdeUsoSms(periodo)+'&t='+Date.now();
-      const res = await fetch(url, {cache:'no-store'});
-      USO_SMS_DATA = await res.json();
+      USO_SMS_DATA = await pedirUsoSms(desdeUsoSms(periodo), isoDiasAtras(30));
       USO_SMS_PERIODO = periodo;
-      if(!USO_SMS_DATA.ok) throw new Error(USO_SMS_DATA.error||'error');
     }catch(e){
       USO_SMS_DATA = null;
       el.innerHTML = '<div style="text-align:center;color:var(--red);padding:30px 0">No se pudieron cargar los datos ('+e.message+').</div>'+
@@ -3573,6 +3691,7 @@ async function renderUsoSmsPanel(recargar){
     </div>
     ${bloqueSin}
     ${tablas || '<div style="text-align:center;color:var(--text2);padding:20px 0">Sin actividad en este periodo.</div>'}
+    ${historicoDiarioUsoSms(d, nombre, jeDe)}
     <div style="font-size:.7rem;color:var(--text2);margin:6px 0 10px">Entr. (entradas), SMS, ✅ y ❌: lo que hizo cada persona en el periodo elegido. Pend.: citas pendientes / citas cargadas ahora mismo. ⭐ = jefe de equipo.</div>
     <button onclick="renderUsoSmsPanel(true)" style="width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.85rem;cursor:pointer">↻ Actualizar datos</button>`;
 }
