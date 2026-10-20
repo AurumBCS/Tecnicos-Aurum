@@ -3560,6 +3560,23 @@ async function renderConfirmacionesEquipo(jeId, recargar){
 
 // "Quién no entró, por equipo" para un día guardado (por defecto el último día
 // laborable anterior a hoy, o sea "ayer"). Va arriba del todo en la pestaña de GD5381.
+// En esta pestaña, todos los técnicos de Tenerife (provincia TF en los datos del
+// portal) cuentan en el equipo de Gustavo Pérez (GD5381), igual que su "Equipo TF",
+// junto con Nicola Morsa (302154), que ya es de GD5381 en el cuadrante.
+const USO_SMS_EQUIPO_GD = 'GD5381';
+const USO_SMS_EXTRA_GD = ['302154'];
+function jerarquiaUsoSms(d){
+  const jer = {};
+  Object.keys(d.jerarquia||{}).forEach(je => jer[je] = (d.jerarquia[je]||[]).map(String));
+  const tf = new Set(((CURRENT_DATA&&CURRENT_DATA.tecnicos)||[])
+    .filter(t => String(t.provincia||'').toUpperCase()==='TF').map(t => String(t.id).toUpperCase()));
+  USO_SMS_EXTRA_GD.forEach(m => tf.add(m));
+  Object.keys(jer).forEach(je => { if(je!==USO_SMS_EQUIPO_GD) jer[je] = jer[je].filter(m => !tf.has(m)); });
+  const gd = new Set(jer[USO_SMS_EQUIPO_GD] || [USO_SMS_EQUIPO_GD]);
+  tf.forEach(m => gd.add(m));
+  jer[USO_SMS_EQUIPO_GD] = [...gd];
+  return jer;
+}
 let USO_SMS_DIA = null;
 let USO_SMS_DETALLE_ABIERTO = false;
 function cambiarDiaUsoSms(f){ USO_SMS_DIA = f; renderUsoSmsPanel(); }
@@ -3586,6 +3603,7 @@ function noEntraronPorEquipo(d, nombre, jeDe){
   const tarjetas = orden.map(j=>{
     const lista = equipos[j];
     const no = lista.filter(r=>r.entro!=='SI').sort((a,b)=>nombre(String(a.mat)).localeCompare(nombre(String(b.mat))));
+    const si = lista.filter(r=>r.entro==='SI').sort((a,b)=>nombre(String(a.mat)).localeCompare(nombre(String(b.mat))));
     const color = !no.length ? 'rgba(61,170,110,.35)' : 'rgba(192,57,43,.35)';
     return `<div style="border:1px solid ${color};border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--s1)">
       <div style="display:flex;justify-content:space-between;gap:8px;font-size:.84rem">
@@ -3596,6 +3614,11 @@ function noEntraronPorEquipo(d, nombre, jeDe){
           <span>${nombre(String(r.mat))} <span style="color:var(--text2)">(${r.mat})</span></span>
           <span style="color:${r.estado==='JE'?'var(--gold2)':'#e05a4a'};font-weight:700;font-size:.72rem">${r.estado==='JE'?'lo hizo su JE':(Number(r.pendientes)?r.pendientes+' sin confirmar':'no entró')}</span>
         </div>`).join('') : '<div style="font-size:.78rem;color:var(--green);margin-top:4px">✅ Entraron todos</div>'}
+      ${si.length ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:.75rem;color:var(--green);font-weight:700">✅ Ver quién entró (${si.length})</summary>
+        ${si.map(r=>`<div style="display:flex;justify-content:space-between;font-size:.78rem;padding:2px 0">
+          <span>${nombre(String(r.mat))} <span style="color:var(--text2)">(${r.mat})</span></span>
+          <span style="color:var(--green);font-size:.72rem">${Number(r.confirmadas)||0} conf. · ${Number(r.enviadas)||0} env.${Number(r.pendientes)?' · '+r.pendientes+' pend.':''}</span>
+        </div>`).join('')}</details>` : ''}
     </div>`;
   }).join('');
   return cab + selector + resumen + tarjetas + '<div style="height:10px"></div>';
@@ -3670,8 +3693,9 @@ async function renderUsoSmsPanel(recargar){
   });
   const sinEntrar = Object.keys(d.citas).filter(m => d.citas[m].pendientes>0 && !activos.has(m));
 
-  // Equipos: JE -> técnicos (jerarquía del servidor, ya con el JE dentro)
-  const jer = d.jerarquia || {};
+  // Equipos: JE -> técnicos (jerarquía del servidor, ya con el JE dentro;
+  // Tenerife pasa al equipo de GD5381, ver jerarquiaUsoSms)
+  const jer = jerarquiaUsoSms(d);
   const jeDe = {};
   Object.keys(jer).forEach(je => (jer[je]||[]).forEach(m => { if(m!==je) jeDe[m]=je; }));
 
