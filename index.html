@@ -3558,6 +3558,48 @@ async function renderConfirmacionesEquipo(jeId, recargar){
     </div>`;
 }
 
+// "Quién no entró, por equipo" para un día guardado (por defecto el último día
+// laborable anterior a hoy, o sea "ayer"). Va arriba del todo en la pestaña de GD5381.
+let USO_SMS_DIA = null;
+function cambiarDiaUsoSms(f){ USO_SMS_DIA = f; renderUsoSmsPanel(); }
+function noEntraronPorEquipo(d, nombre, jeDe){
+  const porDia = {};
+  (d.resumen||[]).forEach(r=>{ (porDia[r.fecha]=porDia[r.fecha]||[]).push(r); });
+  const dias = Object.keys(porDia).sort().reverse().filter(f=>f<isoDiasAtras(0));
+  const cab = '<div style="font-weight:800;color:var(--gold2);font-size:.95rem;margin:2px 0 8px">🚫 Quién no entró a confirmar, por equipo</div>';
+  if(!dias.length) return cab+'<div style="font-size:.78rem;color:var(--text2);margin-bottom:16px">Todavía no hay días guardados (se guardan cada noche de lunes a viernes).</div>';
+  if(!USO_SMS_DIA || !porDia[USO_SMS_DIA]) USO_SMS_DIA = dias[0];
+  const filas = porDia[USO_SMS_DIA];
+  const selector = `<select onchange="cambiarDiaUsoSms(this.value)" style="width:100%;margin-bottom:10px;padding:9px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700">
+      ${dias.map((f,i)=>`<option value="${f}" ${f===USO_SMS_DIA?'selected':''}>${i===0&&f===isoDiasAtras(1)?'Ayer · ':''}${fechaCortaUsoSms(f)}</option>`).join('')}
+    </select>`;
+  // Agrupar por equipo
+  const equipos = {};
+  filas.forEach(r=>{ const j = jeDe[String(r.mat)] || '—'; (equipos[j]=equipos[j]||[]).push(r); });
+  const totalNo = filas.filter(r=>r.entro!=='SI').length;
+  const resumen = `<div style="font-size:.82rem;margin-bottom:10px">De <b>${filas.length}</b> técnicos con citas, <b style="color:var(--green)">${filas.length-totalNo}</b> entraron y <b style="color:#e05a4a">${totalNo}</b> no.</div>`;
+  const orden = Object.keys(equipos).sort((a,b)=>{
+    const na = equipos[a].filter(r=>r.entro!=='SI').length, nb = equipos[b].filter(r=>r.entro!=='SI').length;
+    return nb-na || nombre(a).localeCompare(nombre(b));
+  });
+  const tarjetas = orden.map(j=>{
+    const lista = equipos[j];
+    const no = lista.filter(r=>r.entro!=='SI').sort((a,b)=>nombre(String(a.mat)).localeCompare(nombre(String(b.mat))));
+    const color = !no.length ? 'rgba(61,170,110,.35)' : 'rgba(192,57,43,.35)';
+    return `<div style="border:1px solid ${color};border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--s1)">
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:.84rem">
+        <b style="color:var(--gold2)">${j==='—'?'Sin equipo':'Equipo de '+nombre(j)}</b>
+        <span>${lista.length-no.length}/${lista.length} entraron</span>
+      </div>
+      ${no.length ? no.map(r=>`<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:3px 0;border-top:1px solid var(--border2);margin-top:4px">
+          <span>${nombre(String(r.mat))} <span style="color:var(--text2)">(${r.mat})</span></span>
+          <span style="color:${r.estado==='JE'?'var(--gold2)':'#e05a4a'};font-weight:700;font-size:.72rem">${r.estado==='JE'?'lo hizo su JE':(Number(r.pendientes)?r.pendientes+' sin confirmar':'no entró')}</span>
+        </div>`).join('') : '<div style="font-size:.78rem;color:var(--green);margin-top:4px">✅ Entraron todos</div>'}
+    </div>`;
+  }).join('');
+  return cab + selector + resumen + tarjetas + '<div style="height:10px"></div>';
+}
+
 // Histórico diario (resumen guardado cada noche) para la pestaña de GD5381
 function historicoDiarioUsoSms(d, nombre, jeDe){
   const porDia = {};
@@ -3682,6 +3724,8 @@ async function renderUsoSmsPanel(recargar){
   }).join('');
 
   el.innerHTML = `
+    ${noEntraronPorEquipo(d, nombre, jeDe)}
+    <div style="font-weight:800;color:var(--gold2);font-size:.95rem;margin:6px 0 8px">📈 Actividad (${document.getElementById('periodoUsoSms').selectedOptions[0].text.toLowerCase()})</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
       ${tarjeta(tecnicosQueEntraron.size,'Técnicos que entraron','var(--gold2)')}
       ${tarjeta(jesQueEntraron.size,'JEs que entraron','var(--gold2)')}
