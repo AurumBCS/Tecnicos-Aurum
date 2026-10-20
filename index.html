@@ -722,6 +722,7 @@ const SHEETS_CSV_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx
 const AUTH_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=auth&token=" + APP_TOKEN;
 const DOCS_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=docs&token=" + APP_TOKEN;
 const VACACIONES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=vacaciones&token=" + APP_TOKEN;
+const VACACIONES_DIAS_URL = VACACIONES_URL.replace('type=vacaciones&', 'type=vacaciones-dias&');
 const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=medalia-coord&token=" + APP_TOKEN;
 const MEDALIA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=medalia&token=" + APP_TOKEN;
 const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=cumplimiento&token=" + APP_TOKEN;
@@ -3180,10 +3181,11 @@ function renderVacacionesEquipoCollapsible(jeId, containerId){
   if(!conDatos.length){ container.innerHTML=''; return; }
 
   const rows = conDatos.map(({mat,nombre,solicitadas,restantes})=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--s1);margin-bottom:1px;border-radius:6px">
-      <div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--s1);margin-bottom:1px;border-radius:6px">
+      <div style="flex:1;min-width:0;padding-right:10px">
         <div style="font-size:.78rem;font-weight:700;color:var(--text)">${nombre}</div>
         <div style="font-size:.6rem;color:var(--muted);margin-top:2px">${mat}</div>
+        <div class="vac-dias" data-mat="${mat}" data-compacto="1"></div>
       </div>
       <div style="display:flex;gap:16px;text-align:center">
         <div>
@@ -3207,6 +3209,7 @@ function renderVacacionesEquipoCollapsible(jeId, containerId){
         ${rows}
       </div>
     </div>`;
+  pintarVacDias();
 }
 
 async function loadVacaciones(){
@@ -5003,7 +5006,7 @@ function renderFlota(tecId, containerId){
           <div style="font-size:1.4rem;font-weight:800;color:#e67e22">${vacaciones.ap_total||0}</div>
         </div>
       </div>
-      ${buildVacMensualHTML(vacaciones)}
+      ${buildVacMensualHTML(vacaciones, id)}
     </div>`;
   }
   const cocheLabel = info.esPersonal ? 'Asignación' : 'Matrícula asignada';
@@ -5029,13 +5032,83 @@ function renderFlota(tecId, containerId){
 // ══════════════════════════════════════════════
 //  VACACIONES — desglose mensual
 // ══════════════════════════════════════════════
-function buildVacMensualHTML(vacaciones){
+// ── Vacaciones día a día ────────────────────────────────────────────────────
+// Días exactos por técnico (pestañas mensuales de la hoja de vacaciones, vía
+// ?type=vacaciones-dias). Se pintan en los huecos <div class="vac-dias" data-mat>
+// que dejan buildVacMensualHTML (técnico/JE) y el desplegable del equipo.
+let VAC_DIAS = null;        // mat -> { 'AAAA-MM': [{dia, codigo}] }
+let VAC_DIAS_CARGANDO = null;
+function cargarVacDias(){
+  if(VAC_DIAS) return Promise.resolve(VAC_DIAS);
+  if(VAC_DIAS_CARGANDO) return VAC_DIAS_CARGANDO;
+  VAC_DIAS_CARGANDO = fetchConReintento(VACACIONES_DIAS_URL+'&t='+Date.now(), {cache:'no-store'})
+    .then(r => r.ok ? r.text() : '')
+    .then(txt => {
+      const out = {};
+      if(!/^mat,mes,dia,codigo/.test(txt.trim())) throw new Error('sin datos');
+      txt.trim().split('\n').slice(1).forEach(l => {
+        const [mat, mes, dia, codigo] = l.split(',');
+        if(!mat || !mes || !dia) return;
+        const m = mat.trim().toUpperCase();
+        ((out[m] = out[m] || {})[mes] = out[m][mes] || []).push({dia: parseInt(dia,10), codigo: (codigo||'').trim()});
+      });
+      VAC_DIAS = out;
+      return out;
+    })
+    .catch(() => { VAC_DIAS_CARGANDO = null; return null; });
+  return VAC_DIAS_CARGANDO;
+}
+// [3,4,5,7] -> "3–5, 7"
+function rangosDias(dias){
+  const d = [...new Set(dias)].sort((a,b)=>a-b);
+  const out = [];
+  for(let i=0;i<d.length;i++){
+    let j=i; while(j+1<d.length && d[j+1]===d[j]+1) j++;
+    out.push(j>i ? d[i]+'–'+d[j] : String(d[i]));
+    i=j;
+  }
+  return out.join(', ');
+}
+function htmlVacDias(mat, compacto){
+  const porMes = (VAC_DIAS||{})[String(mat).toUpperCase()];
+  if(!porMes) return '';
+  const anio = String(new Date().getFullYear());
+  const NOMBRES = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const meses = Object.keys(porMes).filter(m=>m.slice(0,4)===anio).sort();
+  if(!meses.length) return '';
+  const color = c => c==='VAC' ? '#4a90e2' : (c==='AP' ? '#e67e22' : 'var(--text2)');
+  const nombreCod = c => c==='VAC' ? 'Vac.' : (c==='AP' ? 'AP' : c);
+  const orden = c => c==='VAC' ? 0 : (c==='AP' ? 1 : 2);
+  const lineas = meses.map(m=>{
+    const porCod = {};
+    porMes[m].forEach(x => (porCod[x.codigo] = porCod[x.codigo] || []).push(x.dia));
+    const cods = Object.keys(porCod).sort((a,b)=>orden(a)-orden(b));
+    return `<div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;border-top:1px solid var(--border2);font-size:${compacto?'.68rem':'.74rem'}">
+      <span style="min-width:${compacto?'42px':'52px'};color:var(--text2);font-weight:700">${NOMBRES[parseInt(m.slice(5),10)]} ${m.slice(2,4)}</span>
+      <span style="flex:1">${cods.map(c=>`<span style="color:${color(c)};font-weight:700">${nombreCod(c)}</span> ${rangosDias(porCod[c])}`).join(' · ')}</span>
+      <span style="color:var(--text2)">${porMes[m].length} d</span>
+    </div>`;
+  }).join('');
+  return `<div style="margin-top:${compacto?'6':'10'}px">${compacto?'':'<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text2);margin-bottom:4px">Días exactos</div>'}${lineas}</div>`;
+}
+function pintarVacDias(){
+  if(!document.querySelector('.vac-dias[data-mat]')) return;
+  cargarVacDias().then(()=>{
+    document.querySelectorAll('.vac-dias[data-mat]').forEach(el=>{
+      el.innerHTML = htmlVacDias(el.dataset.mat, el.dataset.compacto==='1');
+    });
+  });
+}
+
+function buildVacMensualHTML(vacaciones, mat){
   const LABELS={ene:'Ene',feb:'Feb',mar:'Mar',abr:'Abr',may:'May',jun:'Jun',jul:'Jul',ago:'Ago',sep:'Sep',oct:'Oct',nov:'Nov',dic:'Dic'};
   const meses=vacaciones.meses||{};
   const conDatos=Object.entries(meses)
     .filter(([,v])=>v.vac>0||v.ap>0)
     .sort((a,b)=>a[0].localeCompare(b[0]));
-  if(!conDatos.length) return '';
+  const hueco = mat ? `<div class="vac-dias" data-mat="${mat}"></div>` : '';
+  if(mat) setTimeout(pintarVacDias, 0); // se rellena cuando el HTML ya está en la página
+  if(!conDatos.length) return hueco;
   const pills=conDatos.map(([k,v])=>{
     const lbl=LABELS[k.slice(0,3)]||k.slice(0,3);
     const anio=k.slice(3);
@@ -5051,6 +5124,7 @@ function buildVacMensualHTML(vacaciones){
       <span style="color:#4a90e2">■</span> Vacaciones &nbsp;<span style="color:#e67e22">■</span> Asuntos propios
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:6px">${pills}</div>
+    ${hueco}
   </div>`;
 }
 
@@ -5106,7 +5180,7 @@ function renderVacacionesJE(jeId, containerId){
           <div style="font-size:1.4rem;font-weight:800;color:#e67e22">${vacaciones.ap_total||0}</div>
         </div>
       </div>
-      ${buildVacMensualHTML(vacaciones)}
+      ${buildVacMensualHTML(vacaciones, id)}
     </div>`;
 }
 
