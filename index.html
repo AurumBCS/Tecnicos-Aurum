@@ -626,7 +626,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="sync-dot"></div>
       Quién entra en Confirmaciones SMS, envía los SMS y marca las respuestas
     </div>
-    <select id="periodoUsoSms" onchange="renderUsoSmsPanel(true)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+    <select id="periodoUsoSms" onchange="renderUsoSmsPanel(true)" style="display:none;width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
       <option value="hoy">Hoy</option>
       <option value="7">Últimos 7 días</option>
       <option value="mes">Este mes</option>
@@ -3561,6 +3561,7 @@ async function renderConfirmacionesEquipo(jeId, recargar){
 // "Quién no entró, por equipo" para un día guardado (por defecto el último día
 // laborable anterior a hoy, o sea "ayer"). Va arriba del todo en la pestaña de GD5381.
 let USO_SMS_DIA = null;
+let USO_SMS_DETALLE_ABIERTO = false;
 function cambiarDiaUsoSms(f){ USO_SMS_DIA = f; renderUsoSmsPanel(); }
 function noEntraronPorEquipo(d, nombre, jeDe){
   const porDia = {};
@@ -3628,6 +3629,10 @@ function historicoDiarioUsoSms(d, nombre, jeDe){
 
 async function renderUsoSmsPanel(recargar){
   const el = document.getElementById('usoSmsContent');
+  // El selector de periodo vive dentro del contenido (ver final): sacarlo antes
+  // de reescribir el contenido para no destruirlo.
+  const selPrev = document.getElementById('periodoUsoSms');
+  if(selPrev && el.contains(selPrev)){ selPrev.style.display='none'; el.parentNode.insertBefore(selPrev, el); }
   const periodo = document.getElementById('periodoUsoSms').value;
   if(recargar || !USO_SMS_DATA || USO_SMS_PERIODO!==periodo){
     el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px 0">Cargando…<br><span style="font-size:.75rem">(si el servidor estaba dormido puede tardar hasta 1 minuto)</span></div>';
@@ -3683,9 +3688,13 @@ async function renderUsoSmsPanel(recargar){
   // Bloque "sin entrar", agrupado por JE
   const sinPorJE = {};
   sinEntrar.forEach(m => (sinPorJE[jeDe[m]||'—'] = sinPorJE[jeDe[m]||'—'] || []).push(m));
-  const bloqueSin = sinEntrar.length ? `
+  const hayCitas = Object.keys(d.citas).length > 0;
+  const bloqueSin = !hayCitas ? `
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;margin-bottom:16px;color:var(--text2);font-size:.8rem">
+      Ahora mismo no hay citas cargadas. Las del día siguiente se cargan cada tarde a las 17:50 (los viernes, sábado y lunes).
+    </div>` : sinEntrar.length ? `
     <div style="background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.35);border-radius:12px;padding:12px 14px;margin-bottom:16px">
-      <div style="font-weight:800;color:#e05a4a;margin-bottom:6px">⚠️ Con citas pendientes y sin entrar (${sinEntrar.length})</div>
+      <div style="font-weight:800;color:#e05a4a;margin-bottom:6px">⚠️ Ahora mismo: con citas pendientes y sin entrar (${sinEntrar.length})</div>
       <div style="font-size:.72rem;color:var(--text2);margin-bottom:8px">Desde la última carga de citas${d.ultimaCarga?' ('+horaUsoSms(d.ultimaCarga)+')':''}. Ni el técnico ni su JE han movido sus citas.</div>
       ${Object.keys(sinPorJE).sort().map(je=>`
         <div style="font-size:.74rem;color:var(--gold2);font-weight:700;margin-top:6px">${je==='—'?'Sin equipo':'Equipo de '+nombre(je)}</div>
@@ -3696,7 +3705,7 @@ async function renderUsoSmsPanel(recargar){
           </div>`).join('')}`).join('')}
     </div>` : `
     <div style="background:rgba(61,170,110,.08);border:1px solid rgba(61,170,110,.35);border-radius:12px;padding:12px 14px;margin-bottom:16px;color:var(--green);font-weight:700">
-      ✅ Todos los técnicos con citas pendientes han entrado (o su JE las está gestionando).
+      ✅ Ahora mismo: todos los técnicos con citas pendientes han entrado (o su JE las está gestionando).
     </div>`;
 
   // Tabla por equipo
@@ -3725,7 +3734,11 @@ async function renderUsoSmsPanel(recargar){
 
   el.innerHTML = `
     ${noEntraronPorEquipo(d, nombre, jeDe)}
-    <div style="font-weight:800;color:var(--gold2);font-size:.95rem;margin:6px 0 8px">📈 Actividad (${document.getElementById('periodoUsoSms').selectedOptions[0].text.toLowerCase()})</div>
+    ${bloqueSin}
+    <details ${USO_SMS_DETALLE_ABIERTO?'open':''} ontoggle="USO_SMS_DETALLE_ABIERTO=this.open"
+             style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:10px 12px;margin-bottom:12px">
+    <summary style="cursor:pointer;font-weight:800;color:var(--gold2);font-size:.9rem">📈 Ver detalle de actividad (entradas, SMS y respuestas)</summary>
+    <div id="huecoPeriodoUsoSms" style="margin-top:10px"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
       ${tarjeta(tecnicosQueEntraron.size,'Técnicos que entraron','var(--gold2)')}
       ${tarjeta(jesQueEntraron.size,'JEs que entraron','var(--gold2)')}
@@ -3733,11 +3746,15 @@ async function renderUsoSmsPanel(recargar){
       ${tarjeta(total('confirmado'),'Confirmadas','var(--green)')}
       ${tarjeta(total('no_confirmado'),'No confirman','#e05a4a')}
     </div>
-    ${bloqueSin}
     ${tablas || '<div style="text-align:center;color:var(--text2);padding:20px 0">Sin actividad en este periodo.</div>'}
     ${historicoDiarioUsoSms(d, nombre, jeDe)}
     <div style="font-size:.7rem;color:var(--text2);margin:6px 0 10px">Entr. (entradas), SMS, ✅ y ❌: lo que hizo cada persona en el periodo elegido. Pend.: citas pendientes / citas cargadas ahora mismo. ⭐ = jefe de equipo.</div>
+    </details>
     <button onclick="renderUsoSmsPanel(true)" style="width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.85rem;cursor:pointer">↻ Actualizar datos</button>`;
+  // El selector de periodo solo afecta al detalle: se mueve dentro de él
+  const selPeriodo = document.getElementById('periodoUsoSms');
+  const hueco = document.getElementById('huecoPeriodoUsoSms');
+  if(selPeriodo && hueco){ selPeriodo.style.display=''; hueco.appendChild(selPeriodo); }
 }
 
 // ════════════════════════════════════════════════════════
