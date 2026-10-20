@@ -5076,19 +5076,25 @@ function htmlVacDias(mat, compacto){
   const NOMBRES = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const meses = Object.keys(porMes).filter(m=>m.slice(0,4)===anio).sort();
   if(!meses.length) return '';
-  const color = c => c==='VAC' ? '#4a90e2' : (c==='AP' ? '#e67e22' : 'var(--text2)');
-  const nombreCod = c => c==='VAC' ? 'Vac.' : (c==='AP' ? 'AP' : c);
-  const orden = c => c==='VAC' ? 0 : (c==='AP' ? 1 : 2);
+  // Nombres cortos para los códigos largos de la hoja (vistos en vivo)
+  const nombreCod = c => c==='VAC' ? 'Vac.' : c==='AP' ? 'AP'
+    : /^BAJA/.test(c) ? 'Baja médica' : /^FAMILIAR/.test(c) ? 'Permiso familiar'
+    : c==='TALLER' ? 'Taller' : c;
   const lineas = meses.map(m=>{
     const porCod = {};
-    porMes[m].forEach(x => (porCod[x.codigo] = porCod[x.codigo] || []).push(x.dia));
-    const cods = Object.keys(porCod).sort((a,b)=>orden(a)-orden(b));
+    porMes[m].filter(x => x.codigo!=='FEST').forEach(x => (porCod[nombreCod(x.codigo)] = porCod[nombreCod(x.codigo)] || []).push(x.dia));
+    if(!Object.keys(porCod).length) return '';
+    const ordenN = n => n==='Vac.' ? 0 : (n==='AP' ? 1 : 2);
+    const colorN = n => n==='Vac.' ? '#4a90e2' : (n==='AP' ? '#e67e22' : 'var(--text2)');
+    const cods = Object.keys(porCod).sort((a,b)=>ordenN(a)-ordenN(b));
+    const total = Object.values(porCod).reduce((t,l)=>t+l.length,0);
     return `<div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;border-top:1px solid var(--border2);font-size:${compacto?'.68rem':'.74rem'}">
       <span style="min-width:${compacto?'42px':'52px'};color:var(--text2);font-weight:700">${NOMBRES[parseInt(m.slice(5),10)]} ${m.slice(2,4)}</span>
-      <span style="flex:1">${cods.map(c=>`<span style="color:${color(c)};font-weight:700">${nombreCod(c)}</span> ${rangosDias(porCod[c])}`).join(' · ')}</span>
-      <span style="color:var(--text2)">${porMes[m].length} d</span>
+      <span style="flex:1">${cods.map(n=>`<span style="color:${colorN(n)};font-weight:700">${n}</span> ${rangosDias(porCod[n])}`).join(' · ')}</span>
+      <span style="color:var(--text2)">${total} d</span>
     </div>`;
   }).join('');
+  if(!lineas) return '';
   return `<div style="margin-top:${compacto?'6':'10'}px">${compacto?'':'<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text2);margin-bottom:4px">Días exactos</div>'}${lineas}</div>`;
 }
 function pintarVacDias(){
