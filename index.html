@@ -3533,29 +3533,17 @@ async function renderConfirmacionesEquipo(jeId, recargar){
             <span>${nombre(m)} <span style="color:var(--text2)">(${m})</span></span><span style="color:#e05a4a;font-weight:700">${hoy[m].pendientes} pend.</span></div>`).join('')
         : '<div style="font-size:.8rem;color:var(--green);font-weight:700">✅ Todos los de tu equipo con citas las han gestionado.</div>');
 
-  // Días anteriores (resumen guardado cada noche de lunes a viernes)
-  const porDia = {};
-  (d.resumen||[]).filter(r=>equipo.has(String(r.mat))).forEach(r=>{ (porDia[r.fecha]=porDia[r.fecha]||[]).push(r); });
-  const dias = Object.keys(porDia).sort().reverse().filter(f=>f<isoDiasAtras(0)).slice(0,10);
-  const histHtml = !dias.length
-    ? '<div style="font-size:.75rem;color:var(--text2)">Todavía no hay días guardados (el resumen se guarda cada noche de lunes a viernes).</div>'
-    : dias.map(f=>{
-        const filas = porDia[f];
-        const no = filas.filter(r=>r.estado==='NO_USO');
-        return `<div style="padding:6px 0;border-top:1px solid var(--border2)">
-          <div style="display:flex;justify-content:space-between;font-size:.8rem">
-            <b>${fechaCortaUsoSms(f)}</b>
-            <span>${filas.length-no.length}/${filas.length} usaron${no.length?' · <span style="color:#e05a4a;font-weight:700">'+no.length+' no</span>':''}</span>
-          </div>
-          ${no.length?`<div style="font-size:.72rem;color:var(--text2);margin-top:2px">No usaron: ${no.map(r=>nombre(String(r.mat))).join(', ')}</div>`:''}
-        </div>`;
-      }).join('');
+  // Días anteriores: la misma tarjeta que ve GD5381, solo con este equipo,
+  // de peor a mejor % de Cumplimiento y con selector de día (por defecto ayer)
+  const jeDeEquipo = {};
+  equipo.forEach(m => jeDeEquipo[m] = jeId);
+  jeDeEquipo[jeId] = jeId;
+  const histHtml = noEntraronPorEquipo(d, nombre, jeDeEquipo, jeId);
 
   el.innerHTML = cab + `
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
       <div style="font-size:.7rem;color:var(--gold2);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Hoy</div>
       ${hoyHtml}
-      <div style="font-size:.7rem;color:var(--gold2);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 4px">Días anteriores</div>
       ${histHtml}
       <button onclick="renderConfirmacionesEquipo('${jeId}',true)" style="margin-top:10px;width:100%;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.78rem;cursor:pointer">↻ Actualizar</button>
     </div>`;
@@ -3583,22 +3571,30 @@ function jerarquiaUsoSms(d){
 let USO_SMS_DIA = null;
 let USO_SMS_DETALLE_ABIERTO = false;
 function cambiarDiaUsoSms(f){ USO_SMS_DIA = f; renderUsoSmsPanel(); }
-function noEntraronPorEquipo(d, nombre, jeDe){
+// soloJE: si se pasa, solo ese equipo (vista del JE en "Mi equipo", con su propio día elegido)
+let CONF_EQUIPO_DIA = null;
+function cambiarDiaConfEquipo(jeId, f){ CONF_EQUIPO_DIA = f; renderConfirmacionesEquipo(jeId); }
+function noEntraronPorEquipo(d, nombre, jeDe, soloJE){
   const porDia = {};
-  (d.resumen||[]).forEach(r=>{ (porDia[r.fecha]=porDia[r.fecha]||[]).push(r); });
+  (d.resumen||[]).filter(r=>!soloJE || jeDe[String(r.mat)]===soloJE).forEach(r=>{ (porDia[r.fecha]=porDia[r.fecha]||[]).push(r); });
   const dias = Object.keys(porDia).sort().reverse().filter(f=>f<isoDiasAtras(0));
-  const cab = '<div style="font-weight:800;color:var(--gold2);font-size:.95rem;margin:2px 0 8px">🚫 Quién no entró a confirmar, por equipo</div>';
+  const cab = soloJE
+    ? '<div style="font-size:.7rem;color:var(--gold2);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px">Días anteriores · de peor a mejor cumplimiento</div>'
+    : '<div style="font-weight:800;color:var(--gold2);font-size:.95rem;margin:2px 0 8px">🚫 Quién no entró a confirmar, por equipo</div>';
   if(!dias.length) return cab+'<div style="font-size:.78rem;color:var(--text2);margin-bottom:16px">Todavía no hay días guardados (se guardan cada noche de lunes a viernes).</div>';
-  if(!USO_SMS_DIA || !porDia[USO_SMS_DIA]) USO_SMS_DIA = dias[0];
-  const filas = porDia[USO_SMS_DIA];
-  const selector = `<select onchange="cambiarDiaUsoSms(this.value)" style="width:100%;margin-bottom:10px;padding:9px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700">
-      ${dias.map((f,i)=>`<option value="${f}" ${f===USO_SMS_DIA?'selected':''}>${i===0&&f===isoDiasAtras(1)?'Ayer · ':''}${fechaCortaUsoSms(f)}</option>`).join('')}
+  let diaSel = soloJE ? CONF_EQUIPO_DIA : USO_SMS_DIA;
+  if(!diaSel || !porDia[diaSel]) diaSel = dias[0];
+  if(soloJE) CONF_EQUIPO_DIA = diaSel; else USO_SMS_DIA = diaSel;
+  const filas = porDia[diaSel];
+  const alCambiar = soloJE ? `cambiarDiaConfEquipo('${soloJE}',this.value)` : 'cambiarDiaUsoSms(this.value)';
+  const selector = `<select onchange="${alCambiar}" style="width:100%;margin-bottom:10px;padding:9px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700">
+      ${dias.map((f,i)=>`<option value="${f}" ${f===diaSel?'selected':''}>${i===0&&f===isoDiasAtras(1)?'Ayer · ':''}${fechaCortaUsoSms(f)}</option>`).join('')}
     </select>`;
   // Agrupar por equipo
   const equipos = {};
   filas.forEach(r=>{ const j = jeDe[String(r.mat)] || '—'; (equipos[j]=equipos[j]||[]).push(r); });
   const totalNo = filas.filter(r=>r.entro!=='SI').length;
-  const resumen = `<div style="font-size:.82rem;margin-bottom:10px">De <b>${filas.length}</b> técnicos con citas, <b style="color:var(--green)">${filas.length-totalNo}</b> entraron y <b style="color:#e05a4a">${totalNo}</b> no.</div>`;
+  const resumen = soloJE ? '' : `<div style="font-size:.82rem;margin-bottom:10px">De <b>${filas.length}</b> técnicos con citas, <b style="color:var(--green)">${filas.length-totalNo}</b> entraron y <b style="color:#e05a4a">${totalNo}</b> no.</div>`;
   const orden = Object.keys(equipos).sort((a,b)=>{
     const na = equipos[a].filter(r=>r.entro!=='SI').length, nb = equipos[b].filter(r=>r.entro!=='SI').length;
     return nb-na || nombre(a).localeCompare(nombre(b));
