@@ -80,9 +80,14 @@ def _buscar_mantenimiento(page, numero, capturas):
     """Busca el numero en "Buscar en actividades", abre el resultado y devuelve
     la ficha ya filtrada (ficha_ofs.extraer_ficha). Las capturas solo se guardan
     si algo falla (la pantalla trae datos del cliente)."""
-    page.locator(BOTON_BUSCADOR + ":visible").first.click(timeout=15000)
+    # Si una busqueda anterior no encontro nada, el panel de busqueda se queda
+    # abierto y tapa el boton (visto 2026-10-22): se usa el campo directamente.
     campo = page.locator(CAMPO_BUSCADOR + ":visible").first
+    if not campo.count():
+        page.locator(BOTON_BUSCADOR + ":visible").first.click(timeout=15000)
+        campo = page.locator(CAMPO_BUSCADOR + ":visible").first
     campo.wait_for(timeout=10000)
+    campo.click()
     campo.fill("")
     campo.type(numero, delay=60)
     campo.press("Enter")
@@ -92,6 +97,12 @@ def _buscar_mantenimiento(page, numero, capturas):
     try:
         resultado.wait_for(timeout=20000)
     except Exception:
+        # Cerrar el panel de busqueda para que no tape el boton en la siguiente
+        try:
+            campo.fill("")
+            page.keyboard.press("Escape")
+        except Exception:
+            pass
         raise NoVisible(numero)
     resultado.click()
     try:
