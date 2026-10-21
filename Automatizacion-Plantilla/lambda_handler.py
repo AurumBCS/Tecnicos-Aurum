@@ -15,7 +15,13 @@ Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "traspasos_diario"} -> L-V 8:00, aviso de traspasos InterWorker sin completar (ver ov_traspasos.py)
   {"tarea": "traspasos_diario", "respaldo": true} -> L-V 9:30, solo si el de las 8:00 no salio
   {"tarea": "ofs_rm_prueba"} -> prueba (manual): buscar mantenimientos repetidos en Oracle (ver ofs_rm_prueba.py)
+  {"tarea": "upselling_envio"} -> SIN horario: envia al Microsoft Form los lotes de Upselling aprobados en
+                                  la app (ver forms_upselling.py). Lo arranca la URL de funcion (ver _desde_url).
 (El correo de la mañana con capturas a Mercedes se retiro el 2026-10-16.)
+
+URL de funcion (Function URL, auth NONE): solo la usa el Apps Script de la app cuando Anna pulsa
+"Enviar al Form" en Upselling. Solo acepta {"tarea": "upselling_envio", "token": UPS_TOKEN}; cualquier
+otra cosa -> 403. Responde enseguida y se arranca a si misma de forma asincrona para enviar.
 
 IMPORTANTE sobre reintentos (configurar en la consola, ver README): EventBridge
 Scheduler invoca Lambda de forma asincrona, y por defecto Lambda reintenta
@@ -43,11 +49,38 @@ def _correr(fn, nombre):
             ) from e
 
 
+def _desde_url(event, context):
+    """Llamada por la URL de funcion (boton "Enviar al Form" de la app): comprobar la clave y arrancar
+    upselling_envio de forma asincrona, para contestar al Apps Script sin esperar al envio."""
+    import base64
+    import hmac
+    import json
+    import os
+
+    cuerpo = event.get("body") or ""
+    if event.get("isBase64Encoded"):
+        cuerpo = base64.b64decode(cuerpo).decode()
+    try:
+        datos = json.loads(cuerpo or "{}")
+    except ValueError:
+        datos = {}
+    clave = os.environ.get("UPS_TOKEN", "")
+    if datos.get("tarea") != "upselling_envio" or not clave or not hmac.compare_digest(str(datos.get("token", "")), clave):
+        return {"statusCode": 403, "body": "sin permiso"}
+    import boto3
+
+    boto3.client("lambda").invoke(FunctionName=context.function_name, InvocationType="Event",
+                                  Payload=json.dumps({"tarea": "upselling_envio"}).encode())
+    return {"statusCode": 202, "body": "envio arrancado"}
+
+
 def handler(event, context):
+    if isinstance(event, dict) and "requestContext" in event:
+        return _desde_url(event, context)
     tarea = (event or {}).get("tarea")
-    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "ofs_rm_prueba"):
+    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "ofs_rm_prueba", "upselling_envio"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/ofs_rm_prueba): {event}"
+            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/ofs_rm_prueba/upselling_envio): {event}"
         )
 
     if tarea == "listar_buckets":
@@ -80,6 +113,11 @@ def handler(event, context):
         import ofs_rm_prueba
 
         _correr(lambda: ofs_rm_prueba.main(event.get("parejas")), "ofs_rm_prueba")
+    elif tarea == "upselling_envio":
+        # Envia al Microsoft Form UPSELLING el lote aprobado en la app, fila a fila.
+        import forms_upselling
+
+        _correr(lambda: forms_upselling.main(context), "forms_upselling")
     else:
         # "mediodia" (14:00) y "tarde" (17:30) hacen lo mismo: descargar la ruta
         # del dia siguiente y subirla a confirmaciones-sms.

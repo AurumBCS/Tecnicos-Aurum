@@ -332,6 +332,26 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .cf-guardar.on{display:flex}
 .cf-guardar span{margin-right:auto;font-size:.75rem;font-weight:700;color:var(--gold2)}
 .cf-vacio{padding:26px;text-align:center;color:var(--muted);font-size:.75rem}
+/* ── Upselling (Excel → Microsoft Form, aprobación de Control de fichajes) ── */
+.ups-switch{display:none;gap:6px;margin-bottom:12px}
+.ups-switch.on{display:flex}
+.ups-switch .cf-chip{flex:1;padding:9px 12px;font-size:.72rem}
+.ups-subir{display:block;background:var(--s1);border:1.5px dashed var(--gold3);border-radius:12px;padding:18px;text-align:center;cursor:pointer;margin-bottom:12px}
+.ups-subir b{display:block;color:var(--gold2);font-size:.85rem;margin-bottom:4px}
+.ups-subir span{font-size:.66rem;color:var(--muted)}
+.ups-aviso{font-size:.7rem;color:var(--orange);background:rgba(212,131,26,.1);border:1px solid var(--orange);border-radius:10px;padding:9px 11px;margin-bottom:10px;line-height:1.45}
+.ups-ok{font-size:.7rem;color:var(--green2);background:rgba(61,170,110,.1);border:1px solid var(--green2);border-radius:10px;padding:9px 11px;margin-bottom:10px;line-height:1.45}
+.ups-barra{height:8px;background:var(--s2);border-radius:999px;overflow:hidden;margin:6px 0 12px}
+.ups-barra div{height:100%;background:var(--green2);transition:width .4s}
+.ups-fila{background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:8px 11px;margin-bottom:6px}
+.ups-fila.mal{border-left:4px solid #e05a4a}
+.ups-fila .d{font-size:.64rem;color:var(--muted);margin-top:3px;line-height:1.45}
+.ups-fila .x{font-size:.64rem;color:#e05a4a;margin-top:3px}
+.ups-st{font-size:.58rem;font-weight:800;padding:3px 8px;border-radius:999px;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;background:rgba(255,255,255,.08);color:var(--muted)}
+.ups-st.Enviado,.ups-st.Terminado{background:rgba(61,170,110,.15);color:var(--green2)}
+.ups-st.Enviando,.ups-st.Aprobado{background:rgba(201,168,76,.15);color:var(--gold2)}
+.ups-st.Error,.ups-st.Revisar,.ups-st.No-válida,.ups-st.Parado,.ups-st.Terminado-con-errores{background:rgba(224,90,74,.15);color:#e05a4a}
+.ups-st.Listo-para-enviar,.ups-st.Ya-enviada{background:rgba(212,131,26,.15);color:var(--orange)}
 .cf-rapido{margin-top:8px}
 .cf-just{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
 .cf-mot{font-size:.7rem;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--dim);color:var(--gold2);border:1px solid var(--border2)}
@@ -587,6 +607,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <!-- Panel de control de fichajes Odoo + Líneas de Comunicación (CONTROL_FICHAJES_IDS) -->
   <div id="controlFichajesPanel">
     <div style="padding:14px 13px 90px;max-width:680px;margin:0 auto">
+      <div class="ups-switch"><button class="cf-chip on">🕒 Fichajes</button><button class="cf-chip" onclick="upsIr('upselling')">📤 Upselling</button></div>
       <div class="data-banner" style="margin-bottom:14px">
         <div class="sync-dot"></div>
         Control de fichajes · Quién no fichó y por qué
@@ -597,6 +618,18 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <span id="cfNumCambios"></span>
       <button class="cf-btn" onclick="cfDescartar()">Descartar</button>
       <button class="cf-btn prim" onclick="cfGuardar()">Guardar cambios</button>
+    </div>
+  </div>
+
+  <!-- Panel Upselling: Excel del día → Microsoft Form, con aprobación (UPS_IDS) -->
+  <div id="upsellingPanel">
+    <div style="padding:14px 13px 48px;max-width:680px;margin:0 auto">
+      <div class="ups-switch on"><button class="cf-chip" onclick="upsIr('fichajes')">🕒 Fichajes</button><button class="cf-chip on">📤 Upselling</button></div>
+      <div class="data-banner" style="margin-bottom:14px">
+        <div class="sync-dot"></div>
+        Upselling · Excel del día al Form
+      </div>
+      <div id="upsellingContainer"></div>
     </div>
   </div>
 
@@ -1250,7 +1283,7 @@ async function cambiarMes(mes){
 //  PANELS VISIBILITY
 // ══════════════════════════════════════════════
 function hideAllPanels(){
-  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','usagePanel','usoSmsPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel','historicoPanel']
+  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','upsellingPanel','usagePanel','usoSmsPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel','historicoPanel']
     .forEach(id=>document.getElementById(id).style.display='none');
 }
 function showPanel(id){
@@ -5987,6 +6020,7 @@ async function doLogin(){
     CF={mat:found.id,dni,datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
     showPanel('controlFichajesPanel');
     cfAbrir('');
+    upsPreparar();
 
   } else if(found.type==='fichaje-admin'){
     CURRENT_USER_TYPE='fichaje-admin';
@@ -6279,6 +6313,249 @@ async function doRefreshData(){
   }
 }
 
+// ══════════════════════════════════════════════
+//  UPSELLING · Excel del día → Microsoft Form "UPSELLING"
+//  La app lee el Excel (los dos formatos: Anexos_AURUM y el que trae PANEL),
+//  lo pasa a las 10 preguntas del Form y lo guarda como lote (Upselling.gs).
+//  Al aprobarlo, la Lambda (tarea upselling_envio) lo envía fila a fila con la
+//  cuenta de Gustavo y aquí se ve el avance.
+// ══════════════════════════════════════════════
+const UPS_IDS=['314298'];
+const UPS_PANELES=['Moonshot','VERISURE','Otras'];
+// Columnas aceptadas (en mayúsculas, sin acentos ni signos) para cada pregunta del Form
+const UPS_COLS={
+  inst:['INSTALACION'], mant:['NMANTENIMIENTOABS','MANTENIMIENTO','NMANTENIMIENTO'],
+  mat:['TECHNICIANMAINTENANCE','MATRICULA'], panel:['PANEL'],
+  ref:['ITEM','ELEMENTOAMPLIADO','REFERENCIA','REFERENCIAAMPLIADA'],
+  cant:['QUANTY','CANT','CANTIDAD'], cuota:['CUOTA','CUOTASINIVA'], imp:['IMPORTE','REPTEC'],
+};
+let UPS={datos:null,previa:null,lote:'',timer:null,ocupado:false};
+
+const upsNorm=s=>String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+const upsClase=s=>String(s||'').replace(/ /g,'-');
+
+function upsPreparar(){
+  const puede=UPS_IDS.includes(CF.mat);
+  document.querySelectorAll('#controlFichajesPanel .ups-switch').forEach(e=>e.classList.toggle('on',puede));
+}
+
+function upsIr(donde){
+  if(donde==='upselling'){
+    document.getElementById('cfGuardarBar').classList.remove('on');
+    showPanel('upsellingPanel');
+    upsAbrir(UPS.lote);
+  } else {
+    upsParar();
+    showPanel('controlFichajesPanel');
+    document.getElementById('cfGuardarBar').classList.toggle('on',cfNumCambios()>0);
+  }
+}
+
+function upsSalir(){ upsParar(); UPS={datos:null,previa:null,lote:'',timer:null,ocupado:false}; }
+function upsParar(){ if(UPS.timer){ clearTimeout(UPS.timer); UPS.timer=null; } }
+
+async function upsLlamar(accion,extra,intentos){
+  const res=await fetchConReintento(FICHAJE_URL,{method:'POST',
+    body:JSON.stringify(Object.assign({mat:CF.mat,dni:CF.dni,accion},extra||{}))},intentos);
+  let data=null;
+  try{ data=await res.json(); }catch(e){}
+  if(!data) throw new Error('Sin respuesta del servidor.');
+  if(data.ok===false) throw new Error(data.error||'Error desconocido.');
+  return data;
+}
+
+async function upsAbrir(lote){
+  upsParar();
+  const c=document.getElementById('upsellingContainer');
+  if(!UPS.datos) c.innerHTML='<div class="cf-vacio">⏳ Cargando…</div>';
+  try{
+    UPS.datos=await upsLlamar('ups-estado',{lote:lote||''});
+    UPS.lote=UPS.datos.lote;
+    UPS.previa=null;
+    upsRender();
+  }catch(e){
+    c.innerHTML=`<div class="cf-vacio">❌ ${cfEsc(e.message)}<br><br><button class="cf-btn" onclick="upsAbrir('')">Reintentar</button></div>`;
+  }
+}
+
+// Mientras un lote está aprobado o enviándose, se refresca solo cada 10 s
+function upsProgramarRefresco(){
+  upsParar();
+  const l=upsLoteActual();
+  if(!l||!['Aprobado','Enviando'].includes(l.estado)) return;
+  UPS.timer=setTimeout(async()=>{
+    if(document.getElementById('upsellingPanel').style.display==='none') return;
+    try{ UPS.datos=await upsLlamar('ups-estado',{lote:UPS.lote}); if(!UPS.previa) upsRender(); else upsProgramarRefresco(); }
+    catch(e){ upsProgramarRefresco(); }
+  },10000);
+}
+
+const upsLoteActual=()=>UPS.datos&&UPS.datos.lotes.find(l=>l.lote===UPS.lote);
+
+function upsCargarLector(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise((ok,ko)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=ok; s.onerror=()=>ko(new Error('No se pudo cargar el lector de Excel. Revisa la conexión.'));
+    document.head.appendChild(s);
+  });
+}
+
+/** Misma limpieza y comprobación que ups_normalizar_ en Upselling.gs (el servidor vuelve a hacerla). */
+function upsNormalizarFila(f){
+  const t=x=>String(x==null?'':x).trim();
+  const num=x=>t(x).replace(/€/g,'').replace(/\s/g,'').replace(/,00$|\.00$/,'').replace('.',',');
+  const panel=t(f.panel)||'VERISURE';
+  const x={inst:t(f.inst),mant:t(f.mant),mat:t(f.mat).toUpperCase(),
+    panel:UPS_PANELES.find(p=>p.toUpperCase()===panel.toUpperCase())||panel,
+    ref:t(f.ref).toUpperCase(),cant:t(f.cant).replace(/[.,]0+$/,''),cuota:num(f.cuota),imp:num(f.imp)};
+  const mal=[];
+  if(!/^\d{3,10}$/.test(x.inst)) mal.push('instalación');
+  if(!/^\d{5,12}$/.test(x.mant)) mal.push('mantenimiento');
+  if(!/^[A-Z0-9]{3,10}$/.test(x.mat)) mal.push('matrícula');
+  if(!UPS_PANELES.includes(x.panel)) mal.push('panel "'+x.panel+'"');
+  if(!x.ref) mal.push('referencia');
+  if(!/^([1-9]|1\d|20)$/.test(x.cant)) mal.push('cantidad (1 a 20)');
+  if(!/^\d+(,\d+)?$/.test(x.cuota)) mal.push('cuota');
+  if(!/^\d+(,\d+)?$/.test(x.imp)) mal.push('importe');
+  x.error=mal.length?'Revisar '+mal.join(', '):'';
+  return x;
+}
+
+/** Filas del Excel → {formato, filas}. Busca la fila de títulos en las primeras 15. */
+function upsLeerTabla(aoa){
+  const iCab=aoa.slice(0,15).findIndex(r=>r.some(v=>upsNorm(v)==='INSTALACION'));
+  if(iCab<0) throw new Error('No encuentro la columna "Instalación" en el Excel.');
+  const cab=aoa[iCab].map(upsNorm), idx={};
+  Object.entries(UPS_COLS).forEach(([k,nombres])=>{ idx[k]=cab.findIndex(h=>nombres.includes(h)); });
+  const faltan=Object.keys(UPS_COLS).filter(k=>k!=='panel'&&idx[k]<0);
+  if(faltan.length) throw new Error('Faltan columnas en el Excel: '+faltan.join(', ')+'.');
+  const valor=v=>typeof v==='number'?String(v):String(v==null?'':v);
+  const filas=aoa.slice(iCab+1).filter(r=>String(r[idx.inst]??'').trim()).map(r=>{
+    const f={}; Object.keys(UPS_COLS).forEach(k=>{ f[k]=idx[k]>=0?valor(r[idx[k]]):''; });
+    return upsNormalizarFila(f);
+  });
+  if(!filas.length) throw new Error('El Excel no tiene filas con número de instalación.');
+  return {formato:idx.panel>=0?'Con columna Panel':'AURUM (Panel = VERISURE)',filas};
+}
+
+async function upsElegirArchivo(input){
+  const archivo=input.files&&input.files[0];
+  input.value='';
+  if(!archivo) return;
+  const c=document.getElementById('upsPrevia');
+  c.innerHTML='<div class="cf-vacio">⏳ Leyendo el Excel…</div>';
+  try{
+    await upsCargarLector();
+    const libro=XLSX.read(await archivo.arrayBuffer(),{type:'array'});
+    const hoja=libro.Sheets[libro.SheetNames[0]];
+    const t=upsLeerTabla(XLSX.utils.sheet_to_json(hoja,{header:1,raw:true,defval:''}));
+    UPS.previa=Object.assign({archivo:archivo.name},t);
+    upsParar();
+    upsRender();
+  }catch(e){
+    c.innerHTML=`<div class="ups-aviso">❌ ${cfEsc(e.message)}</div>`;
+  }
+}
+
+function upsFilaHTML(f,estado,detalle,hora){
+  const malo=['No válida','Error','Revisar','Ya enviada'].includes(estado)||(!estado&&f.error);
+  return `<div class="ups-fila ${malo?'mal':''}">
+    <div class="cf-top"><div class="cf-nom">${cfEsc(f.inst)} · ${cfEsc(f.ref)}</div>
+      ${estado?`<span class="ups-st ${upsClase(estado)}">${cfEsc(estado)}</span>`:''}</div>
+    <div class="d">Mto ${cfEsc(f.mant)} · Matrícula ${cfEsc(f.mat)} · ${cfEsc(f.panel)} · Cant ${cfEsc(f.cant)} · Cuota ${cfEsc(f.cuota)} · Importe ${cfEsc(f.imp)}${hora?' · '+cfEsc(hora.slice(11)):''}</div>
+    ${detalle||f.error?`<div class="x">${cfEsc(detalle||f.error)}</div>`:''}
+  </div>`;
+}
+
+function upsRender(){
+  const c=document.getElementById('upsellingContainer');
+  const d=UPS.datos||{lotes:[],filas:[]};
+  const subir=`<label class="ups-subir"><input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="upsElegirArchivo(this)">
+      <b>📎 Subir el Excel del día</b><span>Anexos_AURUM o el Excel con columna PANEL</span></label>`;
+  let previa='';
+  if(UPS.previa){
+    const p=UPS.previa, malas=p.filas.filter(f=>f.error).length, buenas=p.filas.length-malas;
+    previa=`<div class="section-head">Vista previa · ${cfEsc(p.archivo)}</div>
+      <div class="cf-obs" style="margin-bottom:8px">Formato: ${cfEsc(p.formato)} · ${p.filas.length} filas · Empresa AURUM · Tipo 303 - ELEMENTO</div>
+      ${malas?`<div class="ups-aviso">⚠️ ${malas} fila${malas>1?'s':''} con datos que el Form no acepta: no se enviará${malas>1?'n':''}.</div>`:''}
+      <div class="cf-bar">
+        <button class="cf-btn prim" ${buenas?'':'disabled'} onclick="upsGuardarLote(this)">Guardar lote (${buenas})</button>
+        <button class="cf-btn" onclick="UPS.previa=null;upsRender()">Cancelar</button>
+      </div>
+      ${p.filas.map(f=>upsFilaHTML(f,'','')).join('')}`;
+  }
+  const l=upsLoteActual();
+  let lote='';
+  if(!UPS.previa&&l){
+    const filas=d.filas, envio=filas.filter(f=>!['No válida','Ya enviada'].includes(f.estado));
+    const hechas=envio.filter(f=>['Enviado','Error','Revisar'].includes(f.estado)).length;
+    const pct=envio.length?Math.round(100*hechas/envio.length):0;
+    const opciones=d.lotes.map(x=>`<option value="${cfEsc(x.lote)}" ${x.lote===l.lote?'selected':''}>${cfEsc(x.subidoEl.slice(0,16))} · ${cfEsc(x.archivo)} · ${cfEsc(x.estado)}</option>`).join('');
+    const quien=l.aprobadoPor?`Envío pedido por ${cfEsc(l.aprobadoPor)} el ${cfEsc(l.aprobadoEl)}`:`Subido el ${cfEsc(l.subidoEl)}`;
+    const conError=filas.filter(f=>f.estado==='Error').length;
+    const reintentar=conError?`<div class="cf-bar"><button class="cf-btn prim" onclick="upsReintentar(this)">🔁 Reintentar las que fallaron (${conError})</button></div>`:'';
+    let accion='';
+    if(l.estado==='Listo para enviar') accion=`
+      <div class="ups-aviso">Lote guardado. No se envía nada hasta que pulses <b>Enviar al Form</b>: se enviarán <b>${l.validas}</b> respuestas con la cuenta de Gustavo.</div>
+      <div class="cf-bar"><button class="cf-btn prim" onclick="upsAprobar(this)">📤 Enviar al Form (${l.validas})</button>
+        <button class="cf-btn" onclick="upsAnular(this)">Anular</button></div>`;
+    else if(l.estado==='Aprobado') accion=`<div class="ups-ok">📤 ${quien}. Arrancando el envío… esta pantalla se actualiza sola.</div>`;
+    else if(l.estado==='Enviando') accion=`<div class="ups-ok">📤 Enviando al Form… ${hechas} de ${envio.length}. ${quien}.</div>
+      <div class="cf-bar"><button class="cf-link" style="margin-left:0" onclick="upsReintentar(this)">¿Lleva mucho rato sin avanzar? Reanudar el envío</button></div>`;
+    else if(l.estado==='Terminado') accion=`<div class="ups-ok">✅ Terminado: ${l.enviadas} respuestas enviadas (${cfEsc(l.terminadoEl)}). ${quien}.</div>`;
+    else if(l.estado==='Terminado con errores'||l.estado==='Parado') accion=`<div class="ups-aviso">⚠️ ${cfEsc(l.estado)}: ${l.enviadas} enviadas, ${l.errores} sin enviar o por revisar. ${cfEsc(l.detalle||'')}
+        ${conError?'Las que fallaron no llegaron al Form y se pueden reintentar.':''} Las marcadas "Revisar" compruébalas con Gustavo.</div>${reintentar}`;
+    else if(l.estado==='Anulado') accion=`<div class="cf-obs" style="margin-bottom:10px">Lote anulado. ${cfEsc(l.detalle||'')}</div>`;
+    lote=`<div class="section-head">Lotes</div>
+      <div class="cf-bar"><select class="cf-input" style="flex:1" onchange="upsAbrir(this.value)">${opciones}</select>
+        <button class="cf-btn" onclick="upsAbrir(UPS.lote)">🔄</button></div>
+      <div class="cf-top" style="margin-bottom:4px"><div class="cf-nom">${cfEsc(l.archivo)} · ${l.filas} filas</div><span class="ups-st ${upsClase(l.estado)}">${cfEsc(l.estado)}</span></div>
+      ${['Enviando','Terminado','Terminado con errores','Parado'].includes(l.estado)?`<div class="ups-barra"><div style="width:${pct}%"></div></div>`:''}
+      ${accion}
+      ${filas.map(f=>upsFilaHTML(f,f.estado,f.detalle,f.estado==='Enviado'?f.hora:'')).join('')}`;
+  } else if(!UPS.previa){
+    lote='<div class="cf-vacio">Todavía no hay lotes. Sube el Excel del día para empezar.</div>';
+  }
+  c.innerHTML=subir+`<div id="upsPrevia">${previa}</div>`+lote;
+  upsProgramarRefresco();
+}
+
+async function upsGuardarLote(btn){
+  btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    const p=UPS.previa;
+    // un solo intento: si se reintenta tras un fallo de red podría quedar el lote dos veces
+    UPS.datos=await upsLlamar('ups-subir',{archivo:p.archivo,formato:p.formato,
+      filas:p.filas.map(({error,...f})=>f)},1);
+    UPS.lote=UPS.datos.lote; UPS.previa=null;
+    upsRender();
+  }catch(e){ btn.disabled=false; btn.textContent='Guardar lote'; alert('❌ '+e.message); }
+}
+
+async function upsAprobar(btn){
+  const l=upsLoteActual();
+  if(!confirm(`¿Enviar ahora al Form?\n\nSe enviarán ${l.validas} respuestas al Form UPSELLING con la cuenta de Gustavo. Quedará registrado que lo pediste tú (${CF.mat}).`)) return;
+  btn.disabled=true; btn.textContent='Arrancando…';
+  try{ UPS.datos=await upsLlamar('ups-aprobar',{lote:UPS.lote},1); upsRender(); }
+  catch(e){ btn.disabled=false; btn.textContent=`📤 Enviar al Form (${l.validas})`; alert('❌ '+e.message); }
+}
+
+async function upsReintentar(btn){
+  if(!confirm('¿Volver a intentar el envío de las filas que no llegaron al Form?')) return;
+  btn.disabled=true;
+  try{ UPS.datos=await upsLlamar('ups-reintentar',{lote:UPS.lote},1); upsRender(); }
+  catch(e){ btn.disabled=false; alert('❌ '+e.message); }
+}
+
+async function upsAnular(btn){
+  if(!confirm('¿Anular este lote? No se enviará nada.')) return;
+  btn.disabled=true;
+  try{ UPS.datos=await upsLlamar('ups-anular',{lote:UPS.lote},1); upsRender(); }
+  catch(e){ btn.disabled=false; alert('❌ '+e.message); }
+}
+
 function doLogout(){
   document.getElementById('appScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
@@ -6292,6 +6569,7 @@ function doLogout(){
   CF_EDITAR.clear();
   cfCerrarAsistente();
   document.getElementById('cfGuardarBar').classList.remove('on');
+  upsSalir();
   hideAllPanels();
   document.getElementById('mainPanel').style.display='block';
 }

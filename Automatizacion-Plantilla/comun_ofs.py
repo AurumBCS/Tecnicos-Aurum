@@ -460,8 +460,10 @@ def iniciar_sesion_microsoft(page, correo, clave):
         # Oracle dentro como parametro (RelayState=...oraclecloud.com...).
         from urllib.parse import urlparse
         dominio = (urlparse(page.url).hostname or "").lower()
-        # (oraclecloudapps.com = app OV de inventario, que a veces vuelve directa sin pasar por Oracle Identity)
-        if dominio.endswith(("oraclecloud.com", "oraclecloudapps.com", "etadirect.com")):
+        # (oraclecloudapps.com = app OV de inventario, que a veces vuelve directa sin pasar por Oracle Identity;
+        # forms.cloud.microsoft / forms.office.com = Form de Upselling, ver forms_upselling.py)
+        if dominio.endswith(("oraclecloud.com", "oraclecloudapps.com", "etadirect.com",
+                             "forms.cloud.microsoft", "forms.office.com")):
             print("[microsoft] inicio de sesion completado")
             return
 
