@@ -3603,25 +3603,48 @@ function noEntraronPorEquipo(d, nombre, jeDe){
     const na = equipos[a].filter(r=>r.entro!=='SI').length, nb = equipos[b].filter(r=>r.entro!=='SI').length;
     return nb-na || nombre(a).localeCompare(nombre(b));
   });
+  // % de Cumplimiento de cada técnico (datos del portal del mes actual)
+  const cumDe = m => {
+    const t = ((CURRENT_DATA&&CURRENT_DATA.tecnicos)||[]).find(x=>String(x.id).toUpperCase()===String(m).toUpperCase());
+    const v = t ? Number(t.pCum) : NaN;
+    return isNaN(v) ? null : v;
+  };
+  const colorCum = v => v===null ? 'var(--text2)' : v>=90 ? 'var(--green)' : v>=85 ? 'var(--orange)' : '#e05a4a';
+  const mediaCum = lista => { const v = lista.map(r=>cumDe(r.mat)).filter(x=>x!==null); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+  // Equipos ordenados de peor a mejor cumplimiento medio (sin dato al final)
+  orden.sort((a,b)=>{ const ma=mediaCum(equipos[a]), mb=mediaCum(equipos[b]);
+    if(ma===null && mb===null) return 0; if(ma===null) return 1; if(mb===null) return -1; return ma-mb; });
   const tarjetas = orden.map(j=>{
     const lista = equipos[j];
-    const no = lista.filter(r=>r.entro!=='SI').sort((a,b)=>nombre(String(a.mat)).localeCompare(nombre(String(b.mat))));
-    const si = lista.filter(r=>r.entro==='SI').sort((a,b)=>nombre(String(a.mat)).localeCompare(nombre(String(b.mat))));
+    const no = lista.filter(r=>r.entro!=='SI');
+    // Todo el equipo, de peor a mejor % de Cumplimiento (sin dato al final)
+    const filasOrd = lista.slice().sort((a,b)=>{
+      const ca=cumDe(a.mat), cb=cumDe(b.mat);
+      if(ca===null && cb===null) return nombre(String(a.mat)).localeCompare(nombre(String(b.mat)));
+      if(ca===null) return 1; if(cb===null) return -1; return ca-cb;
+    });
+    const media = mediaCum(lista);
     const color = !no.length ? 'rgba(61,170,110,.35)' : 'rgba(192,57,43,.35)';
+    const estado = r => r.entro==='SI'
+      ? `<span style="color:var(--green)">✅ entró</span>`
+      : r.estado==='JE' ? `<span style="color:var(--gold2)">su JE</span>`
+      : `<span style="color:#e05a4a">✗ no entró${Number(r.pendientes)?' · '+r.pendientes+' sin conf.':''}</span>`;
     return `<div style="border:1px solid ${color};border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--s1)">
       <div style="display:flex;justify-content:space-between;gap:8px;font-size:.84rem">
         <b style="color:var(--gold2)">${j==='—'?'Sin equipo':'Equipo de '+nombre(j)}</b>
         <span>${lista.length-no.length}/${lista.length} entraron</span>
       </div>
-      ${no.length ? no.map(r=>`<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:3px 0;border-top:1px solid var(--border2);margin-top:4px">
-          <span>${nombre(String(r.mat))} <span style="color:var(--text2)">(${r.mat})</span></span>
-          <span style="color:${r.estado==='JE'?'var(--gold2)':'#e05a4a'};font-weight:700;font-size:.72rem">${r.estado==='JE'?'lo hizo su JE':(Number(r.pendientes)?r.pendientes+' sin confirmar':'no entró')}</span>
-        </div>`).join('') : '<div style="font-size:.78rem;color:var(--green);margin-top:4px">✅ Entraron todos</div>'}
-      ${si.length ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:.75rem;color:var(--green);font-weight:700">✅ Ver quién entró (${si.length})</summary>
-        ${si.map(r=>`<div style="display:flex;justify-content:space-between;font-size:.78rem;padding:2px 0">
-          <span>${nombre(String(r.mat))} <span style="color:var(--text2)">(${r.mat})</span></span>
-          <span style="color:var(--green);font-size:.72rem">${Number(r.confirmadas)||0} conf. · ${Number(r.enviadas)||0} env.${Number(r.pendientes)?' · '+r.pendientes+' pend.':''}</span>
-        </div>`).join('')}</details>` : ''}
+      <div style="font-size:.7rem;color:var(--text2);margin:2px 0 4px">Cumplimiento medio: <b style="color:${colorCum(media)}">${media===null?'—':media.toFixed(1)+'%'}</b> · de peor a mejor</div>
+      <div style="display:flex;justify-content:space-between;font-size:.62rem;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;padding:2px 0">
+        <span>Técnico</span><span style="display:flex;gap:10px"><span style="min-width:46px;text-align:right">% Cumpl.</span><span style="min-width:110px;text-align:right">Confirmaciones</span></span>
+      </div>
+      ${filasOrd.map(r=>{ const c=cumDe(r.mat); return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.78rem;padding:4px 0;border-top:1px solid var(--border2)">
+          <span style="min-width:0">${nombre(String(r.mat))} <span style="color:var(--text2)">(${r.mat})</span></span>
+          <span style="display:flex;gap:10px;align-items:center;flex-shrink:0;font-size:.72rem;font-weight:700">
+            <span style="min-width:46px;text-align:right;color:${colorCum(c)}">${c===null?'—':c.toFixed(1)+'%'}</span>
+            <span style="min-width:110px;text-align:right">${estado(r)}</span>
+          </span>
+        </div>`; }).join('')}
     </div>`;
   }).join('');
   return cab + selector + resumen + tarjetas + '<div style="height:10px"></div>';
@@ -3701,6 +3724,7 @@ async function renderUsoSmsPanel(recargar){
   const jer = jerarquiaUsoSms(d);
   const jeDe = {};
   Object.keys(jer).forEach(je => (jer[je]||[]).forEach(m => { if(m!==je) jeDe[m]=je; }));
+  Object.keys(jer).forEach(je => { if(!jeDe[je]) jeDe[je]=je; }); // el JE con citas propias, en su equipo
 
   const tecnicosQueEntraron = new Set(d.eventos.filter(e=>e.accion==='entrada'&&e.rol==='tecnico').map(e=>e.mat));
   const jesQueEntraron = new Set(d.eventos.filter(e=>e.accion==='entrada'&&e.rol==='je').map(e=>e.mat));
