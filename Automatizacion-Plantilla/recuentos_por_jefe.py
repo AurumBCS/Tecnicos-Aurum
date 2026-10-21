@@ -47,6 +47,8 @@ c["Matricula"] = c["Matricula"].astype(str).str.strip().str.upper()
 c["JDE"] = c["JDE"].astype(str).str.strip().str.upper().str.replace(r"\.0$", "", regex=True)
 # Equipos reasignados: los técnicos de Nicola Morsa (302154) los lleva Gustavo Pérez (GD5381)
 REASIGNAR_JDE = {"302154": "GD5381"}
+# Jefes a los que no se saluda por el nombre en el correo (GD5381 = Gustavo, con Nicola en CCO)
+SALUDO_NEUTRO = {"GD5381"}
 c["JDE"] = c["JDE"].replace(REASIGNAR_JDE)
 c["Nombre"] = (c["Nombre(S)"].str.strip() + " " + c["Apellidos(S)"].fillna("").str.strip()).str.strip()
 nombres = c.set_index("Matricula")["Nombre"].to_dict()
@@ -281,7 +283,7 @@ for jde, g in df.groupby("JDE"):
             bloques.append(_tabla(sub, titulo, fondo, borde, cols))
     urgentes = int(g.Estado.isin(SECCIONES[0][3]).sum())
     cuerpo = f"""<div style="font-family:Arial,Helvetica,sans-serif;color:#222;max-width:680px">
-<p style="font-size:14px">Hola {_html.escape(nombre.split()[0])},</p>
+<p style="font-size:14px">{"Buenos días," if jde in SALUDO_NEUTRO else "Hola " + _html.escape(nombre.split()[0]) + ","}</p>
 <p style="font-size:14px">Te paso el control de recuentos de inventario de tu equipo a fecha <b>{HOY:%d/%m/%Y}</b>.
 Cada técnico debe tener <b>2 recuentos al año</b> (auditoría o periódico). Si no tiene ninguno y lleva más de
 2 meses desde su Inicio TOA, hay que hacérselo ya.</p>

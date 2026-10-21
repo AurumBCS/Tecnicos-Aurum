@@ -26,7 +26,7 @@ from datetime import date
 import pandas as pd
 from openpyxl import Workbook
 
-from devoluciones_por_jefe import COLORES, _fecha, _fmt, _tabla, escribir, leer_cuadrante
+from devoluciones_por_jefe import COLORES, _fecha, _fmt, _tabla, escribir, leer_cuadrante, saludo
 
 MIN_DIAS, URGENTE_DIAS = 3, 7                 # desde "Enviado"
 TENERIFE_ORG, TF_MIN_DIAS, TF_URGENTE_DIAS = "PESIAT", 11, 15   # desde "Solicitada"
@@ -145,7 +145,7 @@ def generar(ruta_tos, cuadrante, carpeta, hoy):
                     f"retirar: aparecen a partir de {TF_MIN_DIAS} días (urgente con más de {TF_URGENTE_DIAS})."
                     if (g.Zona == "Tenerife").any() else "")
         cuerpo = f"""<div style="font-family:Arial,Helvetica,sans-serif;color:#222;max-width:680px">
-<p style="font-size:14px">Hola {_html.escape(nom.split()[0])},</p>
+<p style="font-size:14px">{_html.escape(saludo(j, nom))}</p>
 <p style="font-size:14px">Te paso el material que el almacén ya ha enviado a tu equipo y que <b>todavía no está recibido en la app</b>
 (Recibir TOs), a fecha <b>{hoy:%d/%m/%Y}</b>. Solo aparecen las órdenes enviadas hace {MIN_DIAS} días o más
 (urgente con más de {URGENTE_DIAS}).{tenerife}

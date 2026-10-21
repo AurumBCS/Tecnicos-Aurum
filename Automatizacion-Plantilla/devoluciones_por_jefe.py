@@ -31,6 +31,12 @@ from openpyxl.utils import get_column_letter
 
 AVISO_DIAS, GRAVE_DIAS, OBJETIVO_MES = 7, 15, 2
 REASIGNAR_JDE = {"302154": "GD5381"}
+# Jefes a los que no se saluda por el nombre (GD5381 = Gustavo, que recibe su propio correo con Nicola en CCO)
+SALUDO_NEUTRO = {"GD5381"}
+
+
+def saludo(jde, nombre):
+    return "Buenos días," if jde in SALUDO_NEUTRO else f"Hola {nombre.split()[0]},"
 GRAVE = f"Más de {GRAVE_DIAS} días sin devolver"
 AVISO = f"Más de {AVISO_DIAS} días sin devolver"
 OK = "Al día"
@@ -253,7 +259,7 @@ def generar(rutas, cuadrante, carpeta, hoy):
             if len(sub):
                 bloques.append(_tabla(sub, titulo, fondo, borde, cols))
         cuerpo = f"""<div style="font-family:Arial,Helvetica,sans-serif;color:#222;max-width:680px">
-<p style="font-size:14px">Hola {_html.escape(nombre.split()[0])},</p>
+<p style="font-size:14px">{_html.escape(saludo(jde, nombre))}</p>
 <p style="font-size:14px">Te paso el control de devoluciones al almacén de tu equipo a fecha <b>{hoy:%d/%m/%Y}</b>.
 Cada técnico debe hacer <b>{OBJETIVO_MES} devoluciones al mes</b>. Con más de {AVISO_DIAS} días sin devolver hay que
 organizarla, y con más de {GRAVE_DIAS} días hay que hacerla ya. Los borradores sin enviar hay que completarlos en digital,
