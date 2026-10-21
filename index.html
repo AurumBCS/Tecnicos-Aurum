@@ -620,7 +620,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div id="usageContent"><div style="text-align:center;color:var(--text2);padding:40px 0">Cargando datos de uso…</div></div>
   </div>
 
-  <!-- Panel uso de confirmaciones SMS (solo GD5381) -->
+  <!-- Panel uso de confirmaciones SMS (GD5381, CM9651, JR9426, JN4767) -->
   <div id="usoSmsPanel" style="display:none;padding:14px 13px 48px;max-width:680px;margin:0 auto">
     <div class="data-banner" style="margin-bottom:14px">
       <div class="sync-dot"></div>
@@ -3554,6 +3554,8 @@ async function renderConfirmacionesEquipo(jeId, recargar){
 // En esta pestaña, todos los técnicos de Tenerife (provincia TF en los datos del
 // portal) cuentan en el equipo de Gustavo Pérez (GD5381), igual que su "Equipo TF",
 // junto con Nicola Morsa (302154), que ya es de GD5381 en el cuadrante.
+// Quién ve la pestaña "📲 Uso confirmaciones" (vista completa de todos los equipos)
+const USO_SMS_VISIBLE_PARA = ['GD5381', 'CM9651', 'JR9426', 'JN4767'];
 const USO_SMS_EQUIPO_GD = 'GD5381';
 const USO_SMS_EXTRA_GD = ['302154'];
 function jerarquiaUsoSms(d){
@@ -6015,7 +6017,7 @@ async function doLogin(){
     document.getElementById('tabsBarJR').style.display='flex';
     document.getElementById('tabsBar').style.display='none';
     document.getElementById('btnEquipoTF').style.display = found.id==='GD5381' ? 'block' : 'none';
-    document.getElementById('tabUsoSms').style.display = found.id==='GD5381' ? '' : 'none';
+    document.getElementById('tabUsoSms').style.display = USO_SMS_VISIBLE_PARA.includes(found.id) ? '' : 'none';
     renderJRPanel();
     Promise.all([loadMedialiaCoord(), loadMedaliaDetalle()]).then(()=>renderMedialiaCoord());
     showPanel('jrPanel');
