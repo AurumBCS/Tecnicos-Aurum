@@ -1026,6 +1026,17 @@ function csvRow(r){
       break;
     }
   }
+  // Formato con espacio en vez de guion tras la matrícula ("E-MD-372763 Anibal
+  // Calo Mendez", visto en vivo): buscar la matrícula dentro del texto.
+  if(!id){
+    const m = /([A-Z]{1,2}\d{4,}|\d{5,})(?=[\s-]|$)/.exec(tecRaw);
+    if(m){
+      id = m[1];
+      nombre = tecRaw.slice(m.index + m[1].length).replace(/^[\s-]+/, '').trim();
+      const prev = tecRaw.slice(0, m.index).replace(/[\s-]+$/, '').split('-');
+      provincia = (prev[prev.length-1] || '').trim();
+    }
+  }
   if(!id){ id = tecRaw; nombre = tecRaw; }
 
   return {
