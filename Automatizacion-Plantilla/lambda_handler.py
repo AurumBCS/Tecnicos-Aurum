@@ -15,6 +15,8 @@ Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "traspasos_diario"} -> L-V 8:00, aviso de traspasos InterWorker sin completar (ver ov_traspasos.py)
   {"tarea": "traspasos_diario", "respaldo": true} -> L-V 9:30, solo si el de las 8:00 no salio
   {"tarea": "ofs_rm_prueba"} -> prueba (manual): buscar mantenimientos repetidos en Oracle (ver ofs_rm_prueba.py)
+  {"tarea": "rm_analizar", "mes": "Septiembre"} -> analiza las RM del mes para el dashboard de la app y se
+                                  relanza sola hasta acabar (ver rm_analizar.py)
   {"tarea": "upselling_envio"} -> SIN horario: envia al Microsoft Form los lotes de Upselling aprobados en
                                   la app (ver forms_upselling.py). Lo arranca la URL de funcion (ver _desde_url).
 (El correo de la mañana con capturas a Mercedes se retiro el 2026-10-16.)
@@ -78,9 +80,9 @@ def handler(event, context):
     if isinstance(event, dict) and "requestContext" in event:
         return _desde_url(event, context)
     tarea = (event or {}).get("tarea")
-    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "ofs_rm_prueba", "upselling_envio"):
+    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "ofs_rm_prueba", "rm_analizar", "upselling_envio"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/ofs_rm_prueba/upselling_envio): {event}"
+            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/ofs_rm_prueba/rm_analizar/upselling_envio): {event}"
         )
 
     if tarea == "listar_buckets":
@@ -113,6 +115,11 @@ def handler(event, context):
         import ofs_rm_prueba
 
         _correr(lambda: ofs_rm_prueba.main(event.get("parejas")), "ofs_rm_prueba")
+    elif tarea == "rm_analizar":
+        # Analiza las RM del mes (ficha de Oracle + reglas) y guarda el resultado en la app.
+        import rm_analizar
+
+        return rm_analizar.main(event, context)
     elif tarea == "upselling_envio":
         # Envia al Microsoft Form UPSELLING el lote aprobado en la app, fila a fila.
         import forms_upselling

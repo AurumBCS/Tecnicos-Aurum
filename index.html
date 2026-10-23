@@ -760,6 +760,9 @@ const MEDALIA_COORD_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR
 const MEDALIA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=medalia&token=" + APP_TOKEN;
 const CUMPLIMIENTO_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=cumplimiento&token=" + APP_TOKEN;
 const RM_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=rm&token=" + APP_TOKEN;
+// Análisis de cada RM (qué faltó, codificación) -- lo escribe la Lambda en la
+// pestaña "RM análisis" de la hoja de RM; ver apps-script/RM_mensual.gs.
+const RM_ANALISIS_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=rm-analisis&token=" + APP_TOKEN;
 const TRACK_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=track&token=" + APP_TOKEN;
 const USAGE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=usage&token=" + APP_TOKEN;
 const JERARQUIA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=jerarquia&token=" + APP_TOKEN;
@@ -819,6 +822,10 @@ let MEDALIA_DETALLE_DATA = {}; // mat -> [{mant, fecha, nota, comentario}], una 
 let MEDALIA_MES_ACTUAL = ''; // "AAAA-MM" del mes mas reciente con encuestas, calculado del propio detalle
 let CUM_DATA = {};
 let RM_DATA = {};
+// Mes de RM (nombre, "Septiembre") al que corresponde RM_DATA. El Excel es a
+// mes vencido: el RM de septiembre son los mantenimientos de agosto.
+let RM_DATA_MES = null;
+let RM_ANALISIS = {};   // nMant -> fila del análisis de ese RM
 let _datosActualizados = false;
 
 // ── Matrículas que requieren validación de DNI (Coordinadores + JE) ──
@@ -1266,6 +1273,7 @@ async function cambiarMes(mes){
     }
     MES_SELECCIONADO = mes;
     CURRENT_DATA = {tecnicos: tecs};
+    await Promise.all([loadRM(mes), loadRMAnalisis(mes)]);
   }catch(e){
     alert('No se pudieron cargar los datos de ' + mes);
     poblarSelectoresMes();
@@ -2538,6 +2546,122 @@ function toggleMantenimientosMotivo(rowId){
   listEl.style.display='block';
 }
 
+// ── Dashboard de RM: resumen gráfico y análisis de cada RM ─────────
+// Objetivo de la empresa: como máximo un 12,5 % de mantenimientos repetidos
+// (= %RM ≥ 87,5). La barra va de 0 a 25 % de repetición con la marca en 12,5.
+function rmBloqueResumen(rm, pctResumen){
+  const total = rm.total||0, reps = rm.reps||0;
+  const tasa = Math.max(0, 100 - pctResumen);
+  const maxPermitidas = Math.floor(total*0.125);
+  const sobran = reps - maxPermitidas;
+  const mal = tasa > 12.5;
+  const rojo = '#e05a4a';
+  const tile = (n, l, color) => `<div class="stat-box" style="flex:1 1 120px"><div class="n" style="color:${color||'var(--text)'}">${n}</div><div class="l">${l}</div></div>`;
+  const ancho = Math.min(100, tasa/25*100);
+  return `<div style="display:flex;flex-wrap:wrap;gap:9px;margin-bottom:12px">
+      ${tile(total, 'Mantenimientos<br>del mes')}
+      ${tile(reps, 'Repetidos en<br>menos de 30 días', reps?rojo:'var(--green2)')}
+      ${tile(tasa.toFixed(1).replace('.',',')+' %', 'Tasa de repetición<br>(objetivo 12,5 %)', mal?rojo:'var(--green2)')}
+      ${tile(sobran>0?sobran:'✓', sobran>0?'RM de más para<br>llegar al objetivo':'Dentro del<br>objetivo', sobran>0?rojo:'var(--green2)')}
+    </div>
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
+      <div style="position:relative;height:14px;border-radius:7px;background:var(--dim)">
+        <div style="position:absolute;inset:0 auto 0 0;width:${ancho}%;border-radius:7px;background:${mal?rojo:'var(--green2)'};transition:width .6s"></div>
+        <div title="Objetivo 12,5 %" style="position:absolute;top:-6px;bottom:-6px;left:50%;width:2px;background:var(--gold2)"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.62rem;color:var(--muted);margin-top:6px"><span>0 %</span><span style="color:var(--gold2)">12,5 % objetivo</span><span>25 %</span></div>
+      <div style="font-size:.78rem;color:var(--text);margin-top:10px;line-height:1.6">${sobran>0
+        ? `Con <b style="color:${rojo}">${sobran} RM menos</b> estarías dentro del objetivo (máximo ${maxPermitidas} de ${total}).`
+        : `Estás dentro del objetivo: puedes tener hasta ${maxPermitidas} RM de ${total} y llevas ${reps}.`}</div>
+    </div>`;
+}
+
+// Causas posibles de un RM (códigos que escribe la Lambda en "causas") y el
+// consejo que se muestra cuando aparecen.
+const RM_CAUSAS = {
+  cod:  {t:'Sin codificar lo que hizo', c:'Codifica todo lo que haces: cada cambio de pilas va como SUST en su zona, con la referencia correcta (205036 en MG Moonshot, 7014 las AA, 7002 en MG/SR Fast) y la causa real. Lo que amplías, como AMPL con su referencia.'},
+  reit: {t:'Fallo repetido: había que sustituir o reubicar', c:'Si el fallo ya se ha repetido, cambiar pilas otra vez no lo arregla: reubica el dispositivo o la central, o sustituye el dispositivo.'},
+  texto:{t:'No hizo lo que pedía el texto', c:'Haz todo lo que pide el texto del mantenimiento: otra zona, sustituir, cambiar la SIM, reubicar…'},
+  pilas:{t:'No cambió todas las pilas que tocaban', c:'Mira el historial: si hace más de un año, cambia todas las pilas; entre 6 meses y un año, como mínimo teclado o tag reader, sirena y MG1.'},
+  com:  {t:'Comunicaciones sin revisar (GSM, DDI, SIM)', c:'Revisa siempre las comunicaciones: cobertura, DDI, SIM y conexión a internet de la central.'},
+  cam:  {t:'Cámaras sin revisar', c:'Revisa el sistema entero, cámaras incluidas, aunque el aviso sea de una sola zona.'},
+  ok:   {t:'Trabajo correcto o no imputable', c:''}
+};
+
+function rmEsc(s){ return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function rmFilasAnalisis(rm){
+  return (rm && rm.visitas || []).filter(v=>v.repetido).map(v=>RM_ANALISIS[v.nMant]).filter(Boolean);
+}
+function rmTieneAnalisis(rm){ return rmFilasAnalisis(rm).length > 0; }
+
+// Filtro de las fichas por causa (chips encima de la lista).
+function rmFiltrar(btn, causa){
+  const cont = document.getElementById('rmFichas');
+  if(!cont) return;
+  cont.querySelectorAll('[data-causas]').forEach(el=>{
+    el.style.display = !causa || el.dataset.causas.split(';').includes(causa) ? '' : 'none';
+  });
+  btn.parentElement.querySelectorAll('button').forEach(b=>{
+    const on = b===btn;
+    b.style.background = on ? 'var(--gold2)' : 'var(--s1)';
+    b.style.color = on ? '#1a1400' : 'var(--text)';
+  });
+}
+
+// Por qué se repiten + qué cambiar + ficha de cada RM (análisis de la Lambda).
+function rmBloqueAnalisis(rm){
+  const reps = (rm && rm.visitas || []).filter(v=>v.repetido);
+  const filas = rmFilasAnalisis(rm);
+  if(!filas.length) return '';
+  const cuenta = {};
+  filas.forEach(f=>String(f.causas||'').split(';').map(c=>c.trim()).filter(Boolean)
+    .forEach(c=>cuenta[c]=(cuenta[c]||0)+1));
+  const orden = Object.keys(cuenta).sort((a,b)=>cuenta[b]-cuenta[a]);
+  const rojo = '#e05a4a';
+  const nombre = c => (RM_CAUSAS[c]&&RM_CAUSAS[c].t)||c;
+  const barrasCausas = orden.map(c=>{
+    const pct = Math.round(cuenta[c]/filas.length*100);
+    const color = c==='ok' ? 'var(--green2)' : rojo;
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:.72rem;margin-bottom:3px"><span style="color:var(--text);font-weight:600">${rmEsc(nombre(c))}</span><span style="color:${color};font-weight:700">${cuenta[c]}</span></div>
+      <div style="background:var(--dim);border-radius:4px;height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${color};border-radius:4px;transition:width .6s"></div></div>
+    </div>`;
+  }).join('');
+  const consejos = orden.filter(c=>RM_CAUSAS[c] && RM_CAUSAS[c].c).slice(0,4)
+    .map(c=>`<li style="margin-bottom:6px">${rmEsc(RM_CAUSAS[c].c)}</li>`).join('');
+  const colSev = {alta:rojo, media:'var(--orange)', baja:'var(--green2)'};
+  const chipsFiltro = [`<button type="button" onclick="rmFiltrar(this,'')" style="border:1px solid var(--border2);background:var(--gold2);color:#1a1400;border-radius:999px;padding:5px 10px;font-size:.66rem;font-weight:700;cursor:pointer">Todas (${filas.length})</button>`]
+    .concat(orden.map(c=>`<button type="button" onclick="rmFiltrar(this,'${c}')" style="border:1px solid var(--border2);background:var(--s1);color:var(--text);border-radius:999px;padding:5px 10px;font-size:.66rem;font-weight:600;cursor:pointer">${rmEsc(nombre(c))} (${cuenta[c]})</button>`)).join('');
+  const etiqueta = t => `<div style="color:var(--muted);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;margin-top:8px">${t}</div>`;
+  const fichas = filas.map(f=>{
+    const causas = String(f.causas||'').split(';').filter(Boolean);
+    return `<details data-causas="${rmEsc(causas.join(';'))}" style="background:var(--s1);border:1px solid var(--border);border-left:3px solid ${colSev[f.severidad]||'var(--border2)'};border-radius:10px;margin-bottom:8px">
+      <summary style="cursor:pointer;padding:10px 12px;display:flex;gap:10px;align-items:center;list-style:none">
+        <span style="font-size:.66rem;color:var(--gold2);font-weight:700;user-select:text">#${rmEsc(f.nMant)}</span>
+        <span style="flex:1;min-width:0;font-size:.72rem;color:var(--text)">${rmEsc(f.motivo)} → <b>${rmEsc(f.motivoPost)}</b>${f.panel?` <span style="color:var(--muted)">· ${rmEsc(f.panel)}</span>`:''}</span>
+        <span style="font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:999px;border:1px solid ${colSev[f.severidad]||'var(--border2)'};color:${colSev[f.severidad]||'var(--muted)'};text-transform:uppercase">${rmEsc(f.severidad)}</span>
+      </summary>
+      <div style="padding:0 12px 12px;font-size:.74rem;line-height:1.55;color:var(--text)">
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:2px">${causas.map(c=>`<span style="font-size:.6rem;font-weight:600;padding:2px 7px;border-radius:5px;background:var(--dim);color:var(--gold2)">${rmEsc(nombre(c))}</span>`).join('')}</div>
+        ${etiqueta('Qué hiciste')}<div>${rmEsc(f.queHizo)}</div>
+        ${etiqueta('Qué faltó')}<div>${rmEsc(f.queFalto)}</div>
+        ${etiqueta('Codificación')}<div style="font-family:monospace;font-size:.7rem">${rmEsc(f.codificacion)}</div>
+      </div>
+    </details>`;
+  }).join('');
+  return `<div class="detail-section">Por qué se repiten tus RM</div>
+    <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+      <div style="font-size:.66rem;color:var(--muted);margin-bottom:10px">Revisadas ${filas.length} de ${reps.length} RM con la ficha de Oracle. Una RM puede tener varias causas.</div>
+      ${barrasCausas}
+    </div>
+    ${consejos?`<div class="detail-section">Qué tienes que cambiar</div>
+    <div style="background:rgba(232,201,106,.08);border:1px solid var(--border2);border-radius:12px;padding:12px 14px 6px 30px;margin-bottom:12px;font-size:.74rem;line-height:1.55;color:var(--text)"><ul style="margin:0;padding:0">${consejos}</ul></div>`:''}
+    <div class="detail-section">Tus RM, una a una</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${chipsFiltro}</div>
+    <div id="rmFichas" style="margin-bottom:12px">${fichas}</div>`;
+}
+
 function _openRMDash(tecId){
   const id = String(tecId).trim();
   // Buscar técnico siempre por id, no depender de CURRENT_TEC
@@ -2569,7 +2693,10 @@ function _openRMDash(tecId){
   // deja con el NOMBRE del mes actual tras cada login normal, por eso hay
   // que comparar contra mesActualNombre() y no solo revisar si esta seteado.
   const viendoMesPasado = MES_SELECCIONADO && MES_SELECCIONADO !== mesActualNombre();
-  if(viendoMesPasado){
+  // Desde que el Apps Script guarda cada Excel en su mes (pestañas "RM <Mes>"),
+  // un mes pasado SÍ puede tener detalle: solo se cae a este resumen si
+  // RM_DATA no es de ese mes (mes anterior a guardar por meses).
+  if(viendoMesPasado && RM_DATA_MES !== MES_SELECCIONADO){
     document.getElementById('rmDashContent').innerHTML = `
       <div class="detail-hero">
         <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
@@ -2641,9 +2768,6 @@ function _openRMDash(tecId){
   const maxPost    = rm.topPost    && rm.topPost[0]     ? rm.topPost[0][1]     : 1;
   const maxRMmot   = rm.motivosRM  && rm.motivosRM[0]   ? rm.motivosRM[0][1]   : 1;
 
-  const circ   = 2*Math.PI*28;
-  const offset = circ - (pctResumen/100)*circ;
-
   document.getElementById('rmDashContent').innerHTML = `
     <div class="detail-hero">
       <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
@@ -2651,32 +2775,10 @@ function _openRMDash(tecId){
       <div class="detail-hero-sub">%RM del técnico (Resumen App Claude) · detalle desde el Excel de mantenimientos</div>
     </div>
 
-    <div style="display:flex;gap:9px;margin-bottom:16px">
-      <div class="stat-box" style="flex:1"><div class="n">${rm.total}</div><div class="l">Total<br>visitas</div></div>
-      <div class="stat-box" style="flex:1"><div class="n" style="color:#e05a4a">${rm.reps}</div><div class="l">Visitas<br>repetidas</div></div>
-      <div class="stat-box" style="flex:1"><div class="n" style="color:var(--green2)">${totalOk}</div><div class="l">Resueltas<br>1ª visita</div></div>
-      <div class="stat-box" style="flex:1"><div class="n" style="color:${(rm.nuevos||0)>0?'var(--gold2)':'var(--muted)'}">${rm.nuevos||0}</div><div class="l">Nuevas<br>esta tanda</div></div>
-    </div>
+    ${rmBloqueResumen(rm, pctResumen)}
+    ${rmBloqueAnalisis(rm)}
 
-    <div style="display:flex;align-items:center;gap:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
-      <div style="position:relative;width:70px;height:70px;flex-shrink:0">
-        <svg width="70" height="70" viewBox="0 0 70 70" style="transform:rotate(-90deg)">
-          <circle fill="none" stroke="var(--dim)" stroke-width="8" cx="35" cy="35" r="28"/>
-          <circle fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round"
-            cx="35" cy="35" r="28"
-            stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-        </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:.95rem;font-weight:700;color:${col}">${pctResumen.toFixed(2)}%</div>
-      </div>
-      <div>
-        <div style="font-size:.85rem;font-weight:700;color:var(--gold2)">${pctOk?'✓ Por encima del objetivo':'✗ Por debajo del objetivo'}</div>
-        <div style="font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.6">
-          Objetivo: ≥ 87.5% · ${pctOk?`Margen de ${(pctResumen-87.5).toFixed(2)} puntos`:`Faltan ${(87.5-pctResumen).toFixed(2)} puntos`}
-        </div>
-      </div>
-    </div>
-
-    <div class="detail-section">Top motivos de todas las visitas</div>
+    ${rmTieneAnalisis(rm) ? '' : `<div class="detail-section">Top motivos de todas las visitas</div>
     <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
       ${barras(rm.topMotivos, maxMotivo, 'var(--gold3)')}
     </div>
@@ -2693,7 +2795,7 @@ function _openRMDash(tecId){
       ${rm.topPost && rm.topPost.length
         ? barras(rm.topPost, maxPost, 'var(--orange)', id, 'post')
         : '<div style="color:var(--muted);font-size:.75rem">Sin datos de causa raíz</div>'}
-    </div>`;
+    </div>`}`;
 
   showPanel('rmDashPanel');
   window.scrollTo(0,0);
@@ -3853,10 +3955,10 @@ async function renderUsoSmsPanel(recargar){
 // ════════════════════════════════════════════════════════
 //  CARGAR RM (CSV dinámico)
 // ════════════════════════════════════════════════════════
-async function loadRM(){
-  console.log('📥 Iniciando loadRM...');
+async function loadRM(mes){
+  console.log('📥 Iniciando loadRM...', mes||'');
   try{
-    const res=await fetchConReintento(RM_URL+'&t='+Date.now(),{cache:'no-store'});
+    const res=await fetchConReintento(RM_URL+(mes?'&mes='+encodeURIComponent(mes):'')+'&t='+Date.now(),{cache:'no-store'});
     if(!res.ok){
       console.log('RM error: status',res.status);
       return;
@@ -3907,11 +4009,28 @@ async function loadRM(){
         };
       });
 
-      console.log('✓ RM cargado:',Object.keys(RM_DATA).length,'técnicos');
+      RM_DATA_MES = mes || null;
+      console.log('✓ RM cargado:',Object.keys(RM_DATA).length,'técnicos', mes||'');
     } else {
       console.log('RM: sin datos en respuesta');
     }
   }catch(e){console.log('✗ RM error:',e.message);}
+}
+
+// Análisis de cada RM del mes (lo genera la Lambda leyendo la ficha de Oracle).
+// Si todavía no hay análisis para ese mes, RM_ANALISIS queda vacío y el
+// dashboard simplemente no muestra esas secciones.
+async function loadRMAnalisis(mes){
+  RM_ANALISIS = {};
+  try{
+    const res=await fetchConReintento(RM_ANALISIS_URL+(mes?'&mes='+encodeURIComponent(mes):'')+'&t='+Date.now(),{cache:'no-store'});
+    if(!res.ok) return;
+    parseCSV(await res.text()).forEach(r=>{
+      const n=String(r['nMant']||'').trim();
+      if(n) RM_ANALISIS[n]=r;
+    });
+    console.log('✓ RM análisis:',Object.keys(RM_ANALISIS).length,'RMs',mes||'');
+  }catch(e){console.log('RM análisis no disponible:',e.message);}
 }
 
 // ══════════════════════════════════════════════
@@ -5975,7 +6094,7 @@ async function doLogin(){
     if(CURRENT_TEC) renderDocsPendientes(CURRENT_TEC.id,'docsPendientesMain');
     if(CURRENT_JE_ID) renderDocsEquipo(CURRENT_JE_ID,'equipoDocsContainer');
   });
-  Promise.all([loadVacaciones(), loadCumplimiento(), loadRM()]).then(()=>{
+  Promise.all([loadVacaciones(), loadCumplimiento(), loadRM(MES_SELECCIONADO||mesActualNombre()), loadRMAnalisis(MES_SELECCIONADO||mesActualNombre())]).then(()=>{
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
   document.getElementById('spinner').style.display='none';
@@ -6299,7 +6418,8 @@ async function doRefreshData(){
       loadMedialiaCoord(),
       loadMedaliaDetalle(),
       loadCumplimiento(),
-      loadRM(),
+      loadRM(MES_SELECCIONADO||mesActualNombre()),
+      loadRMAnalisis(MES_SELECCIONADO||mesActualNombre()),
       loadFichajeHoy(),
       loadFichajeVista()
     ]);
