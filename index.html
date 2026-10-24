@@ -1166,6 +1166,8 @@ async function loadJerarquia(){
       // Actualizar la lista de JEs visible para el JR
       const allJEIds = Object.keys(JERARQUIA).filter(k=>!keepIds.has(k));
       JERARQUIA['JR9426'] = allJEIds;
+      // JEs nuevos que no están en JE_NAMES: su nombre del cuadrante
+      allJEIds.forEach(id=>{ if(!JE_NAMES[id] && ROSTER_NOMBRES[id]) JE_NAMES[id] = ROSTER_NOMBRES[id]; });
       console.log('Jerarquía cargada:', allJEIds.length, 'JEs ·', Object.keys(ZONA_DATA).length, 'técnicos con zona');
     }
   }catch(e){console.log('Jerarquía no disponible, usando datos del código',e.message);}
@@ -1969,6 +1971,22 @@ function renderJRPanel(){
   const getTecsPorZona = (zonas) => tieneZonas
     ? CURRENT_DATA.tecnicos.filter(t => zonas.some(z => (ZONA_DATA[t.id.toUpperCase()]||'').toString().includes(z)))
     : [];
+  // Cada JE va al grupo de la zona de su equipo en el cuadrante (la más
+  // repetida entre sus técnicos), así un JE nuevo no cae en "Otros equipos".
+  // Sin cuadrante se usan los jeIds fijos de GRUPOS.
+  if(tieneZonas){
+    const zonaDeJE = id => {
+      const cuenta = {};
+      (JERARQUIA[id]||[]).concat(id).forEach(m=>{ const z=ZONA_DATA[String(m).toUpperCase()]; if(z) cuenta[z]=(cuenta[z]||0)+1; });
+      return Object.keys(cuenta).sort((a,b)=>cuenta[b]-cuenta[a])[0] || '';
+    };
+    GRUPOS.forEach(g=>{ g.jeIds = []; });
+    jeIds.forEach(id=>{
+      const z = zonaDeJE(id);
+      const g = GRUPOS.find(g=>g.zonas.some(zz=>z.includes(zz)));
+      if(g) g.jeIds.push(id);
+    });
+  }
 
   // Resumen global
   const allTecs=jeIds.flatMap(id=>getTecnicosOfJE(id));
