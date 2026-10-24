@@ -763,6 +763,8 @@ const RM_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41
 // Análisis de cada RM (qué faltó, codificación) -- lo escribe la Lambda en la
 // pestaña "RM análisis" de la hoja de RM; ver apps-script/RM_mensual.gs.
 const RM_ANALISIS_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=rm-analisis&token=" + APP_TOKEN;
+// Meses con RM guardado (pestañas "RM <Mes>"), para el desplegable del dashboard de RM.
+const RM_MESES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=rm-meses&token=" + APP_TOKEN;
 const TRACK_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=track&token=" + APP_TOKEN;
 const USAGE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=usage&token=" + APP_TOKEN;
 const JERARQUIA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=jerarquia&token=" + APP_TOKEN;
@@ -2508,6 +2510,61 @@ function showRMDash(tecId){
   _openRMDash(tecId);
 }
 
+// ── Desplegable de mes del dashboard de RM ──
+// El dashboard abre siempre con el mes de RM del resto de la app (el mes en
+// curso salvo que se haya cambiado arriba) y deja ver cualquier otro mes que
+// tenga RM guardado. Mientras enseña otro mes, RM_DATA/RM_ANALISIS son los de
+// ese mes; los de la app se guardan en RM_DASH_GUARDADO y se recuperan al volver.
+let RM_MESES = null;
+let RM_DASH_GUARDADO = null;
+let RM_DASH_TEC = null;
+
+async function rmCargarMeses(){
+  if(RM_MESES) return RM_MESES;
+  try{
+    const res = await fetchConReintento(RM_MESES_URL+'&t='+Date.now(),{cache:'no-store'});
+    RM_MESES = (await res.text()).split(',').map(m=>m.trim()).filter(m=>NOMBRES_MESES_ES.includes(m));
+  }catch(e){ return []; }
+  return RM_MESES;
+}
+
+// Mes de los mantenimientos de un mes de RM (mes vencido: RM Octubre = septiembre).
+function rmMesMantenimientos(mes){
+  const i = NOMBRES_MESES_ES.indexOf(mes);
+  return i<0 ? '' : NOMBRES_MESES_ES[(i+11)%12].toLowerCase();
+}
+
+function rmSelectorMes(mesVisto){
+  const actual = mesActualNombre(), iAct = NOMBRES_MESES_ES.indexOf(actual);
+  const meses = [...new Set([actual, mesVisto].concat(RM_MESES||[]).filter(Boolean))]
+    .sort((a,b)=>((iAct-NOMBRES_MESES_ES.indexOf(a)+12)%12)-((iAct-NOMBRES_MESES_ES.indexOf(b)+12)%12));
+  const opciones = meses.map(m=>`<option value="${m}"${m===mesVisto?' selected':''}>RM ${m}${m===actual?' (en curso)':''}</option>`).join('');
+  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <select onchange="rmCambiarMesDash(this.value)" style="flex:1;background:var(--s1);color:var(--text);border:1px solid var(--border2);border-radius:10px;padding:9px 10px;font-size:.8rem;font-weight:600">${opciones}</select>
+      <span style="font-size:.66rem;color:var(--muted)">mantenimientos de ${rmMesMantenimientos(mesVisto)}</span>
+    </div>`;
+}
+
+async function rmCambiarMesDash(mes){
+  if(!RM_DASH_GUARDADO) RM_DASH_GUARDADO = {data:RM_DATA, mes:RM_DATA_MES, analisis:RM_ANALISIS};
+  if(mes === RM_DASH_GUARDADO.mes){
+    rmRestaurarMesApp();
+  } else {
+    document.getElementById('rmDashContent').innerHTML = rmSelectorMes(mes)
+      + '<div style="color:var(--muted);font-size:.8rem;padding:20px 0;text-align:center">⏳ Cargando RM de '+mes+'…</div>';
+    RM_DATA = {}; RM_DATA_MES = null;
+    await Promise.all([loadRM(mes), loadRMAnalisis(mes)]);
+    if(RM_DATA_MES !== mes){ RM_DATA = {}; RM_DATA_MES = mes; }
+  }
+  _openRMDash(RM_DASH_TEC);
+}
+
+function rmRestaurarMesApp(){
+  if(!RM_DASH_GUARDADO) return;
+  RM_DATA = RM_DASH_GUARDADO.data; RM_DATA_MES = RM_DASH_GUARDADO.mes; RM_ANALISIS = RM_DASH_GUARDADO.analisis;
+  RM_DASH_GUARDADO = null;
+}
+
 let RM_ROW_LOOKUP = {};
 function toggleMantenimientosMotivo(rowId){
   const info = RM_ROW_LOOKUP[rowId];
@@ -2679,10 +2736,20 @@ function _openRMDash(tecId){
     return;
   }
 
+  RM_DASH_TEC = id;
+  if(!RM_MESES) rmCargarMeses().then(m=>{ if(m.length && RM_DASH_TEC===id && document.getElementById('rmDashPanel').style.display==='block') _openRMDash(id); });
+  // Mes que se está viendo en el dashboard: el del Resumen, salvo que se haya
+  // elegido otro en el desplegable (entonces RM_DASH_GUARDADO tiene el de la app).
+  const mesResumen = MES_SELECCIONADO || mesActualNombre();
+  const mesDash = RM_DASH_GUARDADO ? RM_DATA_MES : mesResumen;
+  const selector = rmSelectorMes(mesDash);
+
   // El %RM mostrado es siempre el del Resumen App Claude (tec.pRM), no un
   // recalculo desde el Excel de mantenimientos -- rm.* solo aporta el
   // detalle de visitas/repeticiones/motivos.
-  const pctResumen = tec.pRM;
+  // En otro mes del desplegable no hay Resumen de ese mes: se calcula con sus RM.
+  const rmOtroMes = mesDash !== mesResumen ? (RM_DATA[id] || RM_DATA[id.toUpperCase()]) : null;
+  const pctResumen = mesDash === mesResumen ? tec.pRM : (rmOtroMes ? rmOtroMes.pctRM : 0);
   const pctOk = pctResumen >= 87.5;
   const col = pctOk ? 'var(--green2)' : '#e05a4a';
   const circPreview = 2*Math.PI*28;
@@ -2704,8 +2771,8 @@ function _openRMDash(tecId){
   // Desde que el Apps Script guarda cada Excel en su mes (pestañas "RM <Mes>"),
   // un mes pasado SÍ puede tener detalle: solo se cae a este resumen si
   // RM_DATA no es de ese mes (mes anterior a guardar por meses).
-  if(viendoMesPasado && RM_DATA_MES !== MES_SELECCIONADO){
-    document.getElementById('rmDashContent').innerHTML = `
+  if(viendoMesPasado && !RM_DASH_GUARDADO && RM_DATA_MES !== MES_SELECCIONADO){
+    document.getElementById('rmDashContent').innerHTML = `${selector}
       <div class="detail-hero">
         <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
         <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
@@ -2741,7 +2808,14 @@ function _openRMDash(tecId){
 
   const rm = RM_DATA[id] || RM_DATA[id.toUpperCase()];
   if(!rm){
-    alert('No hay datos de RMs disponibles para este técnico (' + id + ').');
+    if(mesDash === mesResumen && !RM_DASH_GUARDADO){
+      alert('No hay datos de RMs disponibles para este técnico (' + id + ').');
+      return;
+    }
+    document.getElementById('rmDashContent').innerHTML = `${selector}
+      <div class="detail-hero"><div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div></div>
+      <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:.78rem;color:var(--muted)">No hay mantenimientos tuyos en el RM de ${mesDash}.</div>`;
+    showPanel('rmDashPanel');
     return;
   }
   const totalOk = rm.total - rm.reps;
@@ -2776,11 +2850,11 @@ function _openRMDash(tecId){
   const maxPost    = rm.topPost    && rm.topPost[0]     ? rm.topPost[0][1]     : 1;
   const maxRMmot   = rm.motivosRM  && rm.motivosRM[0]   ? rm.motivosRM[0][1]   : 1;
 
-  document.getElementById('rmDashContent').innerHTML = `
+  document.getElementById('rmDashContent').innerHTML = `${selector}
     <div class="detail-hero">
       <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
       <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
-      <div class="detail-hero-sub">%RM del técnico · objetivo ≥ 87,5 %</div>
+      <div class="detail-hero-sub">%RM de ${mesDash} · objetivo ≥ 87,5 %</div>
     </div>
 
     ${rmBloqueResumen(rm, pctResumen)}
@@ -6269,6 +6343,7 @@ document.getElementById('backDashBtn').addEventListener('click',()=>{
   showPanel(_dashBackPanel); window.scrollTo(0,0);
 });
 document.getElementById('backRMBtn').addEventListener('click',()=>{
+  rmRestaurarMesApp();
   showPanel(_rmBackPanel); window.scrollTo(0,0);
 });
 document.getElementById('backCumBtn').addEventListener('click',()=>{
