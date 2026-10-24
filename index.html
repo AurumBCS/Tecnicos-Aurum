@@ -1123,6 +1123,27 @@ async function loadAuth(){
   }catch(e){console.log('Auth no disponible',e.message);}
 }
 
+// En el Resumen algunas matrículas llevan delante el prefijo de provincia
+// (GI373343) y en el cuadrante no (373343). Se copian los datos del cuadrante
+// también con la matrícula del Resumen para que salga en su zona y su equipo.
+function alinearMatriculasCuadrante(){
+  if(!CURRENT_DATA || !CURRENT_DATA.tecnicos) return;
+  CURRENT_DATA.tecnicos.forEach(t=>{
+    const id = String(t.id||'').toUpperCase();
+    if(!/^[A-Z]{2}\d{6}$/.test(id) || ZONA_DATA[id] || CUENTA_DATA[id]) return;
+    const base = id.slice(2);
+    if(!(base in CUENTA_DATA)) return;
+    if(base in ZONA_DATA) ZONA_DATA[id] = ZONA_DATA[base];
+    CUENTA_DATA[id] = CUENTA_DATA[base];
+    if(ROSTER_NOMBRES[base]) ROSTER_NOMBRES[id] = ROSTER_NOMBRES[base];
+    if(ROSTER_EXTRA[base]) ROSTER_EXTRA[id] = ROSTER_EXTRA[base];
+    Object.keys(JERARQUIA).forEach(je=>{
+      const l = JERARQUIA[je];
+      if(Array.isArray(l) && l.includes(base) && !l.includes(id)) l.push(id);
+    });
+  });
+}
+
 async function loadJerarquia(){
   try{
     const url = JERARQUIA_URL + '&t=' + Date.now();
@@ -1168,6 +1189,7 @@ async function loadJerarquia(){
       JERARQUIA['JR9426'] = allJEIds;
       // JEs nuevos que no están en JE_NAMES: su nombre del cuadrante
       allJEIds.forEach(id=>{ if(!JE_NAMES[id] && ROSTER_NOMBRES[id]) JE_NAMES[id] = ROSTER_NOMBRES[id]; });
+      alinearMatriculasCuadrante();
       console.log('Jerarquía cargada:', allJEIds.length, 'JEs ·', Object.keys(ZONA_DATA).length, 'técnicos con zona');
     }
   }catch(e){console.log('Jerarquía no disponible, usando datos del código',e.message);}
@@ -1216,6 +1238,7 @@ async function loadSheets(){
       if(tecs.length > 0){
         CURRENT_DATA = {tecnicos: tecs};
         CURRENT_DATA_LIVE = CURRENT_DATA;
+        alinearMatriculasCuadrante();
         MES_SELECCIONADO = mes;
         // Tomar la fecha de actualización de la primera fila
         if(tecs[0].fecha) CSV_FECHA = tecs[0].fecha;
@@ -1277,6 +1300,7 @@ async function cambiarMes(mes){
     }
     MES_SELECCIONADO = mes;
     CURRENT_DATA = {tecnicos: tecs};
+    alinearMatriculasCuadrante();
     await Promise.all([loadRM(mes), loadRMAnalisis(mes)]);
   }catch(e){
     alert('No se pudieron cargar los datos de ' + mes);
@@ -2700,7 +2724,7 @@ function rmLeyendaGravedad(colSev){
   return `<div style="display:grid;gap:7px;background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:11px 12px;margin-bottom:10px;font-size:.68rem;line-height:1.45;color:var(--text)">
       ${fila('alta','Se habría evitado haciendo lo que tocaba: el fallo ya se había repetido y no se sustituyó ni reubicó, no se hizo lo que pedía el texto o no se cambiaron todas las pilas. También si junta 3 causas o más.')}
       ${fila('media','Algo mal hecho que influye, aunque no explica la vuelta por sí solo: sin codificar lo que se hizo, comunicaciones o cámaras sin revisar.')}
-      ${fila('baja','La ficha no deja ver qué falló. La RM cuenta igual: revísala con tu jefe de equipo.')}
+      ${fila('baja','La ficha no deja ver qué falló.')}
     </div>`;
 }
 
