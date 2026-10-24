@@ -2660,7 +2660,7 @@ const RM_CAUSAS = {
   pilas:{t:'No cambió todas las pilas que tocaban', c:'Mira el historial: si hace más de un año, cambia todas las pilas; entre 6 meses y un año, como mínimo teclado o tag reader, sirena y MG1.'},
   com:  {t:'Comunicaciones sin revisar (GSM, DDI, SIM)', c:'Revisa siempre las comunicaciones: cobertura, DDI, SIM y conexión a internet de la central.'},
   cam:  {t:'Cámaras sin revisar', c:'Revisa el sistema entero, cámaras incluidas, aunque el aviso sea de una sola zona.'},
-  ok:   {t:'Trabajo correcto o no imputable', c:''}
+  ok:   {t:'Fallo sin identificar en la ficha', c:'Cuando no está claro qué falló, revísalo con tu jefe de equipo: la RM cuenta igual.'}
 };
 
 // Quita del análisis las frases internas (dónde se leyó, revisión pendiente) que no van al técnico.
@@ -2692,6 +2692,18 @@ function rmFiltrar(btn, causa){
   });
 }
 
+// Qué quiere decir la gravedad de cada RM (la calcula rm_reglas.py).
+function rmLeyendaGravedad(colSev){
+  const fila = (sev, txt) => `<div style="display:flex;gap:8px;align-items:flex-start">
+      <span style="flex-shrink:0;width:52px;text-align:center;font-size:.58rem;font-weight:700;padding:2px 0;border-radius:999px;border:1px solid ${colSev[sev]};color:${colSev[sev]};text-transform:uppercase">${sev}</span>
+      <span>${txt}</span></div>`;
+  return `<div style="display:grid;gap:7px;background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:11px 12px;margin-bottom:10px;font-size:.68rem;line-height:1.45;color:var(--text)">
+      ${fila('alta','Se habría evitado haciendo lo que tocaba: el fallo ya se había repetido y no se sustituyó ni reubicó, no se hizo lo que pedía el texto o no se cambiaron todas las pilas. También si junta 3 causas o más.')}
+      ${fila('media','Algo mal hecho que influye, aunque no explica la vuelta por sí solo: sin codificar lo que se hizo, comunicaciones o cámaras sin revisar.')}
+      ${fila('baja','La ficha no deja ver qué falló. La RM cuenta igual: revísala con tu jefe de equipo.')}
+    </div>`;
+}
+
 // Por qué se repiten + qué cambiar + ficha de cada RM (análisis de la Lambda).
 function rmBloqueAnalisis(rm){
   const reps = (rm && rm.visitas || []).filter(v=>v.repetido);
@@ -2705,7 +2717,7 @@ function rmBloqueAnalisis(rm){
   const nombre = c => (RM_CAUSAS[c]&&RM_CAUSAS[c].t)||c;
   const barrasCausas = orden.map(c=>{
     const pct = Math.round(cuenta[c]/filas.length*100);
-    const color = c==='ok' ? 'var(--green2)' : rojo;
+    const color = c==='ok' ? 'var(--orange)' : rojo;
     return `<div style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;gap:8px;font-size:.72rem;margin-bottom:3px"><span style="color:var(--text);font-weight:600">${rmEsc(nombre(c))}</span><span style="color:${color};font-weight:700">${cuenta[c]}</span></div>
       <div style="background:var(--dim);border-radius:4px;height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${color};border-radius:4px;transition:width .6s"></div></div>
@@ -2713,7 +2725,7 @@ function rmBloqueAnalisis(rm){
   }).join('');
   const consejos = orden.filter(c=>RM_CAUSAS[c] && RM_CAUSAS[c].c).slice(0,4)
     .map(c=>`<li style="margin-bottom:6px">${rmEsc(RM_CAUSAS[c].c)}</li>`).join('');
-  const colSev = {alta:rojo, media:'var(--orange)', baja:'var(--green2)'};
+  const colSev = {alta:rojo, media:'var(--orange)', baja:'var(--gold3)'};
   const chipsFiltro = [`<button type="button" onclick="rmFiltrar(this,'')" style="border:1px solid var(--border2);background:var(--gold2);color:#1a1400;border-radius:999px;padding:5px 10px;font-size:.66rem;font-weight:700;cursor:pointer">Todas (${filas.length})</button>`]
     .concat(orden.map(c=>`<button type="button" onclick="rmFiltrar(this,'${c}')" style="border:1px solid var(--border2);background:var(--s1);color:var(--text);border-radius:999px;padding:5px 10px;font-size:.66rem;font-weight:600;cursor:pointer">${rmEsc(nombre(c))} (${cuenta[c]})</button>`)).join('');
   const etiqueta = t => `<div style="color:var(--muted);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;margin-top:8px">${t}</div>`;
@@ -2729,7 +2741,6 @@ function rmBloqueAnalisis(rm){
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:2px">${causas.map(c=>`<span style="font-size:.6rem;font-weight:600;padding:2px 7px;border-radius:5px;background:var(--dim);color:var(--gold2)">${rmEsc(nombre(c))}</span>`).join('')}</div>
         ${etiqueta('Qué hiciste')}<div>${rmEsc(rmTextoTecnico(f.queHizo))}</div>
         ${rmTextoTecnico(f.queFalto)?etiqueta('Qué faltó')+`<div>${rmEsc(rmTextoTecnico(f.queFalto))}</div>`:''}
-        ${etiqueta('Codificación')}<div style="font-family:monospace;font-size:.7rem">${rmEsc(f.codificacion)}</div>
       </div>
     </details>`;
   }).join('');
@@ -2741,6 +2752,7 @@ function rmBloqueAnalisis(rm){
     ${consejos?`<div class="detail-section">Qué tienes que cambiar</div>
     <div style="background:rgba(232,201,106,.08);border:1px solid var(--border2);border-radius:12px;padding:12px 14px 6px 30px;margin-bottom:12px;font-size:.74rem;line-height:1.55;color:var(--text)"><ul style="margin:0;padding:0">${consejos}</ul></div>`:''}
     <div class="detail-section">Tus RM, una a una</div>
+    ${rmLeyendaGravedad(colSev)}
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${chipsFiltro}</div>
     <div id="rmFichas" style="margin-bottom:12px">${fichas}</div>`;
 }
