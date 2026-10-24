@@ -510,6 +510,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         <div style="color:var(--muted);font-size:.7rem;margin-top:2px">Ábrelo desde tu móvil de trabajo para mandar los SMS de mañana</div>
       </div>
     </div>
+    <div id="mananaMain"></div>
     <select id="mesSelectorMain" onchange="cambiarMes(this.value)" style="width:100%;margin:8px 0 14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
       <option value="">Cargando meses…</option>
     </select>
@@ -707,6 +708,14 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     </div>
   </div>
 
+  <!-- Panel próxima ruta: qué hacer en cada mantenimiento para que no se repita -->
+  <div id="mananaPanel" style="display:none">
+    <div style="padding:14px 13px 48px;max-width:680px;margin:0 auto">
+      <button class="detail-back" id="backMananaBtn">← Volver</button>
+      <div id="mananaContent"></div>
+    </div>
+  </div>
+
   <!-- Panel dashboard Cumplimiento individual del técnico -->
   <div id="cumDashPanel">
     <div style="padding:14px 13px 48px;max-width:680px;margin:0 auto">
@@ -764,6 +773,8 @@ const RM_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41
 // pestaña "RM análisis" de la hoja de RM; ver apps-script/RM_mensual.gs.
 const RM_ANALISIS_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=rm-analisis&token=" + APP_TOKEN;
 // Meses con RM guardado (pestañas "RM <Mes>"), para el desplegable del dashboard de RM.
+// Sugerencias para los mantenimientos de la próxima ruta (ver apps-script RutaSugerencias).
+const RUTA_SUG_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=ruta-sugerencias&token=" + APP_TOKEN;
 const RM_MESES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=rm-meses&token=" + APP_TOKEN;
 const TRACK_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=track&token=" + APP_TOKEN;
 const USAGE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=usage&token=" + APP_TOKEN;
@@ -1330,7 +1341,7 @@ async function cambiarMes(mes){
 //  PANELS VISIBILITY
 // ══════════════════════════════════════════════
 function hideAllPanels(){
-  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','upsellingPanel','usagePanel','usoSmsPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','cumDashPanel','historicoPanel']
+  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','upsellingPanel','usagePanel','usoSmsPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','mananaPanel','cumDashPanel','historicoPanel']
     .forEach(id=>document.getElementById(id).style.display='none');
 }
 function showPanel(id){
@@ -1557,6 +1568,8 @@ function renderMain(tec, returnToEquipo=false){
   }).join('');
 
   renderDocsPendientes(tec.id,'docsPendientesMain');
+  renderMananaCard(tec.id,'mananaMain','mainPanel');
+  if(!RUTA_SUG) loadRutaSugerencias().then(()=>{ if(CURRENT_TEC && CURRENT_TEC.id===tec.id) renderMananaCard(tec.id,'mananaMain','mainPanel'); });
   // Reintento garantizado tras cargar docs
   const _tecId = tec.id;
   if(!DOCS_DATA.length){
@@ -1832,6 +1845,9 @@ function showTecDetail(tecId){
   if(!tec)return;
   // Guardamos quién era el tecnico actual y lo mostramos en panel aparte
   document.getElementById('tecDetailContent').innerHTML=buildTecDetailHTML(tec);
+  document.getElementById('tecDetailContent').insertAdjacentHTML('afterbegin','<div id="mananaTecDetail"></div>');
+  renderMananaCard(tec.id,'mananaTecDetail','tecDetailPanel');
+  if(!RUTA_SUG) loadRutaSugerencias().then(()=>renderMananaCard(tec.id,'mananaTecDetail','tecDetailPanel'));
   showPanel('tecDetailPanel');
   window.scrollTo(0,0);
 }
@@ -2452,6 +2468,9 @@ function showTecDetailFromJR(tecId){
   if(!tec)return;
   // Reutilizamos tecDetailPanel pero el back vuelve a jrDetailPanel
   document.getElementById('tecDetailContent').innerHTML=buildTecDetailHTML(tec);
+  document.getElementById('tecDetailContent').insertAdjacentHTML('afterbegin','<div id="mananaTecDetail"></div>');
+  renderMananaCard(tec.id,'mananaTecDetail','tecDetailPanel');
+  if(!RUTA_SUG) loadRutaSugerencias().then(()=>renderMananaCard(tec.id,'mananaTecDetail','tecDetailPanel'));
   document.getElementById('backTecBtn').onclick=()=>{
     showPanel('jrDetailPanel'); window.scrollTo(0,0);
   };
@@ -2550,6 +2569,86 @@ function showRMDashFromEquipoDash(tecId){
 function showRMDash(tecId){
   _rmBackPanel = 'mainPanel';
   _openRMDash(tecId);
+}
+
+// ── Próxima ruta: qué hacer en cada mantenimiento para que no se repita ──
+// Las filas las sube ruta_sugerencias.py la tarde anterior. Cada técnico ve
+// las suyas en su pantalla principal y el JE en la ficha de cada técnico.
+let RUTA_SUG = null;
+let _mananaBack = 'mainPanel';
+
+async function loadRutaSugerencias(){
+  if(RUTA_SUG) return RUTA_SUG;
+  try{
+    const res = await fetchConReintento(RUTA_SUG_URL+'&t='+Date.now(),{cache:'no-store'});
+    RUTA_SUG = res.ok ? parseCSV(await res.text()) : [];
+  }catch(e){ RUTA_SUG = []; }
+  return RUTA_SUG;
+}
+
+// GI373343 y 373343 son la misma matrícula
+function rsMat(m){ m = String(m||'').trim().toUpperCase(); return /^[A-Z]{2}\d{6}$/.test(m) ? m.slice(2) : m; }
+function rsFilasDe(tecId){
+  return (RUTA_SUG||[]).filter(r=>rsMat(r.tecnico)===rsMat(tecId))
+    .sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+}
+function rsFechaTexto(iso){
+  const d = new Date(iso+'T12:00:00');
+  if(isNaN(d)) return iso;
+  const dias = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  return dias[d.getDay()]+' '+String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');
+}
+
+function renderMananaCard(tecId, containerId, backPanel){
+  const cont = document.getElementById(containerId);
+  if(!cont) return;
+  const filas = rsFilasDe(tecId);
+  if(!filas.length){ cont.innerHTML=''; return; }
+  const fechas = [...new Set(filas.map(f=>f.fecha))].map(rsFechaTexto).join(' y ');
+  const alertas = filas.filter(f=>f.alertas).length;
+  cont.innerHTML = `<div onclick="showManana('${rmEsc(tecId)}','${backPanel}')" style="cursor:pointer;display:flex;align-items:center;gap:12px;background:var(--s1);border:1px solid var(--border2);border-left:4px solid ${alertas?'#e05a4a':'var(--gold2)'};border-radius:12px;padding:12px 14px;margin:10px 0">
+      <div style="font-size:1.4rem">🧰</div>
+      <div style="flex:1;min-width:0">
+        <div style="color:var(--gold2);font-weight:700;font-size:.82rem">Próxima ruta · ${fechas}</div>
+        <div style="color:var(--text);font-size:.74rem;margin-top:2px">${filas.length} mantenimiento${filas.length!==1?'s':''}${alertas?` · <b style="color:#e05a4a">${alertas} con riesgo de RM</b>`:''}</div>
+        <div style="color:var(--muted);font-size:.68rem;margin-top:2px">Qué hacer en cada uno para que no se repita</div>
+      </div>
+      <div style="color:var(--gold3);font-size:.9rem">→</div>
+    </div>`;
+}
+
+function showManana(tecId, backPanel){
+  _mananaBack = backPanel || 'mainPanel';
+  const filas = rsFilasDe(tecId);
+  const tec = (CURRENT_DATA.tecnicos||[]).find(t=>rsMat(t.id)===rsMat(tecId));
+  const porFecha = {};
+  filas.forEach(f=>{ (porFecha[f.fecha]=porFecha[f.fecha]||[]).push(f); });
+  const lista = s => String(s||'').split(' || ').map(x=>x.trim()).filter(Boolean);
+  const tarjeta = f => {
+    const al = lista(f.alertas), ha = lista(f.hacer);
+    return `<div style="background:var(--s1);border:1px solid var(--border);border-left:3px solid ${al.length?'#e05a4a':'var(--border2)'};border-radius:10px;padding:11px 12px;margin-bottom:8px">
+      <div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline">
+        <span style="font-size:.72rem;color:var(--gold2);font-weight:700">${rmEsc(f.hora)}</span>
+        <span style="font-size:.8rem;color:var(--text);font-weight:700">${rmEsc(f.tipo)}</span>
+        <span style="margin-left:auto;font-size:.64rem;color:var(--muted);user-select:text">#${rmEsc(f.numero)}${f.panel?' · '+rmEsc(f.panel):''}</span>
+      </div>
+      ${al.map(a=>`<div style="margin-top:7px;background:rgba(224,90,74,.12);color:#e05a4a;font-weight:700;font-size:.72rem;line-height:1.45;padding:5px 8px;border-radius:6px">${rmEsc(a)}</div>`).join('')}
+      ${ha.length?`<ul style="margin:8px 0 0;padding-left:18px;font-size:.76rem;line-height:1.5;color:var(--text)">${ha.map(h=>`<li style="margin-bottom:3px">${rmEsc(h)}</li>`).join('')}</ul>`
+        :'<div style="margin-top:6px;font-size:.72rem;color:var(--muted)">Nada especial: revisión completa y codificar todo.</div>'}
+    </div>`;
+  };
+  document.getElementById('mananaContent').innerHTML = `
+    <div class="detail-hero">
+      <div class="detail-hero-title">🧰 Próxima ruta${tec?' · '+rmEsc(tec.nombre.trim()):''}</div>
+      <div class="detail-hero-sub">Qué hacer en cada mantenimiento para que no se repita</div>
+    </div>
+    <div style="background:rgba(232,201,106,.08);border:1px solid var(--border2);border-radius:12px;padding:11px 13px;margin-bottom:14px;font-size:.74rem;line-height:1.55;color:var(--text)">
+      <b>En todos:</b> revisa el sistema entero y codifica todo lo que hagas: cada cambio de pilas como SUST en su zona con su referencia, lo ampliado como AMPL con referencia, la causa real y observaciones.
+    </div>
+    ${Object.keys(porFecha).sort().map(fe=>`<div class="detail-section">${rsFechaTexto(fe)} · ${porFecha[fe].length} mantenimiento${porFecha[fe].length!==1?'s':''}</div>${porFecha[fe].map(tarjeta).join('')}`).join('')}
+    <div style="font-size:.66rem;color:var(--muted);line-height:1.5;margin-top:10px">Pilas: más de un año desde el último cambio, todas; entre 6 meses y un año, como mínimo teclado o tag reader, sirena y MG1. Moonshot: 205036 (AAA) en MG y 7014 las AA. Fast: 7002 (CR123) en MG/SR y 7006 en teclado YP.</div>`;
+  showPanel('mananaPanel');
+  window.scrollTo(0,0);
 }
 
 // ── Desplegable de mes del dashboard de RM ──
@@ -6395,6 +6494,9 @@ document.getElementById('backJRBtn').addEventListener('click',()=>{
 
 document.getElementById('backDashBtn').addEventListener('click',()=>{
   showPanel(_dashBackPanel); window.scrollTo(0,0);
+});
+document.getElementById('backMananaBtn').addEventListener('click',()=>{
+  showPanel(_mananaBack); window.scrollTo(0,0);
 });
 document.getElementById('backRMBtn').addEventListener('click',()=>{
   rmRestaurarMesApp();
