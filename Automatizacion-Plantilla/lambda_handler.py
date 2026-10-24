@@ -6,7 +6,8 @@ correr, replicando el mismo dispatch que ya tenia
 
 Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "mediodia"}  -> 14:00, ruta del dia siguiente
-  {"tarea": "tarde"}     -> 17:30, ruta del dia siguiente
+  {"tarea": "tarde"}     -> 17:30, ruta del dia siguiente; martes y jueves, ademas, analisis de las RM
+                            nuevas del mes con la misma sesion (ver rm_analizar.tras_ruta)
   {"tarea": "ov_prueba"} -> prueba de entrada a la app OV de inventario (manual, sin horario)
   {"tarea": "recuentos_semanal"} -> martes 10:00, control de recuentos por jefe (ver ov_recuentos.py)
   {"tarea": "recuentos_semanal", "respaldo": true} -> martes 12:00, solo si el de las 10:00 no salio
@@ -127,9 +128,19 @@ def handler(event, context):
         _correr(lambda: forms_upselling.main(context), "forms_upselling")
     else:
         # "mediodia" (14:00) y "tarde" (17:30) hacen lo mismo: descargar la ruta
-        # del dia siguiente y subirla a confirmaciones-sms.
+        # del dia siguiente y subirla a confirmaciones-sms. La tarde de martes y
+        # jueves (dias del Excel de RM) aprovecha la misma sesion de Oracle para
+        # analizar las RM nuevas del mes, si ya llego el correo.
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
         import descargar_ruta_y_subir
 
-        _correr(descargar_ruta_y_subir.main, "descargar_ruta_y_subir")
+        despues = None
+        if tarea == "tarde" and datetime.now(ZoneInfo("Europe/Madrid")).weekday() in (1, 3):
+            import rm_analizar
+
+            despues = rm_analizar.tras_ruta(context)
+        _correr(lambda: descargar_ruta_y_subir.main(despues), "descargar_ruta_y_subir")
 
     return {"tarea": tarea, "status": "ok"}

@@ -2588,6 +2588,14 @@ const RM_CAUSAS = {
   ok:   {t:'Trabajo correcto o no imputable', c:''}
 };
 
+// Quita del análisis las frases internas (dónde se leyó, revisión pendiente) que no van al técnico.
+function rmTextoTecnico(s){
+  return String(s||'')
+    .replace(/No se ve en la ficha un fallo claro del técnico: revisar a mano\./g,'')
+    .replace(/No se pudo leer la ficha en Oracle\./g,'Sin detalle de este mantenimiento.')
+    .replace(/\s+/g,' ').trim();
+}
+
 function rmEsc(s){ return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function rmFilasAnalisis(rm){
@@ -2644,15 +2652,15 @@ function rmBloqueAnalisis(rm){
       </summary>
       <div style="padding:0 12px 12px;font-size:.74rem;line-height:1.55;color:var(--text)">
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:2px">${causas.map(c=>`<span style="font-size:.6rem;font-weight:600;padding:2px 7px;border-radius:5px;background:var(--dim);color:var(--gold2)">${rmEsc(nombre(c))}</span>`).join('')}</div>
-        ${etiqueta('Qué hiciste')}<div>${rmEsc(f.queHizo)}</div>
-        ${etiqueta('Qué faltó')}<div>${rmEsc(f.queFalto)}</div>
+        ${etiqueta('Qué hiciste')}<div>${rmEsc(rmTextoTecnico(f.queHizo))}</div>
+        ${rmTextoTecnico(f.queFalto)?etiqueta('Qué faltó')+`<div>${rmEsc(rmTextoTecnico(f.queFalto))}</div>`:''}
         ${etiqueta('Codificación')}<div style="font-family:monospace;font-size:.7rem">${rmEsc(f.codificacion)}</div>
       </div>
     </details>`;
   }).join('');
   return `<div class="detail-section">Por qué se repiten tus RM</div>
     <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
-      <div style="font-size:.66rem;color:var(--muted);margin-bottom:10px">Revisadas ${filas.length} de ${reps.length} RM con la ficha de Oracle. Una RM puede tener varias causas.</div>
+      <div style="font-size:.66rem;color:var(--muted);margin-bottom:10px">Revisadas ${filas.length} de ${reps.length} RM. Una RM puede tener varias causas.</div>
       ${barrasCausas}
     </div>
     ${consejos?`<div class="detail-section">Qué tienes que cambiar</div>
@@ -2701,7 +2709,7 @@ function _openRMDash(tecId){
       <div class="detail-hero">
         <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
         <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
-        <div class="detail-hero-sub">%RM de ${MES_SELECCIONADO} (Resumen App Claude)</div>
+        <div class="detail-hero-sub">%RM de ${MES_SELECCIONADO}</div>
       </div>
       <div style="display:flex;gap:9px;margin-bottom:16px">
         <div class="stat-box" style="flex:1"><div class="n" style="color:${tec.rm===0?'var(--green2)':'#e05a4a'}">${tec.rm}</div><div class="l">Mantenimientos<br>repetidos</div></div>
@@ -2724,7 +2732,7 @@ function _openRMDash(tecId){
         </div>
       </div>
       <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:.72rem;color:var(--muted);line-height:1.6">
-        ℹ️ El detalle de motivos y causa raíz solo está disponible para el mes en curso — el Excel de mantenimientos no guarda un histórico por mes anterior.
+        ℹ️ El detalle de motivos y causa raíz no está disponible para este mes.
       </div>`;
     showPanel('rmDashPanel');
     window.scrollTo(0,0);
@@ -2772,7 +2780,7 @@ function _openRMDash(tecId){
     <div class="detail-hero">
       <div class="detail-hero-title">🛠️ Dashboard de RMs · ${tec.nombre.trim()}</div>
       <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
-      <div class="detail-hero-sub">%RM del técnico (Resumen App Claude) · detalle desde el Excel de mantenimientos</div>
+      <div class="detail-hero-sub">%RM del técnico · objetivo ≥ 87,5 %</div>
     </div>
 
     ${rmBloqueResumen(rm, pctResumen)}
@@ -6310,7 +6318,7 @@ function _openCumDash(tecId){
       <div class="detail-hero">
         <div class="detail-hero-title">✅ Dashboard Cumplimiento · ${nombre}</div>
         <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
-        <div class="detail-hero-sub">%Cumplimiento de ${MES_SELECCIONADO} (Resumen App Claude)</div>
+        <div class="detail-hero-sub">%Cumplimiento de ${MES_SELECCIONADO}</div>
       </div>
       ${incum===null ? '' : `<div style="display:flex;gap:9px;margin-bottom:16px">
         <div class="stat-box" style="flex:1"><div class="n" style="color:${incum===0?'var(--green2)':'#e05a4a'}">${incum}</div><div class="l">Incumplimientos</div></div>
@@ -6332,7 +6340,7 @@ function _openCumDash(tecId){
         </div>
       </div>
       <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:.72rem;color:var(--muted);line-height:1.6">
-        ℹ️ El detalle de razones de incumplimiento solo está disponible para el mes en curso — el Excel de cumplimiento no guarda un histórico por mes anterior.
+        ℹ️ El detalle de razones de incumplimiento no está disponible para este mes.
       </div>`;
     showPanel('cumDashPanel'); window.scrollTo(0,0);
     return;
@@ -6370,7 +6378,7 @@ function _openCumDash(tecId){
     <div class="detail-hero">
       <div class="detail-hero-title">✅ Dashboard Cumplimiento · ${nombre}</div>
       <div class="detail-hero-val" style="color:${col}">${pctResumen.toFixed(2)}%</div>
-      <div class="detail-hero-sub">%Cumplimiento (Resumen App Claude) · objetivo ≥ 90%</div>
+      <div class="detail-hero-sub">%Cumplimiento · objetivo ≥ 90%</div>
     </div>
     <div style="display:flex;gap:9px;margin-bottom:16px">
       <div class="stat-box" style="flex:1"><div class="n">${cum.total}</div><div class="l">Total<br>visitas</div></div>

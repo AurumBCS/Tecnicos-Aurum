@@ -107,12 +107,87 @@ def _fila(mes, rm, ficha):
                 queHizo=a["queHizo"], queFalto=a["queFalto"], codificacion=a["codificacion"])
 
 
-def main(event=None, context=None):
+def _mes_actual():
+    return MESES[datetime.now(ZoneInfo("Europe/Madrid")).month - 1]
+
+
+def _analizar_lista(page, ctx, correo, clave, mes, lista, queda_tiempo, errores, capturas, local=False):
+    """Lee la ficha de cada RM con la consola ya abierta y manda el analisis cada LOTE. Devuelve cuantas hizo."""
     import consola_sso
     import ofs_rm_prueba
 
+    hechas, lote, fallos_seguidos = 0, [], 0
+    try:
+        for i, rm in enumerate(lista, 1):
+            if not queda_tiempo():
+                break
+            ficha = ofs_rm_prueba._leer(page, rm["nMant"], capturas, errores)
+            # Varias fichas seguidas sin poder leer = la sesion de Oracle caduco:
+            # volver a entrar (pedira otra aprobacion) y reintentar esta RM.
+            fallos_seguidos = fallos_seguidos + 1 if ficha is None else 0
+            if fallos_seguidos >= 5:
+                print("[rm] 5 fichas seguidas sin leer: se vuelve a entrar en la consola")
+                page.reload(wait_until="domcontentloaded")
+                consola_sso.entrar_a_consola(page, correo, clave)
+                ctx.storage_state(path=str(SESION))
+                fallos_seguidos = 0
+                ficha = ofs_rm_prueba._leer(page, rm["nMant"], capturas, errores)
+            lote.append(_fila(mes, rm, ficha))
+            hechas += 1
+            if local and i % 25 == 0:
+                print(f"[rm] {i}/{len(lista)} analizadas")
+            if len(lote) >= LOTE:
+                _enviar(lote)
+                lote = []
+    finally:
+        try:
+            _enviar(lote)
+        except Exception as e:
+            errores.append(f"envio final: {e}")
+    return hechas
+
+
+def _seguir_en_otra_ronda(context, event, mes, ronda):
+    import boto3
+    boto3.client("lambda").invoke(FunctionName=context.function_name, InvocationType="Event",
+                                  Payload=json.dumps(dict(event, tarea="rm_analizar", mes=mes, ronda=ronda + 1)).encode())
+    print("[rm] lanzada la ronda", ronda + 1)
+
+
+def tras_ruta(context=None):
+    """Para descargar_ruta_y_subir.main(despues=...): la tarde de martes y jueves, con la consola que
+    ya abrio la descarga de la ruta, analiza las RM nuevas del mes (las del Excel que llega esos dias).
+    Si el correo aun no ha llegado no hay pendientes y no hace nada. Un fallo aqui no toca la ruta."""
+    def despues(page, ctx, correo, clave):
+        try:
+            mes = _mes_actual()
+            lista = pendientes(mes)
+            print(f"[rm] tras la ruta: {len(lista)} RM de {mes} sin analizar")
+            if not lista:
+                return
+            def queda_tiempo():
+                return context is None or context.get_remaining_time_in_millis() > MARGEN_MS
+            errores, capturas = [], []
+            hechas = _analizar_lista(page, ctx, correo, clave, mes, lista, queda_tiempo, errores, capturas)
+            ctx.storage_state(path=str(SESION))
+            quedan = len(lista) - hechas
+            print(f"[rm] tras la ruta: {hechas} analizadas, quedan {quedan}")
+            if quedan and context is not None and hechas > 0:
+                _seguir_en_otra_ronda(context, {}, mes, 1)
+            elif errores:
+                enviar_aviso(f"⚠️ Análisis de RM {mes} (tras la ruta): {hechas} analizadas",
+                             "\n".join(["Errores:"] + errores), capturas=capturas)
+        except Exception as e:
+            registrar_error("rm_analizar", f"tras la ruta: {e}")
+            enviar_aviso("⚠️ Análisis de RM no hecho tras la ruta", str(e))
+    return despues
+
+
+def main(event=None, context=None):
+    import consola_sso
+
     event = dict(event or {})
-    mes = event.get("mes") or MESES[datetime.now(ZoneInfo("Europe/Madrid")).month - 1]
+    mes = event.get("mes") or _mes_actual()
     ronda = int(event.get("ronda") or 1)
     lista = pendientes(mes, event.get("tecnicos"))
     if event.get("max"):
@@ -125,7 +200,7 @@ def main(event=None, context=None):
         return context is None or context.get_remaining_time_in_millis() > MARGEN_MS
 
     correo, clave = consola_sso.leer_credenciales_sso()
-    hechas, lote, errores, capturas = 0, [], [], []
+    hechas, errores, capturas = 0, [], []
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
         opciones = {"viewport": {"width": 1600, "height": 1000}}
@@ -136,36 +211,12 @@ def main(event=None, context=None):
         try:
             consola_sso.entrar_a_consola(page, correo, clave)
             ctx.storage_state(path=str(SESION))
-            fallos_seguidos = 0
-            for i, rm in enumerate(lista, 1):
-                if not queda_tiempo():
-                    break
-                ficha = ofs_rm_prueba._leer(page, rm["nMant"], capturas, errores)
-                # Varias fichas seguidas sin poder leer = la sesion de Oracle caduco:
-                # volver a entrar (pedira otra aprobacion) y reintentar esta RM.
-                fallos_seguidos = fallos_seguidos + 1 if ficha is None else 0
-                if fallos_seguidos >= 5:
-                    print("[rm] 5 fichas seguidas sin leer: se vuelve a entrar en la consola")
-                    page.reload(wait_until="domcontentloaded")
-                    consola_sso.entrar_a_consola(page, correo, clave)
-                    ctx.storage_state(path=str(SESION))
-                    fallos_seguidos = 0
-                    ficha = ofs_rm_prueba._leer(page, rm["nMant"], capturas, errores)
-                lote.append(_fila(mes, rm, ficha))
-                hechas += 1
-                if context is None and i % 25 == 0:
-                    print(f"[rm] {i}/{len(lista)} analizadas")
-                if len(lote) >= LOTE:
-                    _enviar(lote)
-                    lote = []
+            hechas = _analizar_lista(page, ctx, correo, clave, mes, lista, queda_tiempo, errores, capturas,
+                                     local=context is None)
         except Exception as e:
             errores.append(f"ronda {ronda}: {e}")
             registrar_error("rm_analizar", str(e))
         finally:
-            try:
-                _enviar(lote)
-            except Exception as e:
-                errores.append(f"envio final: {e}")
             try:
                 ctx.storage_state(path=str(SESION))
             except Exception:
@@ -176,10 +227,7 @@ def main(event=None, context=None):
     print(f"[rm] ronda {ronda}: {hechas} analizadas, quedan {quedan}")
     seguir = quedan > 0 and not event.get("max") and ronda < MAX_RONDAS and context is not None and hechas > 0
     if seguir:
-        import boto3
-        boto3.client("lambda").invoke(FunctionName=context.function_name, InvocationType="Event",
-                                      Payload=json.dumps(dict(event, tarea="rm_analizar", mes=mes, ronda=ronda + 1)).encode())
-        print("[rm] lanzada la ronda", ronda + 1)
+        _seguir_en_otra_ronda(context, event, mes, ronda)
     elif errores or not quedan:
         asunto = ("⚠️" if errores else "✅") + f" Análisis de RM {mes}: {hechas} en la última ronda"
         cuerpo = [f"RM de {mes}: ronda {ronda}, {hechas} analizadas, quedan {quedan}."]

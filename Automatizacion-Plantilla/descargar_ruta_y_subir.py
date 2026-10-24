@@ -77,11 +77,15 @@ def subir_excel(ruta_excel):
     return resp
 
 
-def main():
+def main(despues=None):
     """
     Consola nueva (cuenta de Verisure por SSO + Authenticator): entra, pide el
     CSV de cada grupo Aurum para el dia siguiente, los une en un .xlsx y lo
     sube. Ver consola_sso.py para el recorrido confirmado en vivo.
+
+    despues(page, context, correo, clave): si se pasa, se llama con la consola
+    todavia abierta una vez subida la ruta, para aprovechar la misma sesion
+    (la tarde de martes y jueves: analisis de RM, ver rm_analizar.tras_ruta).
     """
     import consola_sso
 
@@ -130,9 +134,15 @@ def main():
                 captura,
             )
             sys.exit(1)
+        else:
+            _subir_y_avisar(ruta_excel, fecha_txt, csvs, filas)
+            if despues:
+                despues(page, context, correo, clave)
         finally:
             browser.close()
 
+
+def _subir_y_avisar(ruta_excel, fecha_txt, csvs, filas):
     try:
         resp = subir_excel(ruta_excel)
     except Exception as e:
