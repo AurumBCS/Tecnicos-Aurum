@@ -136,12 +136,25 @@ def main(event=None, context=None):
         try:
             consola_sso.entrar_a_consola(page, correo, clave)
             ctx.storage_state(path=str(SESION))
-            for rm in lista:
+            fallos_seguidos = 0
+            for i, rm in enumerate(lista, 1):
                 if not queda_tiempo():
                     break
                 ficha = ofs_rm_prueba._leer(page, rm["nMant"], capturas, errores)
+                # Varias fichas seguidas sin poder leer = la sesion de Oracle caduco:
+                # volver a entrar (pedira otra aprobacion) y reintentar esta RM.
+                fallos_seguidos = fallos_seguidos + 1 if ficha is None else 0
+                if fallos_seguidos >= 5:
+                    print("[rm] 5 fichas seguidas sin leer: se vuelve a entrar en la consola")
+                    page.reload(wait_until="domcontentloaded")
+                    consola_sso.entrar_a_consola(page, correo, clave)
+                    ctx.storage_state(path=str(SESION))
+                    fallos_seguidos = 0
+                    ficha = ofs_rm_prueba._leer(page, rm["nMant"], capturas, errores)
                 lote.append(_fila(mes, rm, ficha))
                 hechas += 1
+                if context is None and i % 25 == 0:
+                    print(f"[rm] {i}/{len(lista)} analizadas")
                 if len(lote) >= LOTE:
                     _enviar(lote)
                     lote = []
@@ -177,6 +190,14 @@ def main(event=None, context=None):
 
 
 if __name__ == "__main__":
-    import sys
-    # python rm_analizar.py Septiembre [302154 ...]   (prueba local, sin encadenar rondas)
-    main({"mes": sys.argv[1] if len(sys.argv) > 1 else None, "tecnicos": sys.argv[2:], "max": 5})
+    # Desde el Mac, en una sola sesion de Oracle y sin limite de tiempo (no encadena rondas):
+    #   python3 rm_analizar.py Septiembre            -> todas las RM pendientes del mes
+    #   python3 rm_analizar.py Septiembre --max 5    -> prueba con 5
+    #   python3 rm_analizar.py Septiembre --tecnicos 302154 356434
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("mes", nargs="?")
+    ap.add_argument("--max", type=int)
+    ap.add_argument("--tecnicos", nargs="*", default=[])
+    a = ap.parse_args()
+    print(main({"mes": a.mes, "max": a.max, "tecnicos": a.tecnicos}))
