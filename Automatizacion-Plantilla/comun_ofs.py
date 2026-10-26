@@ -423,6 +423,17 @@ def _escribir_como_persona(page, selector, texto):
     return escritos
 
 
+def codigo_totp(secreto, momento=None):
+    """Codigo de 6 digitos (TOTP, RFC 6238) de la clave de una app de autenticacion."""
+    import base64, hashlib, hmac, struct
+    s = secreto.replace(" ", "").upper()
+    clave_b = base64.b32decode(s + "=" * (-len(s) % 8))
+    contador = int((momento or time.time()) // 30)
+    h = hmac.new(clave_b, struct.pack(">Q", contador), hashlib.sha1).digest()
+    o = h[-1] & 0x0F
+    return f"{(struct.unpack('>I', h[o:o + 4])[0] & 0x7FFFFFFF) % 1000000:06d}"
+
+
 def iniciar_sesion_microsoft(page, correo, clave):
     """
     Completa el inicio de sesion de Microsoft con correo + contraseña y
@@ -450,6 +461,10 @@ def iniciar_sesion_microsoft(page, correo, clave):
     correo_enviado = 0
     cancelaciones_fido = 0
     selecciones_cuenta = 0
+    # MS_TOTP_SECRET (solo en el Mac, del Llavero): en vez de esperar la aprobacion en el
+    # movil se usa "codigo de verificacion" de una app de autenticacion registrada en la cuenta.
+    totp = os.environ.get("MS_TOTP_SECRET", "").strip()
+    codigos_enviados = []
 
     while time.time() < limite:
         page.wait_for_timeout(2000)
@@ -525,6 +540,33 @@ def iniciar_sesion_microsoft(page, correo, clave):
         if _visible(page, "#KmsiCheckboxField") or _visible(page, "#KmsiDescription"):
             _clic_si_visible(page, "#idSIButton9")
             continue
+
+        # Codigo de verificacion (TOTP): campo del codigo -> escribirlo
+        if totp:
+            campo_otc = page.locator("input[name=otc]:visible, #idTxtBx_SAOTCC_OTC:visible").first
+            if campo_otc.count():
+                if len(codigos_enviados) >= 3:
+                    raise RuntimeError("Microsoft no acepta el codigo de verificacion")
+                codigo = codigo_totp(totp)
+                if codigo in codigos_enviados:   # mismo intervalo de 30 s: esperar al siguiente
+                    page.wait_for_timeout(int((30 - time.time() % 30 + 1) * 1000))
+                    codigo = codigo_totp(totp)
+                campo_otc.fill(codigo)
+                codigos_enviados.append(codigo)
+                print(f"[microsoft] codigo de verificacion escrito (intento {len(codigos_enviados)})")
+                _clic_si_visible(page, "#idSubmit_SAOTCC_Continue", "input[type=submit]")
+                continue
+            # Lista de metodos: "Usar un codigo de verificacion"
+            if _clic_si_visible(page, "[data-value=PhoneAppOTP]", "text=Use a verification code",
+                                "text=Usar un código de verificación"):
+                print("[microsoft] metodo: codigo de verificacion")
+                continue
+            # Si salta directo a la aprobacion en el movil: "Iniciar sesion de otra forma"
+            if _visible(page, "#idRichContext_DisplaySign") or _visible(page, "#idDiv_SAOTCAS_Title"):
+                if _clic_si_visible(page, "#signInAnotherWay", "text=I can't use my Microsoft Authenticator app right now",
+                                    "text=No puedo usar la aplicación Microsoft Authenticator en este momento"):
+                    print("[microsoft] se pide otra forma de verificar (codigo)")
+                    continue
 
         # Numero de aprobacion en pantalla -> avisar por correo (una vez por numero)
         if _visible(page, "#idRichContext_DisplaySign"):
