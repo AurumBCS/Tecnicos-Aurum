@@ -91,6 +91,11 @@ def sugerir(ficha, hoy=None):
     recientes = [h for h in visitas if (_fecha(h.get("apertura")) or date.min) >= date.fromordinal(hoy.toordinal() - 60)]
     if len(recientes) >= 2:
         alertas.append(f"Instalación reincidente: {len(recientes)} visitas en los últimos 60 días.")
+    ultimo_mes = [h for h in visitas if (_fecha(h.get("apertura")) or date.min) >= date.fromordinal(hoy.toordinal() - 30)]
+    if len(ultimo_mes) >= 4 or "heavy repeater" in pet:
+        alertas.append("HEAVY REPEATER (4 o más visitas en el último mes).")
+        hacer.append("Heavy Repeater: llama a Soporte Técnico (66043) antes de finalizar la validación; "
+                     "cuando se llama, no vuelve a repetirse.")
     if _n(ficha.get("historial_atipico")) in ("si", "sí", "s"):
         alertas.append("Instalación marcada con historial atípico.")
 
@@ -100,19 +105,38 @@ def sugerir(ficha, hoy=None):
         if previas:
             disp = DISPOSITIVO.get(z[:2], "dispositivo")
             alertas.append(f"La zona {z} ({disp}) ya falló antes ({len(previas)} visita/s en el histórico).")
-            if any(re.search(r"pila|bateri|supervis", _n(h.get("texto"))) for h in previas):
+            ya_sustituido = any(re.search(r"sustitu|\bsust\b|cambi\w* (el |la |de )?(dispositivo|detector|magnetico|sirena|teclado|foto)", t)
+                                and not re.search(r"pila|bateri", t) for t in (_n(h.get("texto")) for h in previas))
+            if ya_sustituido and re.search(r"pila|bateri|supervis", pet):
+                hacer.append(f"{z}: el dispositivo ya se sustituyó y sigue fallando: cambiarlo otra vez no lo arregla. "
+                             "REUBÍCALO o cambia de tipo de dispositivo, y mide el RSSI con salto (no con tamper).")
+            elif any(re.search(r"pila|bateri|supervis", _n(h.get("texto"))) for h in previas):
                 hacer.append(f"{z}: ya fue un técnico por batería baja o supervisión. SUSTITUYE el dispositivo ({disp}); "
                              "no se vuelven a cambiar las pilas.")
             else:
                 hacer.append(f"{z}: si vuelve a fallar no basta con pilas. Lleva {disp} para SUSTITUIR o REUBÍCALO; "
                              "si cambias pilas otra vez, volverá.")
     if re.search(r"supervis", pet):
-        hacer.append("Fallo de supervisión: si no tienes el fallo muy claro, cambia el dispositivo.")
+        hacer.append("Fallo de supervisión: si no tienes el fallo muy claro, cambia el dispositivo. Mide el RSSI con salto "
+                     "(76-98 % o -86 a -29 dBm) y busca muros gruesos, puertas metálicas o inhibición.")
+        if len(_zonas_citadas(pet_original)) >= 3:
+            hacer.append("Varias zonas en supervisión: si no hay obstáculos y tras reubicar sigue igual, es la central: cámbiala.")
 
     if re.search(r"reincident", pet):
         hacer.append("El aviso es reincidente: SUSTITUYE el dispositivo (o reubícalo); revisar o cambiar pilas otra vez no basta.")
     if re.search(r"(mg\d*|magnetico)\b.{0,40}(se ha caido|caido|despegad)|(se ha caido|caido|despegad).{0,40}(mg\d*|magnetico)", pet):
         hacer.append("Magnético caído: además de fijarlo bien, otra resolución es SUSTITUIRLO (SUST con su referencia).")
+    if re.search(r"tamper|caido|despegad", pet):
+        if panel == "Moonshot":
+            hacer.append("Tamper o caído en Moonshot: base NUEVA de Shock Sensor (202409) obligatoria, nunca reutilizar. "
+                         "Atornilla si puedes; si pegas, limpia con la toallita 201127.")
+        elif panel == "Fast":
+            hacer.append("Tamper en Fast: si cambias un 2250SP por F250SP/F252SP, cambia también la base (no son compatibles). "
+                         "Tag reader y sirena, de la misma tecnología (PIC/EFM) que el resto.")
+    if re.search(r"falsa alarma|falsas alarmas|saltos? (sin|en falso)|fallo de armado", pet):
+        hacer.append("Falsas alarmas: descarta en orden cliente → mascotas → entorno → equipo; cambia el dispositivo solo al final. "
+                     "Si el texto trae diagnóstico de CRA (reubicación), haz lo que indica."
+                     + (" Si el imán queda separado, imán potente 202411 (+ espaciador 202407)." if panel == "Moonshot" else ""))
     if re.search(r"anulad", pet):
         hacer.append("Hay zonas anuladas: no las dejes anuladas, sustituye lo que falla.")
     if re.search(r"cambiar placa si es recurrente", pet):
@@ -168,9 +192,14 @@ def sugerir(ficha, hoy=None):
     elif re.search(r"pila|bateria", pet):
         hacer.append(f"Aviso de pilas sin fecha del último cambio: revisa el estado de todas ({refs}).")
 
+    # best practice ANP/Traslados/RBE: su ratio de RM es peor que el de las altas nuevas
+    if re.search(r"\banp\b|montaje de alarma|traslado|\brbe\b", tipo):
+        hacer.append("ANP / montaje por traslado / RBE: cambia las pilas de TODOS los elementos vía radio y sustituye "
+                     "los dispositivos antiguos (DESM del viejo + MONT del nuevo).")
+
     # ── cerradura electrica (smartlock / DR): no sale en las zonas, se busca en los textos ──
     textos = [ficha.get("texto_actividad") or "", ficha.get("observaciones_tecnico") or ""] + [h.get("texto") or "" for h in hist]
-    if any(re.search(r"smart ?lock|\bDR\d{2}\b", t, re.I) for t in textos):
+    if "smartlock" in tipo or any(re.search(r"smart ?lock|\bDR\d{2}\b", t, re.I) for t in textos):
         f_cerr = None
         for h in visitas:
             t = _n(h.get("texto"))
@@ -182,24 +211,55 @@ def sugerir(ficha, hoy=None):
         mc = _meses(desde, hoy) if desde else None
         if mc is None or mc >= 5:
             hacer.append("Cerradura eléctrica (smartlock): " + (f"pilas cambiadas hace {mc} meses. " if mc is not None else "")
-                         + "Con más de 5 meses se cambian sus pilas aunque vayas por otra cosa.")
+                         + "Con más de 5 meses se cambian sus pilas (4 × CR123A, ref. 7002) aunque vayas por otra cosa; "
+                         "después de cambiarlas hay que calibrarla con la puerta abierta.")
 
     # ── FAST 2 ──
     if panel == "Fast" and "vf2" in _n(ficha.get("version_panel")):
         if re.search(r"bloqueo|fallo (de )?(la )?central|central (no|bloque)", tipo + " " + pet):
+            if _cuenta(zonas, ("XP",)):
+                hacer.append("Pase a FAST 4: los fotoperimetrales OPDD (zona XP) no son compatibles; lleva OPDI F455SP para sustituirlos.")
             hacer.append("FAST 2 con bloqueo GSM o fallo de central: hay que pasarla a FAST 4."
-                         + (" Al resetear los dispositivos, cambia también las pilas de todos." if m is not None and m >= 12 else ""))
+                         + (" Al resetear los dispositivos, cambia también las pilas de todos." if m is not None and m >= 12 else "")
+                         + " Batería nueva F013 (nunca la 9082). Sin coste: AMPL de F049 + F055 + F057 (o el pack, no los dos), "
+                         "DESM de la Fast 2 y MONT de la SIM.")
         if re.search(r"\b2g\b", pet):
             hacer.append("FAST 2 transmitiendo en 2G: 1) monetiza el cambio a FAST 4 (AMPLIAR); 2) si no, cambia la SIM y "
                          "verifica que queda en 3G; 3) cambio a FAST 4 a coste 0 (AMPL F049) según zonas y riesgo en ruta: "
                          "LLAMA OBLIGATORIAMENTE AL JE antes.")
 
+    # ── caducidad: IMA no deja salir de programacion con humo caducado o a menos de 1 año ──
+    f_inst = _fecha(ficha.get("fecha_instalacion"))
+    if f_inst and _cuenta(zonas, ("FR",)) and _meses(f_inst, hoy) >= 108:
+        hacer.append(f"Detector de humo de hace {_meses(f_inst, hoy) // 12} años: si está caducado o le queda menos de 1 año, "
+                     "IMA no te deja salir de programación. Lleva uno nuevo.")
+
+    if f_inst and _cuenta(zonas, ("FG",)) and _meses(f_inst, hoy) >= 48:
+        hacer.append("ZeroVision: la cánula caduca a los 5 años y IMA bloquea si le queda menos de 1 año. "
+                     "Revisa la fecha y lleva cánula de repuesto.")
+
+    if any(h.startswith(("Pilas:", "Magnéticos de puertas", "Detectores de humo", "Cerradura eléctrica")) for h in hacer):
+        hacer.append("Codificación de pilas: 'Añadir pilas' solo en los dispositivos en los que SOLO cambias pilas; "
+                     "lo que sustituyas, amplíes o montes ya lleva sus pilas (si no, salen duplicadas).")
+
     # ── comunicaciones ──
     if any(t in tipo for t in TIPOS_COM) or (not venta and re.search(r"ddi|gsm|cobertura|\bsim\b|no envia|missing|no transmite|comunicacion", pet)):
-        hacer.append("Comunicaciones: revisa cobertura, DDI, SIM de otro operador y que la central esté conectada a internet. Causa 7052.")
+        # prioridad de operador confirmada por Gustavo 27/10/2026: Vodafone
+        sim = "prioridad Vodafone; Movistar fuera salvo que no haya otra" + ("; deja módulo 3G" if panel == "Fast" else "")
+        hacer.append(f"Comunicaciones: prueba SIM de todos los operadores y deja la de mejor cobertura ({sim}). "
+                     "Revisa DDI, antena y que la central esté conectada a internet; nada de antenas exteriores. Causa 7052. "
+                     "La SIM se codifica en Añadir trabajos como MONT (no 'Datos de SIM' ni causa 2500/2501)."
+                     + (" Conecta la CU al router del cliente por cable (o wifi): sin internet hay el doble de missing test."
+                        if panel == "Moonshot" else
+                        " Si es 4PRO, conéctala al wifi del cliente." if "vf4" in _n(ficha.get("version_panel")) else "")
+                     + (f" Instalación de hace {_meses(f_inst, hoy) // 12} años: cambia la batería de la central si tiene más de 2 años "
+                        f"({'205086' if panel == 'Moonshot' else 'F013, nunca la 9082'})." if f_inst and _meses(f_inst, hoy) >= 24 else ""))
 
     # ── camaras ──
     if not venta and (re.search(r"camara|arlo|hub|cloudcam", pet) or "arlo" in tipo):
-        hacer.append("Cámaras: comprueba wifi y velocidad de subida (≥ 1 Mb) y el hub; si cambió el router, desvincular y volver a grabar.")
+        hacer.append("Cámaras: casi siempre es la señal wifi, no la cámara: mídela con Wifi Analyzer antes de cambiarla "
+                     "(subida ≥ 1 Mb). Exterior siempre con HUB (a 1 m del router, en altura, punto intermedio) y panel solar "
+                     "al sol directo con el cable tensado; configura 'Mejor duración de la batería', zonas de actividad, "
+                     "menos sensibilidad y clips de 30 s. Si cambió el router, desvincular y volver a grabar.")
 
     return {"alertas": alertas, "hacer": list(dict.fromkeys(hacer)), "panel": panel}

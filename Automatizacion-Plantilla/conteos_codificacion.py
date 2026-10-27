@@ -19,7 +19,7 @@ from collections import defaultdict
 FAMILIAS = [
     ("magnéticos Moonshot", ["121272", "121295"]),
     ("perimetrales Moonshot", ["120221", "120264"]),
-    ("cánulas Zerovision", ["130958", "FOG001", "135104"]),
+    ("cánulas Zerovision", ["130958", "FOG001", "135104", "135059"]),
     ("sirenas Moonshot", ["131179", "131179IN"]),
     ("Orion", ["120213", "120213T"]),
     ("centrales Moonshot", ["182083", "182084"]),
@@ -27,20 +27,26 @@ FAMILIAS = [
     ("sirenas Fast", ["F500SP", "F505SP"]),
     ("cámaras Arlo", ["322050V", "322070V"]),
     ("paneles solares Arlo", ["325603", "326600", "327600"]),
-    ("kits Moonshot", ["199005", "199013"]),
+    ("kits Moonshot", ["199001", "199005", "199013"]),
     ("llaves Moonshot", ["131347", "131348"] + [str(n) for n in range(131370, 131380)]),
     ("llaves Fast", ["F443", "F444", "F445", "F446", "F447", "F448", "F449"]),
+    # comunicados de Verisure: la bateria de 4PRO es la F013 (la 9082 es la externa de Alianzas)
+    ("baterías de central Fast2/4PRO", ["F013", "9082"]),
+    ("teclados exteriores MOK", ["134039V", "134052V"]),
+    ("centrales FAST 4 / 4PRO", ["F045", "F049"]),   # F045 Rev3 negra, F049 Rev4 blanca
 ]
-VIEJAS = {"121272", "120221", "130958", "FOG001", "199005", "322030V", "322040V"}
+VIEJAS = {"121272", "120221", "130958", "FOG001", "199001", "199005", "322030V", "322040V"}
 # El almacen cambia la referencia al recibir el defectuoso: no es fallo del tecnico
-RENOMBRA_ALMACEN = [("322050V", "322050"), ("340001V", "340004")]
-KITS = {"199005", "199013"}
+RENOMBRA_ALMACEN = [("322050V", "322050"), ("340001V", "340004"),
+                    ("ZES536", "ZES520")]   # disuasorio: se pone el ZES536 y se codifica el ZES520 hasta que IMA cambie
+KITS = {"199001", "199005", "199013"}
 CONTENIDO_KIT = {"120213": 2, "131179": 1, "182084": 1, "121295": 1}
 
 LLAVES = {r for _, g in FAMILIAS if _.startswith("llaves") for r in g}
 MANDOS = {"280785": "Moonshot", "2409SP": "Fast2", "2410SP": "Fast2", "2411SP": "Fast4"}
 CILINDROS = {"131560", "131561", "131562", "131563", "131564"}
-SIN_CODIFICAR_TIPICO = {"120236": "porta pilas AA de los Aquila"}
+SIN_CODIFICAR_TIPICO = {"120236": "porta pilas AA de los Aquila",
+                        "7008": "pilas de los mandos 4PRO (no se añaden solas al codificar el mando)"}
 
 
 def _num(v):
@@ -147,7 +153,7 @@ def analizar(lineas, matricula):
         elif _es_sim(it, d):
             cat = "sims"
         elif it in SIN_CODIFICAR_TIPICO:
-            cat, d = "portapilas", SIN_CODIFICAR_TIPICO[it]
+            cat, d = ("portapilas" if it == "120236" else "pilasmando"), SIN_CODIFICAR_TIPICO[it]
         elif it in ("F055", "F057") and f049:
             cat = "f049"
         elif _es_pila(d):
@@ -223,11 +229,11 @@ def puntos(hallazgos):
                 frases.append(f"{cod} en vez de {puso} ×{n}")
         out.append(("Codifica una referencia por otra", ", ".join(frases[:5]) + (f" y {len(frases) - 5} más" if len(frases) > 5 else ""),
                     sum(h["euros"] for h in conf)))
-    entrega = por(lambda h: h["tipo"] == "falta" and h.get("cat") in ("llaves", "mandos", "sims", "cilindros", "portapilas", "f049"))
+    entrega = por(lambda h: h["tipo"] == "falta" and h.get("cat") in ("llaves", "mandos", "sims", "cilindros", "portapilas", "pilasmando", "f049"))
     if entrega:
         tot = lambda c: sum(h["unidades"] for h in entrega if h.get("cat") == c)
         partes = [f"{tot(c)} {t}" for c, t in (("llaves", "llaves"), ("mandos", "mandos"), ("sims", "SIMs"),
-                                               ("cilindros", "cilindros"), ("portapilas", "porta pilas"), ("f049", "F055/F057")) if tot(c)]
+                                               ("cilindros", "cilindros"), ("portapilas", "porta pilas"), ("pilasmando", "pilas de mandos 4PRO"), ("f049", "F055/F057")) if tot(c)]
         out.append(("No codifica lo que entrega en montajes y ANP", ", ".join(partes), sum(h["euros"] for h in entrega)))
     pilas = por(lambda h: h["tipo"] == "falta" and h.get("cat") == "pilas")
     if pilas:
