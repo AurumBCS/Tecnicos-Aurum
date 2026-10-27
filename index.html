@@ -866,8 +866,14 @@ function textoFechaDatosActualizados(){
   const nombresMeses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   return `Datos actualizados hasta el ${f.getDate()} de ${nombresMeses[f.getMonth()]} de ${f.getFullYear()}`;
 }
+// Hora de la ultima vez que la app trajo los datos (login, boton 🔄 o refresco automatico)
+let _ultimaCarga = 0;
 function actualizarBannerFechaDatos(){
-  const texto = textoFechaDatosActualizados();
+  let texto = textoFechaDatosActualizados();
+  if(_ultimaCarga){
+    const h = new Date(_ultimaCarga).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    texto += (texto ? ' · ' : '') + 'app actualizada a las ' + h;
+  }
   document.querySelectorAll('.fecha-datos').forEach(el=>{ el.textContent = texto; });
 }
 let CURRENT_TEC  = null;
@@ -6332,6 +6338,8 @@ async function doLogin(){
   Promise.all([loadVacaciones(), loadCumplimiento(), loadRM(MES_SELECCIONADO||mesActualNombre()), loadRMAnalisis(MES_SELECCIONADO||mesActualNombre())]).then(()=>{
     if(CURRENT_TEC) renderFlota(CURRENT_TEC.id,'flotaMain');
   });
+  _ultimaCarga = Date.now();
+  actualizarBannerFechaDatos();
   document.getElementById('spinner').style.display='none';
   document.getElementById('loginBtn').style.opacity='1';
 
@@ -6639,7 +6647,13 @@ function _openCumDash(tecId){
   showPanel('cumDashPanel'); window.scrollTo(0,0);
 }
 
-async function doRefreshData(){
+// auto=true: refresco en segundo plano (al volver a la app o cada 30 min). Solo repinta la pantalla
+// que se esta viendo, para no sacar al usuario de un dashboard o de un detalle.
+let _refrescando = false;
+async function doRefreshData(auto=false){
+  if(auto === true && (_refrescando || !CURRENT_USER_TYPE)) return;
+  if(auto !== true) auto = false;
+  _refrescando = true;
   const btn = document.getElementById('refreshBtn');
   btn.disabled = true;
   btn.style.opacity = '0.5';
@@ -6647,9 +6661,14 @@ async function doRefreshData(){
 
   console.log('🔄 Iniciando actualización de datos...');
 
+  // Si esta mirando un mes pasado, no se recarga el mes (loadSheets vuelve al mes en curso)
+  const mesHistorico = auto && MES_SELECCIONADO && MESES_DISPONIBLES.length && MES_SELECCIONADO !== MESES_DISPONIBLES[0];
+  const visible = id => { const el = document.getElementById(id); return !!el && el.style.display === 'block'; };
+  RUTA_SUG = null;
   try {
     await Promise.all([
-      loadSheets(),
+      mesHistorico ? Promise.resolve() : loadSheets(),
+      loadRutaSugerencias(),
       loadAuth(),
       loadDocs(),
       loadJerarquia(),
@@ -6663,15 +6682,20 @@ async function doRefreshData(){
       loadFichajeVista()
     ]);
 
-    if(CURRENT_TEC) renderMain(CURRENT_TEC);
-    else if(CURRENT_JE_ID){
+    // CURRENT_TEC apunta a la fila vieja: se busca la nueva por matricula
+    const tecNuevo = CURRENT_TEC && CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_TEC.id.toUpperCase());
+    if(tecNuevo && (!auto || visible('mainPanel'))) renderMain(tecNuevo);
+    else if(tecNuevo) CURRENT_TEC = tecNuevo;
+    else if(CURRENT_JE_ID && (!auto || visible('mainPanel'))){
       const jeTec = CURRENT_DATA.tecnicos.find(t=>t.id.toUpperCase()===CURRENT_JE_ID.toUpperCase());
       if(jeTec && ACTIVE_TAB==='misDatos') renderMain(jeTec);
     }
-    if(CURRENT_USER_TYPE === 'jr'){ renderJRPanel(); renderMedialiaCoord(); }
-    else if(CURRENT_USER_TYPE === 'je' && ACTIVE_TAB === 'equipo') renderEquipoPanel(CURRENT_JE_ID);
+    if(CURRENT_USER_TYPE === 'jr'){ if(!auto || visible('jrPanel')) renderJRPanel(); renderMedialiaCoord(); }
+    else if(CURRENT_USER_TYPE === 'je' && ACTIVE_TAB === 'equipo' && (!auto || visible('equipoPanel'))) renderEquipoPanel(CURRENT_JE_ID);
     else if(CURRENT_USER_TYPE === 'fichaje-admin') renderFichajeJR('fichajeAdminContainer');
     pintarBotonFichaje();
+    _ultimaCarga = Date.now();
+    actualizarBannerFechaDatos();
 
     console.log('✅ Datos actualizados correctamente');
   } catch(e) {
@@ -6680,8 +6704,20 @@ async function doRefreshData(){
     btn.disabled = false;
     btn.style.opacity = '1';
     btn.textContent = '🔄';
+    _refrescando = false;
   }
 }
+
+// Refresco automatico: al volver a la app (si hace mas de 10 min de la ultima carga) y cada 30 min
+// mientras esta abierta y a la vista. Asi no hace falta salir y volver a entrar para ver datos nuevos.
+const REFRESCO_AL_VOLVER_MS = 10*60*1000;
+const REFRESCO_PERIODICO_MS = 30*60*1000;
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && Date.now() - _ultimaCarga > REFRESCO_AL_VOLVER_MS) doRefreshData(true);
+});
+setInterval(()=>{
+  if(document.visibilityState === 'visible' && Date.now() - _ultimaCarga >= REFRESCO_PERIODICO_MS - 60*1000) doRefreshData(true);
+}, REFRESCO_PERIODICO_MS);
 
 // ══════════════════════════════════════════════
 //  UPSELLING · Excel del día → Microsoft Form "UPSELLING"
@@ -6944,7 +6980,7 @@ function doLogout(){
   document.getElementById('mainPanel').style.display='block';
 }
 document.getElementById('logoutBtn').addEventListener('click',doLogout);
-document.getElementById('refreshBtn').addEventListener('click',doRefreshData);
+document.getElementById('refreshBtn').addEventListener('click',()=>doRefreshData(false));
 document.getElementById('fichajeBtn').addEventListener('click',onFichajeBtnClick);
 
 // ── Events ──
