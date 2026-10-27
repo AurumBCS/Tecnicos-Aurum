@@ -47,6 +47,19 @@ LAUNCH_ARGS = [
 ] if EN_LAMBDA else []
 
 
+def lanzar_chromium(p, headless=True, intentos=3):
+    """p.chromium.launch con reintentos: en Lambda Chromium a veces muere nada mas arrancar
+    (SIGSEGV, "Target page, context or browser has been closed"); al segundo intento suele ir bien."""
+    for n in range(1, intentos + 1):
+        try:
+            return p.chromium.launch(headless=headless, args=LAUNCH_ARGS)
+        except Exception as e:
+            if n == intentos:
+                raise
+            print(f"Chromium no arranco (intento {n}/{intentos}): {str(e).splitlines()[0]}; reintento en 5 s")
+            time.sleep(5)
+
+
 def registrar_error(script, mensaje):
     """
     Guarda un error en un log compartido (automatizacion.log), ademas de

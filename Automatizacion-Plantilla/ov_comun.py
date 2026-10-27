@@ -77,7 +77,7 @@ def abrir_ov(p, ver=False):
     """Devuelve (browser, context, page) ya dentro de la app OV."""
     global ULTIMA_ENTRADA
     bajar_sesion()
-    browser = p.chromium.launch(headless=not ver, args=LAUNCH_ARGS)
+    browser = comun_ofs.lanzar_chromium(p, headless=not ver)
     context = browser.new_context(
         storage_state=str(ARCHIVO_SESION) if ARCHIVO_SESION.exists() else None,
         accept_downloads=True, locale="es-ES", viewport={"width": 1400, "height": 900})
