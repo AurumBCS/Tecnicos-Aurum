@@ -13,9 +13,21 @@ from datetime import date, datetime
 
 from rm_reglas import _n, _panel, _peticion, _zonas_citadas
 
-DISPOSITIVO = {"MG": "magnético", "SR": "sirena", "QR": "detector con foto", "YR": "teclado/tag reader",
-               "YP": "teclado", "VV": "detector de vibración", "TI": "tag reader", "PS": "pulsador",
-               "SH": "detector de humo", "AG": "detector de agua"}
+# Prefijos de zona (confirmados por Gustavo 27/10). SRnn es el sismico del magnetico MGnn: el mismo aparato.
+DISPOSITIVO = {"MG": "magnético", "MR": "magnético", "SR": "magnético (sísmico)", "QR": "detector con foto",
+               "YR": "detector con foto", "XR": "detector con foto", "QP": "perimetral", "YP": "perimetral con foto",
+               "XP": "perimetral con foto", "KP": "teclado", "VV": "teclado", "TI": "tag reader", "TO": "tag reader",
+               "ZR": "sirena", "FR": "detector de humo", "B3": "pulsador", "DR": "cerradura (smartlock)"}
+FOTOS, MAGNETICOS, PERIMETRALES = ("QR", "YR", "XR"), ("MG", "MR"), ("QP", "YP", "XP")
+
+
+def _mismo_aparato(z):
+    """SR01 y MG01 son el mismo magnetico: se buscan las dos formas en el historico."""
+    return {z, "MG" + z[2:]} if z.startswith("SR") else {z, "SR" + z[2:]} if z.startswith("MG") else {z}
+
+
+def _cuenta(zonas, prefijos):
+    return sum(1 for z in zonas if z.get("ID", "")[:2] in prefijos)
 
 
 def _fecha(txt):
@@ -84,12 +96,18 @@ def sugerir(ficha, hoy=None):
 
     # ── zona del aviso que ya fallo antes ──
     for z in sorted(_zonas_citadas(pet_original)):
-        previas = [h for h in visitas if z in (h.get("texto") or "")]
+        previas = [h for h in visitas if any(a in (h.get("texto") or "") for a in _mismo_aparato(z))]
         if previas:
             disp = DISPOSITIVO.get(z[:2], "dispositivo")
             alertas.append(f"La zona {z} ({disp}) ya falló antes ({len(previas)} visita/s en el histórico).")
-            hacer.append(f"{z}: si vuelve a fallar no basta con pilas. Lleva {disp} para SUSTITUIR o REUBÍCALO; "
-                         "si cambias pilas otra vez, volverá.")
+            if any(re.search(r"pila|bateri|supervis", _n(h.get("texto"))) for h in previas):
+                hacer.append(f"{z}: ya fue un técnico por batería baja o supervisión. SUSTITUYE el dispositivo ({disp}); "
+                             "no se vuelven a cambiar las pilas.")
+            else:
+                hacer.append(f"{z}: si vuelve a fallar no basta con pilas. Lleva {disp} para SUSTITUIR o REUBÍCALO; "
+                             "si cambias pilas otra vez, volverá.")
+    if re.search(r"supervis", pet):
+        hacer.append("Fallo de supervisión: si no tienes el fallo muy claro, cambia el dispositivo.")
 
     if re.search(r"reincident", pet):
         hacer.append("El aviso es reincidente: SUSTITUYE el dispositivo (o reubícalo); revisar o cambiar pilas otra vez no basta.")
@@ -126,16 +144,55 @@ def sugerir(ficha, hoy=None):
     base = ult_pilas or _fecha(ficha.get("fecha_instalacion"))
     refs = ("205036 (AAA) en MG Moonshot, 7014 las AA" if panel == "Moonshot"
             else "7002 (CR123) en MG/SR, 7006 en teclado YP" if panel == "Fast" else "con su referencia")
+    zonas = ficha.get("zonas") or []
+    m = _meses(base, hoy) if base else None
     if base:
-        m = _meses(base, hoy)
         cuando = (f"último cambio de pilas hace {m} meses" if ult_pilas
                   else f"no consta cambio de pilas en el histórico (instalación hace {m} meses)")
-        if m >= 12:
-            hacer.append(f"Pilas: {cuando}. Cambia TODAS ({refs}).")
+        pequena = (_cuenta(zonas, FOTOS) <= 4 and _cuenta(zonas, MAGNETICOS) <= 6
+                   and _cuenta(zonas, PERIMETRALES) <= 2)
+        if m >= 12 and pequena:
+            hacer.append(f"Pilas: {cuando}. Más de 1 año: cambia TODAS sin excepción, vayas por lo que vayas ({refs}).")
+        elif m >= 12:
+            minimo = ("teclado de entrada, sirena y foto de entrada" if panel == "Fast"
+                      else "teclado de entrada, foto de entrada y los magnéticos por donde entran y salen")
+            hacer.append(f"Pilas: {cuando}. Instalación grande con más de 1 año: arregla el fallo y cambia como "
+                         f"mínimo {minimo} ({refs}).")
         elif m >= 6:
             hacer.append(f"Pilas: {cuando}. Como mínimo teclado o tag reader, sirena y MG1 ({refs}).")
+        # con mas de 1 año ya va arriba (todas, o el minimo de una instalacion grande)
+        if panel == "Moonshot" and 8 <= m < 12 and _cuenta(zonas, MAGNETICOS):
+            hacer.append(f"Magnéticos de puertas: {cuando}. En Moonshot se cambian cada 8 meses, aunque vayas por otra cosa.")
+        if panel == "Fast" and m >= 5 and not (m >= 12 and pequena) and _cuenta(zonas, ("FR",)):
+            hacer.append(f"Detectores de humo: {cuando}. En Fast, con más de 5 meses se cambian sus pilas aunque vayas por otra cosa.")
     elif re.search(r"pila|bateria", pet):
         hacer.append(f"Aviso de pilas sin fecha del último cambio: revisa el estado de todas ({refs}).")
+
+    # ── cerradura electrica (smartlock / DR): no sale en las zonas, se busca en los textos ──
+    textos = [ficha.get("texto_actividad") or "", ficha.get("observaciones_tecnico") or ""] + [h.get("texto") or "" for h in hist]
+    if any(re.search(r"smart ?lock|\bDR\d{2}\b", t, re.I) for t in textos):
+        f_cerr = None
+        for h in visitas:
+            t = _n(h.get("texto"))
+            if re.search(r"smart ?lock|\bdr\d{2}\b|cerradura", t) and re.search(r"pila|bateri", t):
+                f = _fecha(h.get("cierre")) or _fecha(h.get("apertura"))
+                if f and (not f_cerr or f > f_cerr):
+                    f_cerr = f
+        desde = f_cerr or base
+        mc = _meses(desde, hoy) if desde else None
+        if mc is None or mc >= 5:
+            hacer.append("Cerradura eléctrica (smartlock): " + (f"pilas cambiadas hace {mc} meses. " if mc is not None else "")
+                         + "Con más de 5 meses se cambian sus pilas aunque vayas por otra cosa.")
+
+    # ── FAST 2 ──
+    if panel == "Fast" and "vf2" in _n(ficha.get("version_panel")):
+        if re.search(r"bloqueo|fallo (de )?(la )?central|central (no|bloque)", tipo + " " + pet):
+            hacer.append("FAST 2 con bloqueo GSM o fallo de central: hay que pasarla a FAST 4."
+                         + (" Al resetear los dispositivos, cambia también las pilas de todos." if m is not None and m >= 12 else ""))
+        if re.search(r"\b2g\b", pet):
+            hacer.append("FAST 2 transmitiendo en 2G: 1) monetiza el cambio a FAST 4 (AMPLIAR); 2) si no, cambia la SIM y "
+                         "verifica que queda en 3G; 3) cambio a FAST 4 a coste 0 (AMPL F049) según zonas y riesgo en ruta: "
+                         "LLAMA OBLIGATORIAMENTE AL JE antes.")
 
     # ── comunicaciones ──
     if any(t in tipo for t in TIPOS_COM) or (not venta and re.search(r"ddi|gsm|cobertura|\bsim\b|no envia|missing|no transmite|comunicacion", pet)):
