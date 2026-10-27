@@ -119,8 +119,6 @@ def sugerir(ficha, hoy=None):
     if re.search(r"supervis", pet):
         hacer.append("Fallo de supervisión: si no tienes el fallo muy claro, cambia el dispositivo. Mide el RSSI con salto "
                      "(76-98 % o -86 a -29 dBm) y busca muros gruesos, puertas metálicas o inhibición.")
-        if len(_zonas_citadas(pet_original)) >= 3:
-            hacer.append("Varias zonas en supervisión: si no hay obstáculos y tras reubicar sigue igual, es la central: cámbiala.")
 
     if re.search(r"reincident", pet):
         hacer.append("El aviso es reincidente: SUSTITUYE el dispositivo (o reubícalo); revisar o cambiar pilas otra vez no basta.")
@@ -196,6 +194,19 @@ def sugerir(ficha, hoy=None):
     if re.search(r"\banp\b|montaje de alarma|traslado|\brbe\b", tipo):
         hacer.append("ANP / montaje por traslado / RBE: cambia las pilas de TODOS los elementos vía radio y sustituye "
                      "los dispositivos antiguos (DESM del viejo + MONT del nuevo).")
+
+    # ── fallo de supervision: arbol oficial de Pharus (All4Tech, lista FalloSupervision) ──
+    if re.search(r"supervis", pet + " " + tipo):
+        if len(_zonas_citadas(pet_original)) >= 3:
+            paso = "3 o más zonas a la vez: es el receptor RF de la central, CAMBIA LA CENTRAL"
+        elif m is not None and m >= 12:
+            paso = f"pilas de hace {m} meses (más de 1 año): CAMBIA LAS PILAS DE TODOS los dispositivos"
+        elif ult_pilas and (hoy - ult_pilas).days < 90:
+            paso = "pilas cambiadas hace menos de 3 meses: consumo excesivo, CAMBIA EL DISPOSITIVO con sus pilas"
+        else:
+            paso = "mide el voltaje: si es correcto, cambia el dispositivo con sus pilas; si no, revisa el RSSI"
+        hacer.append("Supervisión (árbol oficial): si el fallo es continuo, RSSI correcto → cambia el dispositivo con sus pilas; "
+                     f"RSSI incorrecto → reubícalo con pilas nuevas. Si es con reset: {paso}.")
 
     # ── cerradura electrica (smartlock / DR): no sale en las zonas, se busca en los textos ──
     textos = [ficha.get("texto_actividad") or "", ficha.get("observaciones_tecnico") or ""] + [h.get("texto") or "" for h in hist]
