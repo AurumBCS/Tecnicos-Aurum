@@ -86,10 +86,23 @@ def extraer_ficha(texto):
     ficha["tecnico"] = m.group(1) if m else ""
 
     # Texto de la actividad (bajo NOTAS): motivo de apertura + trabajos + observaciones del tecnico
+    # El texto puede ocupar varias lineas (peticion, notas y "**** Mant: ... Observaciones: ... ****"):
+    # se coge el bloque hasta cerrar el "**** Mant" o, si no lo hay, hasta la primera linea vacia.
     actividad = ""
     for i, l in enumerate(lineas[:-1]):
         if l.strip() == "Texto de la Actividad":
-            actividad = lineas[i + 1]
+            bloque = [x.strip() for x in lineas[i + 1:i + 16]]
+            junto = " ".join(x for x in bloque if x)
+            m = re.search(r"^(.*?\*{4}\s*Mant:.*?\*{4})", junto)
+            if m:
+                actividad = m.group(1)
+            else:
+                partes = []
+                for x in bloque:
+                    if not x or x in CAMPOS or "\t" in x:
+                        break
+                    partes.append(x)
+                actividad = " ".join(partes)
     actividad = limpiar(actividad)
     ficha["texto_actividad"] = actividad
     obs = re.search(r"Observaciones:\s*(.*?)(?:\*{4}|$)", actividad)

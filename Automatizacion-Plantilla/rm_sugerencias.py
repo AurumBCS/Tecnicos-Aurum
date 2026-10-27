@@ -165,7 +165,7 @@ def sugerir(ficha, hoy=None):
                 ult_pilas = f
     base = ult_pilas or _fecha(ficha.get("fecha_instalacion"))
     refs = ("205036 (AAA) en MG Moonshot, 7014 las AA" if panel == "Moonshot"
-            else "7002 (CR123) en MG/SR, 7006 en teclado YP" if panel == "Fast" else "con su referencia")
+            else "7002 (CR123) en MG/SR, 7006 en perimetral YP" if panel == "Fast" else "con su referencia")
     zonas = ficha.get("zonas") or []
     m = _meses(base, hoy) if base else None
     if base:
