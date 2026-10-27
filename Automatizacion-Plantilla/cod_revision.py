@@ -107,19 +107,24 @@ def revisar_y_mandar(fecha_iso, datos, modo="enviar"):
         return
     jer = _jerarquia()
     por_je = defaultdict(lambda: defaultdict(list))
+    fin_je = defaultdict(lambda: defaultdict(int))   # JE -> matricula -> partes FINL
     total = finl = 0
+    datos = list({d["numero"]: d for d in datos}.values())   # un parte puede salir en dos grupos de la ruta
     for d in datos:
         f = d.get("ficha") or {}
-        finl += (f.get("estado") or "").upper() == "FINL"
-        h = cr.revisar(f)
-        if not h:
+        if (f.get("estado") or "").upper() != "FINL":
             continue
-        total += 1
+        finl += 1
         mat = (d.get("tecnico") or f.get("tecnico") or "").upper()
         p = jer.get(mat) or jer.get(re.sub(r"^[A-Z]{2}(?=\d{6}$)", "", mat)) or {}
         je = (p.get("JE") or "").strip().upper() or "SIN JE"
         if je == "302154":
             je = "GD5381"   # los de Nicola Morsa: a Gustavo con Nicola en CCO (CORREO_FORZADO / CCO_JEFE del Apps Script)
+        fin_je[je][mat] += 1
+        h = cr.revisar(f)
+        if not h:
+            continue
+        total += 1
         por_je[je][(p.get("Nombre") or mat, mat)].append((d["numero"], f, h))
     fecha_txt = "/".join(reversed(fecha_iso.split("-")))
     jefes, resumen = [], []
@@ -127,7 +132,8 @@ def revisar_y_mandar(fecha_iso, datos, modo="enviar"):
         if je == "SIN JE":
             resumen.append(f"Sin jefe de equipo en el cuadrante: {', '.join(m for _, m in tecs)}")
             continue
-        html = cr.correo_html_corto(fecha_txt, [(n, m, [(num, h) for num, _, h in ms]) for (n, m), ms in tecs.items()])
+        html = cr.correo_html_corto(fecha_txt, [(n, m, [(num, h) for num, _, h in ms]) for (n, m), ms in tecs.items()],
+                                    fin_je[je])
         filas = [[n, m, num, f.get("tipo"), " · ".join(dict.fromkeys(cr.corto(x["texto"]) for x in h)),
                   cr._observaciones(f), cr._cod_texto(f)] for (n, m), ms in tecs.items() for num, f, h in ms]
         archivo = f"Codificacion {fecha_iso} JE {je}.xlsx"
@@ -136,13 +142,14 @@ def revisar_y_mandar(fecha_iso, datos, modo="enviar"):
         jefes.append({"codigo": je, "jde": je, "asunto": f"Partes del {fecha_txt} con la codificación mal ({n_p})",
                       "html": html, "texto": f"Partes del {fecha_txt} con la codificación mal: {n_p}.",
                       "archivo": archivo, "xlsx_b64": base64.b64encode((CARPETA / archivo).read_bytes()).decode()})
-        resumen.append(f"JE {je}: {n_p} partes de {len(tecs)} técnicos")
+        n_f = sum(fin_je[je].values())
+        resumen.append(f"JE {je}: {n_p} de {n_f} partes mal ({cr._pct(n_p, n_f)}), {len(tecs)} técnicos")
     errores = []
     if jefes:
         res = _mandar(jefes, modo)
         ok = sum(1 for r in res.get("resultado", []) if r.get("ok"))
         errores = [f"JE {r.get('jde')}: {r.get('error')}" for r in res.get("resultado", []) if not r.get("ok")]
-        resumen.insert(0, f"{fecha_txt}: {finl} partes finalizados, {total} con la codificación mal. "
+        resumen.insert(0, f"{fecha_txt}: {finl} partes finalizados, {total} con la codificación mal ({cr._pct(total, finl)}). "
                           f"Modo {res.get('modo')}: {ok}/{len(jefes)} correos ok.")
     if modo == "enviar" and jefes:
         from datetime import datetime

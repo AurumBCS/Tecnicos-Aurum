@@ -21,6 +21,7 @@ PACK_4PRO = re.compile(r"^(OXVSF4|RXVSF4)\w+$")
 ZV = {"135058", "135059", "135059F", "135104", "FOG001", "FOG003SP", "FOG100"}
 MANDOS = {"280785", "280786", "2409SP", "2410SP", "2411SP", "2412SP"}
 LLAVES = re.compile(r"^(F44\d|1313(47|48)|13137\d)$")
+MAGNETICOS = {"121272", "121295", "2250SP", "F250SP", "F252SP"}   # MG Moonshot (MC2/MC3) y Fast (MGLS/MGLS+)
 PILAS = {"7002", "7006", "7008", "7014", "205036", "205112", "205114"}
 VIEJAS = {"121272": "ya no se envía: si pusiste un MC3 va DESM 121272 + MONT 121295",
           "199005": "es un kit: no se codifica en un parte",
@@ -140,8 +141,10 @@ def revisar(ficha):
         mal("SIM", "Usa la causa 2500/2501 (Upgrade): bloquea la facturación, no se usa en mantenimientos.")
 
     # ── reubicacion ──
-    if _dice(obs, r"\breubic") and not res_de("REUB"):
-        mal("reubicación", "Reubica y no codifica la REUB del dispositivo.")
+    # la REUB no hace falta codificarla si el comentario dice que se reubica
+    # parte de reubicacion: el comentario dice que se reubica o que el cliente no la quiere
+    if "reubicacion" in tipo and not _dice(obs, r"re ?h?ubic|reunic|no (quiere|desea|acepta)|rechaza"):
+        mal("reubicación", "Parte de reubicación y el comentario no dice que se reubique: si no se hace, poner que el cliente no quiere la reubicación.")
 
     # ── desmontajes ──
     if _dice(obs, r"se (desmonta|elimina|retira)n? (\d+ ?)?(mg|magnetico|foto|tag|sirena|teclado|dispositivo|sentinel|centinel)") \
@@ -149,7 +152,7 @@ def revisar(ficha):
         mal("desmontaje", "Dice que desmonta o elimina dispositivos y no codifica el DESM/DESU.")
     m = re.search(r"(?:elimina|desmonta|retira)n? (\d+) ?(?:mg|magneticos?)", obs)
     if m:
-        n_desm = sum(int(l["n"] or 1) for l in lin if l["res"] in ("DESM", "DESU") and l["item"] not in PILAS)
+        n_desm = sum(int(l["n"] or 1) for l in lin if l["res"] in ("DESM", "DESU") and l["item"] in MAGNETICOS)
         if n_desm and n_desm != int(m.group(1)):
             mal("desmontaje", f"Dice que quita {m.group(1)} magnéticos y codifica {n_desm}.")
 
@@ -180,7 +183,11 @@ def revisar(ficha):
         mal("pilas", "Dice que cambia pilas y no hay ninguna pila codificada ('Añadir pilas').")
 
     # ── comunicaciones ──
-    if re.search(r"bloqueo|no transmite|missing|gsm|cobertura", tipo + " " + pet) and \
+    # bloqueo GSM: en el comentario si se conecto a internet, o el cambio de SIM codificado
+    gsm = "bloqueos gsm" in tipo
+    if gsm and not a4 and not items & SIMS and not _dice(obs, r"internet|router|wifi|wi-fi|ethernet|cable de red|\bsim\b|tarjeta|chip"):
+        mal("comunicaciones", "Bloqueo GSM: poner en el comentario si se conectó a internet o, si se cambió la SIM, codificarla (MONT).")
+    if not gsm and re.search(r"bloqueo|no transmite|missing|gsm|cobertura", tipo + " " + pet) and \
             not (items & SIMS or a4 or any(l["causa"] == "7052" for l in lin)
                  or _dice(obs, r"cobertura|\bsim\b|router|wifi|internet|operador|antena|ethernet|fuente|corriente|bateria de (la )?central")):
         mal("comunicaciones", "Aviso de comunicaciones y no consta nada de comunicaciones (SIM, cobertura, router, causa 7052).")
@@ -268,6 +275,8 @@ CORTO = [
     (r"fuente o batería de la central", "Fuente/batería central sin codificar"),
     (r"Cambia la SIM y no la codifica", "SIM sin codificar (MONT)"),
     (r"2500/2501", "Causa 2500/2501 prohibida"),
+    (r"Bloqueo GSM: poner", "Bloqueo GSM: ¿internet o SIM?"),
+    (r"Parte de reubicación y", "Reubicación: no dice si se hizo"),
     (r"no codifica la REUB", "Falta REUB"),
     (r"desmonta o elimina dispositivos", "Desmontaje sin codificar"),
     (r"quita (\d+) magnéticos y codifica (\d+)", r"Quita \1 MG, codifica \2"),
@@ -292,17 +301,28 @@ def corto(texto):
     return texto
 
 
-def correo_html_corto(fecha, tecnicos):
-    """tecnicos: lista de (nombre, matricula, [(numero, [hallazgos])]). Una línea por mantenimiento."""
+def _pct(a, b):
+    return f"{round(100 * a / b)} %" if b else "-"
+
+
+def correo_html_corto(fecha, tecnicos, finalizados=None):
+    """tecnicos: lista de (nombre, matricula, [(numero, [hallazgos])]). Una línea por mantenimiento.
+    finalizados: {matricula: partes FINL del dia} del equipo, para el porcentaje de partes mal codificados."""
     n_mant = sum(len(ms) for _, _, ms in tecnicos)
+    fin = finalizados or {}
+    n_fin = sum(fin.values())
+    resumen = (f'<p>Tu equipo finalizó <b>{n_fin}</b> mantenimientos y <b>{n_mant}</b> tienen la codificación mal: '
+               f'<b>{_pct(n_mant, n_fin)}</b> de mala ejecución ({len(fin)} técnicos, media de '
+               f'{n_mant / len(fin):.1f} partes mal por técnico).</p>' if n_fin else "")
     bloques = ""
     for nombre, mat, ms in sorted(tecnicos, key=lambda t: -len(t[2])):
         lineas = "".join(f'<li style="margin:2px 0"><b>{_e(num)}</b> · {_e(" · ".join(dict.fromkeys(corto(h["texto"]) for h in hall)))}</li>'
                          for num, hall in ms)
-        bloques += (f'<p style="margin:14px 0 4px"><b>{_e(nombre)}</b> ({_e(mat)}) — {len(ms)}</p>'
+        cuenta = f"{len(ms)} de {fin[mat]} ({_pct(len(ms), fin[mat])})" if fin.get(mat) else str(len(ms))
+        bloques += (f'<p style="margin:14px 0 4px"><b>{_e(nombre)}</b> ({_e(mat)}) — {cuenta}</p>'
                     f'<ul style="margin:0;padding-left:18px">{lineas}</ul>')
     return f"""<div style="font-family:Arial,sans-serif;font-size:14px;color:#222;max-width:680px;line-height:1.45">
 <p>Hola,</p>
 <p>Partes del <b>{_e(fecha)}</b> con la codificación mal (<b>{n_mant}</b>). Avisa a cada técnico para que lo corrija:</p>
-{bloques}
+{resumen}{bloques}
 <p>Gustavo Perez<br>Aurum BC Security SL</p></div>"""
