@@ -142,9 +142,6 @@ def revisar(ficha):
 
     # ── reubicacion ──
     # la REUB no hace falta codificarla si el comentario dice que se reubica
-    # parte de reubicacion: el comentario dice que se reubica o que el cliente no la quiere
-    if "reubicacion" in tipo and not _dice(obs, r"re ?h?ubic|reunic|no (quiere|desea|acepta)|rechaza"):
-        mal("reubicación", "Parte de reubicación y el comentario no dice que se reubique: si no se hace, poner que el cliente no quiere la reubicación.")
 
     # ── desmontajes ──
     if _dice(obs, r"se (desmonta|elimina|retira)n? (\d+ ?)?(mg|magnetico|foto|tag|sirena|teclado|dispositivo|sentinel|centinel)") \
@@ -187,10 +184,8 @@ def revisar(ficha):
     gsm = "bloqueos gsm" in tipo
     if gsm and not a4 and not items & SIMS and not _dice(obs, r"internet|router|wifi|wi-fi|ethernet|cable de red|\bsim\b|tarjeta|chip"):
         mal("comunicaciones", "Bloqueo GSM: poner en el comentario si se conectó a internet o, si se cambió la SIM, codificarla (MONT).")
-    if not gsm and re.search(r"bloqueo|no transmite|missing|gsm|cobertura", tipo + " " + pet) and \
-            not (items & SIMS or a4 or any(l["causa"] == "7052" for l in lin)
-                 or _dice(obs, r"cobertura|\bsim\b|router|wifi|internet|operador|antena|ethernet|fuente|corriente|bateria de (la )?central")):
-        mal("comunicaciones", "Aviso de comunicaciones y no consta nada de comunicaciones (SIM, cobertura, router, causa 7052).")
+    # (sin aviso generico de comunicaciones: lo disparaba la nota automatica "Missing Test... comprobar
+    # cobertura" de Verisure y no es un error de codificacion; Gustavo, 28/10)
 
     # quitar repetidos manteniendo el orden
     vistos, out = set(), []
@@ -276,7 +271,6 @@ CORTO = [
     (r"Cambia la SIM y no la codifica", "SIM sin codificar (MONT)"),
     (r"2500/2501", "Causa 2500/2501 prohibida"),
     (r"Bloqueo GSM: poner", "Bloqueo GSM: ¿internet o SIM?"),
-    (r"Parte de reubicación y", "Reubicación: no dice si se hizo"),
     (r"no codifica la REUB", "Falta REUB"),
     (r"desmonta o elimina dispositivos", "Desmontaje sin codificar"),
     (r"quita (\d+) magnéticos y codifica (\d+)", r"Quita \1 MG, codifica \2"),
