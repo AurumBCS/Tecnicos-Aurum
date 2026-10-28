@@ -48,7 +48,9 @@ jobs:
           REGISTRO: ${{ steps.ecr-login.outputs.registry }}
         run: |
           IMAGEN="$REGISTRO/$ECR_REPOSITORIO:${{ github.sha }}"
-          docker build -t "$IMAGEN" -t "$REGISTRO/$ECR_REPOSITORIO:latest" .
+          # Sin provenance/sbom: desde el 28/10/2026 el Docker del runner anade un "attestation
+          # manifest" y Lambda rechaza la imagen ("image manifest ... media type ... is not supported").
+          docker build --provenance=false --sbom=false -t "$IMAGEN" -t "$REGISTRO/$ECR_REPOSITORIO:latest" .
           docker push "$IMAGEN"
           docker push "$REGISTRO/$ECR_REPOSITORIO:latest"
           echo "IMAGEN=$IMAGEN" >> "$GITHUB_ENV"
