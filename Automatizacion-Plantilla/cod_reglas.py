@@ -61,12 +61,21 @@ def _dice(obs, patron):
     return bool(re.search(patron, obs))
 
 
+def no_revisable(ficha):
+    """Montajes, upgrades y documentaciones (ALTA): no traen codificacion de material que revisar."""
+    tipo = _n(ficha.get("tipo"))
+    if re.search(r"anp remoto|(?<!des)montaje de alarma|upgrade", tipo):
+        return True
+    cods = ficha.get("codificaciones") or []
+    return bool(cods) and all((c.get("RESOLUCION") or "").upper() == "ALTA" for c in cods)
+
+
 def revisar(ficha):
     if (ficha.get("estado") or "").upper() != "FINL":
         return []      # CERR (en negro en la consola) = no se realizo: no hay parte que revisar
-    tipo = _n(ficha.get("tipo"))
-    if re.search(r"desmontaje de alarma|anp remoto|montaje de alarma", tipo):
+    if no_revisable(ficha):
         return []      # partes manuales / documentacion: no se revisan aqui
+    tipo = _n(ficha.get("tipo"))
     if any((c.get("RESOLUCION") or "").upper() == "ERRO" for c in ficha.get("codificaciones") or []):
         return []
     obs_original = _observaciones(ficha)

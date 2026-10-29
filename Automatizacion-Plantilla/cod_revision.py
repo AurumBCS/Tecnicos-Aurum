@@ -112,7 +112,7 @@ def revisar_y_mandar(fecha_iso, datos, modo="enviar"):
     datos = list({d["numero"]: d for d in datos}.values())   # un parte puede salir en dos grupos de la ruta
     for d in datos:
         f = d.get("ficha") or {}
-        if (f.get("estado") or "").upper() != "FINL":
+        if (f.get("estado") or "").upper() != "FINL" or cr.no_revisable(f):
             continue
         finl += 1
         mat = (d.get("tecnico") or f.get("tecnico") or "").upper()
