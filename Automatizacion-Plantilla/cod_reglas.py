@@ -31,7 +31,7 @@ VIEJAS = {"121272": "ya no se envía: si pusiste un MC3 va DESM 121272 + MONT 12
 PILAS_POR_ZONA = {
     # la 7014 la llevan muchos dispositivos distintos (y no todos salen en zonas): no se cuenta
     "Moonshot": [("205036", "2", ("MG", "MR"))],
-    "Fast": [("7002", "1", ("MG", "FG"))],
+    "Fast": [("7002", "1", ("MG", "FG", "B3"))],   # B3 = pulsador SOS (feedback JE 29/10)
 }
 
 
@@ -79,6 +79,9 @@ def revisar(ficha):
     if any((c.get("RESOLUCION") or "").upper() == "ERRO" for c in ficha.get("codificaciones") or []):
         return []
     obs_original = _observaciones(ficha)
+    cods = ficha.get("codificaciones") or []
+    if not obs_original and cods and not any((c.get("ID ITEM") or "").strip() for c in cods):
+        return []      # cerrado con soporte: lineas sin referencia y sin observaciones (feedback JE 29/10)
     obs = _n(obs_original)
     pet = _n((ficha.get("texto_actividad") or "").split("****")[0])
     panel = _panel(ficha)
@@ -120,6 +123,9 @@ def revisar(ficha):
 
     # ── misma referencia montada y desmontada: es una SUST ──
     misma = {l["item"] for l in res_de("MONT")} & {l["item"] for l in lin if l["res"] in ("DESM", "DESU")}
+    # perdida/robo: el viejo no vuelve a DF, asi que DESU + MONT es correcto (feedback JE 29/10)
+    if _dice(obs, r"perdid|extravi|robad|robo\b|no se recupera"):
+        misma -= {l["item"] for l in res_de("DESU")}
     for it in misma:
         mal("sustitución", f"MONT + DESM/DESU de la misma referencia {it}: si es la misma referencia es una SUST.")
     # ── sustitucion por otra referencia con DESU: lo retirado va a DF (DESM) ──
@@ -133,7 +139,9 @@ def revisar(ficha):
     if sustituye and not sust_disp:
         if res_de("DESM") and not res_de("MONT"):
             mal("sustitución", "Dice que sustituye y solo codifica el DESM: falta el MONT del dispositivo nuevo.")
-        elif res_de("MONT") and not (res_de("DESM") or res_de("DESU")):
+        elif [l for l in res_de("MONT") if l["item"] not in SIMS] and not (res_de("DESM") or res_de("DESU") or res_de("MONU")) \
+                and not _dice(obs, r"instalacion anterior|otra instalacion"):
+            # la SIM no se desmonta y lo que viene de otra instalacion (MONU) no tiene DESM (feedback JE 29/10)
             mal("sustitución", "Dice que sustituye y solo codifica el MONT: si es la misma referencia va SUST; "
                                "si es otra, DESM del viejo + MONT del nuevo.")
         elif not disp:
@@ -191,7 +199,10 @@ def revisar(ficha):
     # ── comunicaciones ──
     # bloqueo GSM: en el comentario si se conecto a internet, o el cambio de SIM codificado
     gsm = "bloqueos gsm" in tipo
-    if gsm and not a4 and not items & SIMS and not _dice(obs, r"internet|router|wifi|wi-fi|ethernet|cable de red|\bsim\b|tarjeta|chip"):
+    # vale tambien si comprueba que transmite / senales ok o cambia la central: el bloqueo no siempre es
+    # de la central o la SIM, a veces lo abre la voz del cliente (feedback JE 29/10)
+    if gsm and not a4 and not items & SIMS and not _dice(obs, r"internet|router|wifi|wi-fi|ethernet|cable de red|\bsim\b|tarjeta|chip"
+                                                         r"|transmi|senales (ok|correct)|operativ|(camb|sustitu)\w* (de )?(la )?central"):
         mal("comunicaciones", "Bloqueo GSM: falta indicar en observaciones si se conectó a internet (si se cambió la SIM, codificarla con MONT).")
     # (sin aviso generico de comunicaciones: lo disparaba la nota automatica "Missing Test... comprobar
     # cobertura" de Verisure y no es un error de codificacion; Gustavo, 28/10)
