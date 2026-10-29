@@ -128,7 +128,8 @@ def revisar(ficha):
     for it in misma:
         mal("sustitución", f"MONT + DESM de la misma referencia {it}: si es la misma referencia es una SUST.")
     # ── dice que sustituye y solo hay medio cambio ──
-    sustituye = _dice(obs, r"se sustitu\w* (?!(el |la |los |las )?(bater|pila|sim\b|fuente|zv|zero|canula))(el |la |los |las )?\w+|se cambia (el |la )?(magnetico|sirena|foto|teclado|tag)")
+    sustituye = _dice(obs, r"se sustitu\w* (?!(el |la |los |las |un |una |dos |tres |cuatro |\d+ )*(bater|pila|sim\b|fuente|zv|zero|canula|bases?\b|soportes?\b))(el |la |los |las )?\w+|se cambia (el |la )?(magnetico|sirena|foto|teclado|tag)")
+    # las bases y soportes (p. ej. base de magnetico) son piezas que no se codifican (Gustavo, 29/10)
     sust_disp = [l for l in res_de("SUST") if l["item"] not in PILAS]
     if sustituye and not sust_disp:
         if res_de("DESM") and not res_de("MONT"):
