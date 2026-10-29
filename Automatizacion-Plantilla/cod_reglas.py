@@ -122,17 +122,11 @@ def revisar(ficha):
             mal("referencia", f"{l['res']} de {l['item']}: {VIEJAS[l['item']]}.")
 
     # ── misma referencia montada y desmontada: es una SUST ──
-    misma = {l["item"] for l in res_de("MONT")} & {l["item"] for l in lin if l["res"] in ("DESM", "DESU")}
-    # perdida/robo: el viejo no vuelve a DF, asi que DESU + MONT es correcto (feedback JE 29/10)
-    if _dice(obs, r"perdid|extravi|robad|robo\b|no se recupera"):
-        misma -= {l["item"] for l in res_de("DESU")}
+    # DESM (se lo lleva el tecnico) y DESU (se lo queda el cliente, o perdida) valen los dos al retirar (Gustavo, 29/10):
+    # solo MONT + DESM de la misma referencia deberia ser SUST
+    misma = {l["item"] for l in res_de("MONT")} & {l["item"] for l in res_de("DESM")}
     for it in misma:
-        mal("sustitución", f"MONT + DESM/DESU de la misma referencia {it}: si es la misma referencia es una SUST.")
-    # ── sustitucion por otra referencia con DESU: lo retirado va a DF (DESM) ──
-    desu_otra = [l for l in res_de("DESU") if l["item"] not in misma]
-    if res_de("MONT") and desu_otra and not _dice(obs, r"perdid|extravi|se lo queda|cliente se queda|no se recupera|altura"):
-        mal("sustitución", "Sustituye por otra referencia y lo retirado va como DESU: si te lo llevas es DESM (DESU solo si "
-                           "se lo queda el cliente o no se recupera).")
+        mal("sustitución", f"MONT + DESM de la misma referencia {it}: si es la misma referencia es una SUST.")
     # ── dice que sustituye y solo hay medio cambio ──
     sustituye = _dice(obs, r"se sustitu\w* (?!(el |la |los |las )?(bater|pila|sim\b|fuente|zv|zero|canula))(el |la |los |las )?\w+|se cambia (el |la )?(magnetico|sirena|foto|teclado|tag)")
     sust_disp = [l for l in res_de("SUST") if l["item"] not in PILAS]
@@ -143,7 +137,7 @@ def revisar(ficha):
                 and not _dice(obs, r"instalacion anterior|otra instalacion"):
             # la SIM no se desmonta y lo que viene de otra instalacion (MONU) no tiene DESM (feedback JE 29/10)
             mal("sustitución", "Dice que sustituye y solo codifica el MONT: si es la misma referencia va SUST; "
-                               "si es otra, DESM del viejo + MONT del nuevo.")
+                               "si es otra, DESM (o DESU si se lo queda el cliente) del viejo + MONT del nuevo.")
         elif not disp:
             mal("sustitución", "Dice que sustituye un dispositivo y no está codificado (SUST con su referencia).")
     if _dice(obs, r"sustitu\w* (la )?(zv|zero ?vision|canula)") and not items & ZV:
@@ -221,7 +215,7 @@ MEJORAS = {
     "sin codificar": "Codificar siempre el motivo del aviso y todo lo instalado: lo que no se codifica descuadra el stock.",
     "4PRO": "Pase a 4PRO: con pack (OXVSF4…/RXVSF4…) la fuente F055 y el soporte F057 ya van dentro; con la central F049 suelta "
             "se codifican también F055 y F057. Siempre DESM de la Fast 2 y MONT de la SIM nueva; si se cambia la batería, SUST de la F013.",
-    "sustitución": "Misma referencia → SUST. Otra referencia → DESM del viejo + MONT del nuevo. DESU solo si el cliente se lo queda.",
+    "sustitución": "Misma referencia → SUST. Otra referencia → MONT del nuevo + DESM (te lo llevas) o DESU (se lo queda el cliente).",
     "pilas": "'Añadir pilas' solo en los dispositivos en los que únicamente se cambian pilas: lo sustituido o ampliado ya lleva las suyas.",
     "SIM": "La SIM se codifica en Añadir trabajos con su referencia y resolución MONT (nunca 'Datos de SIM' ni causa 2500/2501).",
     "reubicación": "Todo lo que se reubica va codificado como REUB.",
@@ -281,8 +275,7 @@ CORTO = [
     (r"^AMPL de 9082|9082", "Batería 9082 → F013"),
     (r"121272", "121272 → si es MC3: DESM 121272 + MONT 121295"),
     (r"es un kit", "Kit en el parte"),
-    (r"misma referencia (\S+): si es", "Misma referencia: SUST, no MONT + DESU/DESM"),
-    (r"lo retirado va como DESU", "Retirado: DESM, no DESU"),
+    (r"misma referencia (\S+): si es", "Misma referencia: SUST, no MONT + DESM"),
     (r"solo codifica el DESM", "Sustitución: falta MONT del nuevo"),
     (r"solo codifica el MONT", "Sustitución: falta DESM/SUST"),
     (r"sustituye un dispositivo y no está", "Sustitución sin codificar"),
