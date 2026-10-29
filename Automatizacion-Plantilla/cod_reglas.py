@@ -192,7 +192,7 @@ def revisar(ficha):
     # bloqueo GSM: en el comentario si se conecto a internet, o el cambio de SIM codificado
     gsm = "bloqueos gsm" in tipo
     if gsm and not a4 and not items & SIMS and not _dice(obs, r"internet|router|wifi|wi-fi|ethernet|cable de red|\bsim\b|tarjeta|chip"):
-        mal("comunicaciones", "Bloqueo GSM: poner en el comentario si se conectó a internet o, si se cambió la SIM, codificarla (MONT).")
+        mal("comunicaciones", "Bloqueo GSM: falta indicar en observaciones si se conectó a internet (si se cambió la SIM, codificarla con MONT).")
     # (sin aviso generico de comunicaciones: lo disparaba la nota automatica "Missing Test... comprobar
     # cobertura" de Verisure y no es un error de codificacion; Gustavo, 28/10)
 
@@ -279,7 +279,7 @@ CORTO = [
     (r"fuente o batería de la central", "Fuente/batería central sin codificar"),
     (r"Cambia la SIM y no la codifica", "SIM sin codificar (MONT)"),
     (r"2500/2501", "Causa 2500/2501 prohibida"),
-    (r"Bloqueo GSM: poner", "Bloqueo GSM: ¿internet o SIM?"),
+    (r"Bloqueo GSM: falta indicar", "Bloqueo GSM: indicar en observaciones si se conectó a internet"),
     (r"no codifica la REUB", "Falta REUB"),
     (r"desmonta o elimina dispositivos", "Desmontaje sin codificar"),
     (r"quita (\d+) magnéticos y codifica (\d+)", r"Quita \1 MG, codifica \2"),
