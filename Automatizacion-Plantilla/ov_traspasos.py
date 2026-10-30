@@ -176,7 +176,7 @@ def main(respaldo=False):
     except Exception as e:
         registrar_error("ov_traspasos", str(e))
         siguiente = ("Lanzalo a mano desde Lambda -> Test con {\"tarea\": \"traspasos_diario\"}." if respaldo
-                     else "A las 9:30 el respaldo lo intenta otra vez solo.")
+                     else "Ya no hay respaldo automatico: avisa a Claude y se lanza desde el Mac.")
         enviar_aviso(f"Traspasos {hoy:%d/%m}: fallo" + (" (respaldo)" if respaldo else ""),
                      f"El aviso de traspasos sin completar fallo:\n\n{e}\n\n{siguiente}")
         raise

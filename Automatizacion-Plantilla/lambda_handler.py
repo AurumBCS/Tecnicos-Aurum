@@ -86,6 +86,12 @@ def handler(event, context):
             f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/ofs_rm_prueba/rm_analizar/upselling_envio): {event}"
         )
 
+    if (event or {}).get("respaldo"):
+        # Respaldos retirados (30/10/2026): si falla la tarea, Gustavo avisa a Claude y se lanza desde el Mac.
+        # Las reglas de EventBridge siguen llamando, pero no se hace nada.
+        print(f"[lambda] respaldo de {tarea} desactivado: no se hace nada")
+        return {"ok": True, "respaldo": "desactivado"}
+
     if tarea == "listar_buckets":
         # Diagnostico de una sola vez -- ver listar_buckets.py.
         import listar_buckets

@@ -183,7 +183,7 @@ def main(respaldo=False):
     except Exception as e:
         registrar_error("ov_recuentos", str(e))
         siguiente = ("Lanzalo a mano desde Lambda -> Test con {\"tarea\": \"recuentos_semanal\"}." if respaldo
-                     else "A las 12:00 el respaldo lo intenta otra vez solo.")
+                     else "Ya no hay respaldo automatico: avisa a Claude y se lanza desde el Mac.")
         enviar_aviso(f"Recuentos {hoy}: fallo" + (" (respaldo)" if respaldo else ""),
                      f"El control semanal de recuentos fallo:\n\n{e}\n\n{siguiente}")
         raise
