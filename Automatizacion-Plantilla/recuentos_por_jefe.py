@@ -53,7 +53,7 @@ c["JDE"] = c["JDE"].replace(REASIGNAR_JDE)
 c["Nombre"] = (c["Nombre(S)"].str.strip() + " " + c["Apellidos(S)"].fillna("").str.strip()).str.strip()
 nombres = c.set_index("Matricula")["Nombre"].to_dict()
 # Las filas 1-24 del cuadrante (encabezados + PM, ADM, COORD y JDE) no entran en el control
-activos = c[(c["Fila"] > 24) & (c["Jerarquia"] == "5 TEC") & c["F Baja"].isna()].copy()
+activos = c[(c["Fila"] > 24) & c["Jerarquia"].fillna("").str.upper().str.endswith(" TEC") & c["F Baja"].isna()].copy()
 # Sin fecha de Inicio TOA (columna O) = nuevo ingreso: no entran en el control ni en los correos
 _tiene_toa = activos["Inicio TOA"].map(lambda v: isinstance(v, datetime))
 nuevo_ingreso = activos[~_tiene_toa].copy()

@@ -90,7 +90,7 @@ def leer_cuadrante(ruta, exigir_toa=True):
     c["JDE"] = c["JDE"].astype(str).str.strip().str.upper().str.replace(r"\.0$", "", regex=True).replace(REASIGNAR_JDE)
     c["Nombre"] = (c["Nombre(S)"].str.strip() + " " + c["Apellidos(S)"].fillna("").str.strip()).str.strip()
     nombres = c.set_index("Matricula")["Nombre"].to_dict()
-    activos = c[(c["Fila"] > 24) & (c["Jerarquia"] == "5 TEC") & c["F Baja"].isna()]
+    activos = c[(c["Fila"] > 24) & c["Jerarquia"].fillna("").str.upper().str.endswith(" TEC") & c["F Baja"].isna()]
     if exigir_toa:
         activos = activos[activos["TOA"].notna()]
     return activos, nombres
