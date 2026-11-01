@@ -4,7 +4,7 @@ Pre-conteo: stock del sistema de cada técnico con un conteo PERIÓDICO pendient
 (Mi equipo -> Pre-conteo), vea el descuadre exacto y qué dejarle o quitarle para quedar en ±100 €.
 
   1. Entra a la app OV (ov_comun.abrir_ov: reutiliza la sesión de la tarea de traspasos de las 8:00).
-  2. Lee los conteos periódicos en "Entrada Pendiente".
+  2. Lee los conteos periódicos en "Entrada Pendiente" (sin los técnicos de baja en el cuadrante).
   3. Para cada técnico: Technicians/Installers -> Manage Subinventories (organización PESIAU o PESIAT,
      trabajador = matrícula, Buscar, pulsar el importe de "Valor Stock") -> Acciones -> Descargar -> CSV.
      Bueno y DF, con importe y cantidad (precio = importe / cantidad).
@@ -127,13 +127,17 @@ def stock_tecnico(page, org, mat):
     return lineas, valor
 
 
-def _jefes():
-    """Jefe de equipo de cada matrícula desde el cuadrante completo (?type=recuentos, incluye bajas)."""
+def _cuadrante():
+    """(jefe de equipo de cada matrícula, matrículas de baja) desde el cuadrante completo (?type=recuentos)."""
     url = os.environ["RECUENTOS_SCRIPT_URL"].strip() + "?type=recuentos&token=" + os.environ["RECUENTOS_APP_TOKEN"].strip()
     with urllib.request.urlopen(url, timeout=120) as r:
         filas = list(csv.DictReader(io.StringIO(r.read().decode())))
-    return {f["Matricula"].strip().upper(): REASIGNAR_JDE.get(f["JDE"].strip().upper(), f["JDE"].strip().upper())
-            for f in filas if f.get("Matricula")}
+    jefes = {f["Matricula"].strip().upper(): REASIGNAR_JDE.get(f["JDE"].strip().upper(), f["JDE"].strip().upper())
+             for f in filas if f.get("Matricula")}
+    # De baja: con fecha en "F Baja" o jerarquía "99 BAJA" (01/11: de momento no entran en el pre-conteo)
+    bajas = {f["Matricula"].strip().upper() for f in filas if f.get("Matricula")
+             and ((f.get("F Baja") or "").strip() or "BAJA" in (f.get("Jerarquia") or "").upper())}
+    return jefes, bajas
 
 
 def _subir(fecha, tecnicos, catalogo):
@@ -156,7 +160,7 @@ def main(modo=None):
     CARPETA.mkdir(parents=True, exist_ok=True)
     catalogo = json.loads((AQUI / "items_catalogo.json").read_text(encoding="utf-8"))
     try:
-        jefes = _jefes()
+        jefes, bajas = _cuadrante()
         with sync_playwright() as p:
             browser, context, page = abrir_ov(p, ver="--ver" in sys.argv)
             try:
@@ -165,6 +169,9 @@ def main(modo=None):
                                 "nombre": "", "creado": "", "stock_conteo": ""}]
                 else:
                     conteos = conteos_pendientes(page)
+                    for c in [c for c in conteos if c["mat"] in bajas]:
+                        print(f"[preconteo] {c['conteo']} {c['mat']} {c['nombre']}: de baja en el cuadrante, no se sube")
+                    conteos = [c for c in conteos if c["mat"] not in bajas]
                 print(f"[preconteo] conteos periódicos pendientes: {len(conteos)}")
                 pend = pendientes_por_tecnico(page) if conteos else {}
                 for c in conteos:
