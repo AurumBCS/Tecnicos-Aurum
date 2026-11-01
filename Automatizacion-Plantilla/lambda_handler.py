@@ -15,6 +15,8 @@ Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "devoluciones_diario", "respaldo": true} -> L-V 13:00, solo si el de las 11:00 no salio
   {"tarea": "traspasos_diario"} -> L-V 8:00, aviso de traspasos InterWorker sin completar (ver ov_traspasos.py)
   {"tarea": "traspasos_diario", "respaldo": true} -> L-V 9:30, solo si el de las 8:00 no salio
+      (despues de traspasos, con la misma sesion: pre-conteo, ver ov_preconteo.py)
+  {"tarea": "preconteo"} -> solo el pre-conteo (manual)
   {"tarea": "ofs_rm_prueba"} -> prueba (manual): buscar mantenimientos repetidos en Oracle (ver ofs_rm_prueba.py)
   {"tarea": "rm_analizar", "mes": "Septiembre"} -> analiza las RM del mes para el dashboard de la app y se
                                   relanza sola hasta acabar (ver rm_analizar.py)
@@ -81,9 +83,9 @@ def handler(event, context):
     if isinstance(event, dict) and "requestContext" in event:
         return _desde_url(event, context)
     tarea = (event or {}).get("tarea")
-    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "ofs_rm_prueba", "rm_analizar", "upselling_envio"):
+    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "preconteo", "ofs_rm_prueba", "rm_analizar", "upselling_envio"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/ofs_rm_prueba/rm_analizar/upselling_envio): {event}"
+            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/preconteo/ofs_rm_prueba/rm_analizar/upselling_envio): {event}"
         )
 
     if (event or {}).get("respaldo"):
@@ -116,7 +118,25 @@ def handler(event, context):
         # Avisa de los traspasos InterWorker de dias anteriores sin aceptar (tecnicos + jefes).
         import ov_traspasos
 
-        _correr(lambda: ov_traspasos.main(respaldo=bool(event.get("respaldo"))), "ov_traspasos")
+        error = None
+        try:
+            _correr(lambda: ov_traspasos.main(respaldo=bool(event.get("respaldo"))), "ov_traspasos")
+        except Exception as e:
+            error = e
+        # Pre-conteo con la misma sesion de la app OV: stock de los tecnicos con conteo periodico pendiente.
+        # Si falla, no afecta a traspasos (avisa por su cuenta).
+        try:
+            import ov_preconteo
+
+            ov_preconteo.main()
+        except Exception as e:
+            print(f"[lambda] pre-conteo fallo: {e}")
+        if error:
+            raise error
+    elif tarea == "preconteo":
+        import ov_preconteo
+
+        _correr(ov_preconteo.main, "ov_preconteo")
     elif tarea == "ofs_rm_prueba":
         # Busca unos mantenimientos repetidos en Oracle y manda capturas/observaciones/historial.
         import ofs_rm_prueba

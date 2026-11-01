@@ -541,6 +541,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <!-- Uso de Confirmaciones SMS del equipo (hoy en vivo + días anteriores) -->
       <div id="equipoConfirmaciones" style="margin-bottom:14px"></div>
 
+      <!-- Pre-conteo: contar el coche del técnico antes del conteo periódico -->
+      <div id="equipoPreconteo" style="margin-bottom:14px"></div>
+
       <!-- Hero métricas promedio -->
       <div class="section-head">Promedios del equipo</div>
       <div class="hero-metrics" id="equipoHero"></div>
@@ -1657,6 +1660,7 @@ function renderEquipoPanel(jeId){
   `;
 
   renderConfirmacionesEquipo(jeId);
+  renderPreconteo(jeId);
   document.getElementById('equipoKpis').innerHTML = kpiHtml;
 
   // ── Rankings del equipo: mantenimientos, ventas, conversión, 20% ──
@@ -3886,6 +3890,207 @@ function fechaCortaUsoSms(iso){
   const dias=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
   const d=new Date(iso+'T12:00:00');
   return isNaN(d)?iso:dias[d.getDay()]+' '+iso.slice(8,10)+'/'+iso.slice(5,7);
+}
+
+// ── Pre-conteo (Mi equipo del JE) ─────────────────────────────────────────
+// El JE cuenta el coche del técnico antes del conteo periódico: la app compara con el stock del sistema
+// (lo sube la Lambda a las 8:00, ov_preconteo.py), da el descuadre exacto y qué dejarle o quitarle para
+// quedar en ±PC_OBJETIVO €. Las confusiones de referencia que se compensan (F250SP/F252SP...) se dejan así.
+const PRECONTEO_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=preconteo&token=" + APP_TOKEN;
+const PRECONTEO_POST_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=preconteo-fisico";
+const PC_OBJETIVO = 100, PC_LIMITE = 300;
+const PC_FAMILIAS = [
+  ['Magnéticos Moonshot',['121272','121295']], ['Cámaras Arlo',['322050V','322070V']],
+  ['Paneles solares Arlo',['325603','326600','327600']], ['Sirenas Moonshot',['131179','131179IN']],
+  ['Orion',['120213','120213T']], ['Perimetrales Moonshot',['120221','120264']],
+  ['Cánulas Zerovision',['130958','FOG001','135104','135059']], ['Centrales Moonshot',['182083','182084']],
+  ['Magnéticos Fast',['F250SP','F252SP']], ['Sirenas Fast',['F500SP','F505SP']], ['Kits Moonshot',['199005','199013','199001']],
+  ['Baterías central',['F013','9082']], ['MOK',['134039V','134052V']], ['Centrales Fast 4',['F045','F049']],
+  ['Llaves Fast',['F443','F444','F445','F446','F447','F448','F449']],
+  ['Tags Moonshot',['131347','131348','131370','131371','131372','131373','131374','131375','131376','131377','131378','131379']],
+  ['Kit Arlo (cambio del almacén)',['340001V','340004']], ['Cámara Arlo (cambio del almacén)',['322050V','322050']],
+];
+let PC_DATOS = {}, PC_ACTUAL = null, PC_EXTRA = {};
+
+function pcEur(v, signo=true){ const s = Math.round(v).toLocaleString('es-ES'); return (signo && v>0 ? '+' : '') + s + ' €'; }
+function pcEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function renderPreconteo(jeId, recargar){
+  const el = document.getElementById('equipoPreconteo');
+  if(!el || !jeId) return;
+  const cab = '<div class="section-head" style="margin-top:0">🧮 Pre-conteo</div>';
+  let d = PC_DATOS[jeId];
+  if(recargar || !d){
+    el.innerHTML = cab + '<div style="color:var(--text2);font-size:.78rem;padding:8px 2px">Cargando…</div>';
+    try{
+      const res = await fetchConReintento(PRECONTEO_URL + '&je=' + encodeURIComponent(jeId) + '&t=' + Date.now(), {cache:'no-store'});
+      d = await res.json();
+      if(!d.ok) throw new Error(d.error||'error');
+      PC_DATOS[jeId] = d;
+    }catch(e){
+      el.innerHTML = cab + `<div style="color:var(--text2);font-size:.78rem;padding:8px 2px">No se pudo cargar. <a href="#" onclick="renderPreconteo('${jeId}',true);return false" style="color:var(--gold2)">Reintentar</a></div>`;
+      return;
+    }
+  }
+  if(PC_ACTUAL && d.tecnicos.some(t=>t.conteo===PC_ACTUAL)) return pcEditor(jeId, PC_ACTUAL);
+  const lista = d.tecnicos.map(t => {
+    const hecho = t.fisico ? `<span style="color:var(--green);font-weight:700">Contado ${pcEsc(t.fisico_guardado)}</span>` : '<span style="color:var(--gold2)">Pendiente de contar</span>';
+    return `<button onclick="pcEditor('${jeId}','${pcEsc(t.conteo)}')" style="display:block;width:100%;text-align:left;padding:10px 12px;margin-top:6px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);cursor:pointer">
+      <div style="font-size:.85rem;font-weight:700">${pcEsc(t.nombre || ROSTER_NOMBRES[t.mat] || t.mat)} <span style="color:var(--text2);font-weight:400">(${pcEsc(t.mat)})</span></div>
+      <div style="font-size:.72rem;color:var(--text2)">Conteo ${pcEsc(t.conteo)} · stock ${pcEsc(t.valor)} € · ${hecho}${t.pendientes.length?` · <span style="color:#e05a4a">⚠ ${t.pendientes.length} pendiente(s)</span>`:''}</div></button>`;
+  }).join('');
+  el.innerHTML = cab + `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
+    <div style="font-size:.78rem;color:var(--text2)">Cuenta el coche del técnico <b>antes</b> del conteo periódico: te digo el descuadre y qué dejarle o quitarle para quedar en ±${PC_OBJETIVO} €.</div>
+    ${lista || '<div style="font-size:.8rem;margin-top:8px">No hay conteos periódicos pendientes en tu equipo.</div>'}
+    <button onclick="renderPreconteo('${jeId}',true)" style="margin-top:10px;width:100%;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.78rem;cursor:pointer">↻ Actualizar</button></div>`;
+}
+
+function pcLineas(t, cat){
+  // Una línea por subinventario + referencia: sistema (cantidad, precio) y lo contado
+  const map = {};
+  t.lineas.forEach(l => {
+    const k = l.sub + '|' + l.item;
+    map[k] = {k, sub:l.sub, item:l.item, desc:l.desc || (cat[l.item]||{}).d || '', sis:+l.cant,
+              precio: l.cant ? l.importe / l.cant : ((cat[l.item]||{}).p || 0)};
+  });
+  Object.keys(PC_EXTRA[t.conteo]||{}).forEach(k => {
+    if(map[k]) return;
+    const [sub, item] = k.split('|');
+    map[k] = {k, sub, item, desc:(cat[item]||{}).d || '', sis:0, precio:(cat[item]||{}).p || 0, extra:true};
+  });
+  return Object.values(map).sort((a,b) => (a.sub===t.mat?0:1)-(b.sub===t.mat?0:1) || a.item.localeCompare(b.item));
+}
+
+function pcEditor(jeId, conteo){
+  PC_ACTUAL = conteo;
+  const d = PC_DATOS[jeId], t = d.tecnicos.find(x=>x.conteo===conteo), cat = d.catalogo || {};
+  const fis = t.fisico || {};
+  const filas = pcLineas(t, cat).map(l => `<tr>
+      <td style="padding:4px 6px;border-top:1px solid var(--border2)"><b>${pcEsc(l.item)}</b>${l.sub!==t.mat?' <span style="color:var(--gold2);font-size:.65rem">DF</span>':''}
+        <div style="font-size:.66rem;color:var(--text2)">${pcEsc(l.desc)}</div></td>
+      <td style="padding:4px 6px;border-top:1px solid var(--border2);text-align:right;${l.sis<0?'color:#e05a4a;font-weight:700':''}">${l.sis}</td>
+      <td style="padding:4px 6px;border-top:1px solid var(--border2);text-align:right">
+        <input data-k="${pcEsc(l.k)}" type="number" inputmode="numeric" min="0" step="1" value="${fis[l.k]!=null?fis[l.k]:''}"
+          style="width:64px;padding:5px;background:var(--s2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);text-align:right"></td></tr>`).join('');
+  const opciones = Object.keys(cat).sort().map(i=>`<option value="${pcEsc(i)}">${pcEsc(cat[i].d||'')}</option>`).join('');
+  document.getElementById('equipoPreconteo').innerHTML = `<div class="section-head" style="margin-top:0">🧮 Pre-conteo</div>
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
+    <button onclick="PC_ACTUAL=null;renderPreconteo('${jeId}')" style="background:none;border:none;color:var(--gold2);font-size:.78rem;cursor:pointer;padding:0">← Volver</button>
+    <div style="font-size:.9rem;font-weight:800;margin:6px 0 2px">${pcEsc(t.nombre || ROSTER_NOMBRES[t.mat] || t.mat)} (${pcEsc(t.mat)})</div>
+    <div style="font-size:.72rem;color:var(--text2)">Conteo ${pcEsc(t.conteo)} · stock del sistema del ${pcEsc(t.fecha)} (${pcEsc(t.valor)} €)</div>
+    ${t.pendientes.length ? `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,90,74,.12);font-size:.74rem"><b style="color:#e05a4a">⚠ Antes del recuento tiene que dejar hecho:</b><br>${t.pendientes.map(pcEsc).join('<br>')}</div>` : ''}
+    <div style="font-size:.74rem;color:var(--text2);margin:10px 0 6px">Escribe lo que hay en el coche (bueno y DF). Lo que dejes vacío cuenta como 0.</div>
+    <button onclick="pcCopiarSistema()" style="padding:6px 10px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:.72rem;cursor:pointer">Rellenar con el sistema</button>
+    <div style="overflow-x:auto;margin-top:8px"><table id="pcTabla" style="width:100%;border-collapse:collapse;font-size:.78rem">
+      <tr style="color:var(--text2);font-size:.68rem"><th style="text-align:left;padding:4px 6px">Referencia</th><th style="text-align:right;padding:4px 6px">Sistema</th><th style="text-align:right;padding:4px 6px">En el coche</th></tr>${filas}</table></div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <input id="pcNueva" list="pcCatalogo" placeholder="Añadir referencia" style="flex:1;padding:6px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:.75rem">
+      <select id="pcNuevaSub" style="padding:6px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:.75rem"><option value="${pcEsc(t.mat)}">Bueno</option><option value="${pcEsc(t.mat)}DF">DF</option></select>
+      <button onclick="pcAnadir('${jeId}')" style="padding:6px 10px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:.75rem;cursor:pointer">+</button>
+      <datalist id="pcCatalogo">${opciones}</datalist></div>
+    <div style="display:flex;gap:6px;margin-top:12px">
+      <button onclick="pcCalcular('${jeId}')" style="flex:1;padding:10px;background:var(--gold2);border:none;border-radius:10px;color:#111;font-weight:800;cursor:pointer">Calcular</button>
+      <button onclick="pcGuardar('${jeId}')" style="flex:1;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-weight:700;cursor:pointer">Guardar</button></div>
+    <div id="pcResultado" style="margin-top:12px"></div>
+    <div id="pcEstado" style="font-size:.7rem;color:var(--text2);margin-top:6px">${t.fisico_guardado?'Guardado el '+pcEsc(t.fisico_guardado)+' por '+pcEsc(t.fisico_por):''}</div>
+  </div>`;
+  if(t.fisico) pcCalcular(jeId);
+}
+
+function pcLeerFisico(){
+  const f = {};
+  document.querySelectorAll('#pcTabla input[data-k]').forEach(i => { if(i.value!=='') f[i.dataset.k] = Math.max(0, parseInt(i.value,10)||0); });
+  return f;
+}
+function pcCopiarSistema(){
+  document.querySelectorAll('#pcTabla input[data-k]').forEach(i => {
+    const sis = +i.closest('tr').children[1].textContent;
+    if(i.value==='') i.value = Math.max(0, sis);
+  });
+}
+function pcAnadir(jeId){
+  const item = document.getElementById('pcNueva').value.trim().toUpperCase(), sub = document.getElementById('pcNuevaSub').value;
+  if(!item) return;
+  const fis = pcLeerFisico();
+  (PC_EXTRA[PC_ACTUAL] = PC_EXTRA[PC_ACTUAL] || {})[sub+'|'+item] = 1;
+  const t = PC_DATOS[jeId].tecnicos.find(x=>x.conteo===PC_ACTUAL);
+  t.fisico = Object.assign({}, t.fisico||{}, fis);
+  pcEditor(jeId, PC_ACTUAL);
+}
+
+function pcCalcular(jeId){
+  const d = PC_DATOS[jeId], t = d.tecnicos.find(x=>x.conteo===PC_ACTUAL), cat = d.catalogo || {};
+  const fis = pcLeerFisico();
+  const lineas = pcLineas(t, cat);
+  let vacias = 0, sinPrecio = [];
+  lineas.forEach(l => {
+    if(fis[l.k]==null){ vacias += (l.sis>0); l.fis = 0; } else l.fis = fis[l.k];
+    l.dif = l.fis - l.sis; l.aj = l.dif * l.precio;
+    if(l.dif && !l.precio) sinPrecio.push(l.item);
+  });
+  const total = lineas.reduce((a,l)=>a+l.aj, 0);
+  // Confusiones que se compensan (mismo subinventario, una referencia de menos y otra de la familia de más)
+  const comp = [];
+  PC_FAMILIAS.forEach(([fam, refs]) => {
+    const subs = [...new Set(lineas.map(l=>l.sub))];
+    subs.forEach(sub => {
+      const fl = lineas.filter(l=>l.sub===sub && refs.includes(l.item) && l.dif);
+      const menos = fl.filter(l=>l.dif<0), mas = fl.filter(l=>l.dif>0);
+      if(menos.length && mas.length) comp.push(`${fam}: ${menos.map(l=>l.item+' '+l.dif).join(', ')} / ${mas.map(l=>l.item+' +'+l.dif).join(', ')}`);
+    });
+  });
+  // Orden para acercar el recuento a 0: quitar si sale a favor (+), dejar si sale en contra (-)
+  const plan = [];
+  if(Math.abs(total) > PC_OBJETIVO){
+    let resto = Math.abs(total);
+    const aFavor = total > 0;
+    // Quitar: solo lo que está en el coche, primero lo que le sobra (coche > sistema). Dejar: primero lo que le falta.
+    const propias = lineas.filter(l => l.sub===t.mat && l.precio>0 && (aFavor ? (l.dif>0 && l.fis>0) : l.dif<0)).sort((a,b)=>b.precio-a.precio);
+    const otras = lineas.filter(l => l.sub===t.mat && l.precio>=15 && l.precio<=200 && !propias.includes(l) && (aFavor ? l.fis>0 : l.sis>0)).sort((a,b)=>b.precio-a.precio);
+    [[propias, l=>aFavor ? Math.min(l.dif, l.fis) : -l.dif], [otras, l=>aFavor ? l.fis : 3]].forEach(([grupo, maxUd]) => {
+      grupo.forEach(l => {
+        if(resto <= PC_OBJETIVO*0.5) return;
+        const n = Math.min(maxUd(l), Math.floor((resto + PC_OBJETIVO*0.3) / l.precio));
+        if(n >= 1){ plan.push({l, n}); resto -= n*l.precio; }
+      });
+    });
+  }
+  const tras = total - Math.sign(total) * plan.reduce((a,p)=>a+p.n*p.l.precio, 0);
+  const color = Math.abs(total)<=PC_OBJETIVO ? 'var(--green)' : Math.abs(total)<=PC_LIMITE ? 'var(--gold2)' : '#e05a4a';
+  const difs = lineas.filter(l=>l.dif).sort((a,b)=>Math.abs(b.aj)-Math.abs(a.aj));
+  const verbo = total > 0 ? 'Quítale' : 'Déjale';
+  document.getElementById('pcResultado').innerHTML = `
+    <div style="text-align:center;padding:12px;border-radius:10px;background:var(--s2);border-top:3px solid ${color}">
+      <div style="font-size:1.5rem;font-weight:800;color:${color}">${pcEur(total)}</div>
+      <div style="font-size:.7rem;color:var(--text2)">Descuadre si el recuento fuera ahora (objetivo ±${PC_OBJETIVO} €, límite ±${PC_LIMITE} €)</div></div>
+    ${vacias ? `<div style="font-size:.72rem;color:var(--gold2);margin-top:6px">⚠ ${vacias} referencia(s) del sistema sin rellenar: cuentan como 0.</div>` : ''}
+    ${sinPrecio.length ? `<div style="font-size:.72rem;color:var(--gold2);margin-top:4px">Sin precio conocido: ${sinPrecio.map(pcEsc).join(', ')}.</div>` : ''}
+    <div style="font-size:.82rem;font-weight:800;margin:12px 0 4px">Qué hacer</div>
+    ${Math.abs(total)<=PC_OBJETIVO ? `<div style="font-size:.8rem;color:var(--green)">✅ Dentro de ±${PC_OBJETIVO} €: no hace falta dejarle ni quitarle nada.</div>` :
+      `<div style="font-size:.8rem">${verbo} ${total>0?'del coche':'de tu excedente'}:</div>
+       <ul style="font-size:.8rem;margin:4px 0 0 18px;padding:0">${plan.map(p=>`<li>${p.n} × <b>${pcEsc(p.l.item)}</b> ${pcEsc(p.l.desc)} (${pcEur(p.n*p.l.precio,false)})</li>`).join('')}</ul>
+       <div style="font-size:.8rem;margin-top:4px">Con eso quedaría en <b>${pcEur(tras)}</b>.</div>`}
+    ${comp.length ? `<div style="font-size:.82rem;font-weight:800;margin:12px 0 4px">Se compensan (no tocar)</div><div style="font-size:.74rem;color:var(--text2)">${comp.map(pcEsc).join('<br>')}</div>` : ''}
+    <div style="font-size:.82rem;font-weight:800;margin:12px 0 4px">Diferencias (${difs.length})</div>
+    <table style="width:100%;border-collapse:collapse;font-size:.74rem">${difs.map(l=>`<tr>
+      <td style="padding:3px 6px;border-top:1px solid var(--border2)">${pcEsc(l.item)}${l.sub!==t.mat?' DF':''} <span style="color:var(--text2)">${pcEsc(l.desc)}</span></td>
+      <td style="padding:3px 6px;border-top:1px solid var(--border2);text-align:right">${l.sis} → ${l.fis}</td>
+      <td style="padding:3px 6px;border-top:1px solid var(--border2);text-align:right;color:${l.aj<0?'#e05a4a':'var(--green)'}">${pcEur(l.aj)}</td></tr>`).join('')}</table>`;
+}
+
+async function pcGuardar(jeId){
+  const est = document.getElementById('pcEstado');
+  est.textContent = 'Guardando…';
+  const fisico = pcLeerFisico();
+  try{
+    const res = await fetch(PRECONTEO_POST_URL, {method:'POST', body: JSON.stringify({token: APP_TOKEN, je: jeId, conteo: PC_ACTUAL, fisico})});
+    const r = await res.json();
+    if(!r.ok) throw new Error(r.error);
+    const t = PC_DATOS[jeId].tecnicos.find(x=>x.conteo===PC_ACTUAL);
+    t.fisico = fisico; t.fisico_guardado = r.guardado; t.fisico_por = jeId;
+    est.textContent = 'Guardado el ' + r.guardado;
+    pcCalcular(jeId);
+  }catch(e){ est.textContent = 'No se pudo guardar: ' + e.message; }
 }
 
 // ── Apartado en "Mi equipo" del JE ─────────────────────────────────────────
