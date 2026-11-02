@@ -651,6 +651,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="sync-dot"></div>
       Conexiones registradas por matrícula
     </div>
+    <div id="usoSeccionesContent" style="margin-bottom:18px"></div>
+    <div style="font-weight:800;color:var(--gold2);font-size:.9rem;margin-bottom:8px">🔌 Conexiones a la app</div>
     <select id="mesSelectorUsage" onchange="renderUsagePanel(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
       <option value="">Total (todo el histórico)</option>
     </select>
@@ -780,6 +782,13 @@ const RM_ANALISIS_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-S
 const RUTA_SUG_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=ruta-sugerencias&token=" + APP_TOKEN;
 const RM_MESES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=rm-meses&token=" + APP_TOKEN;
 const TRACK_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=track&token=" + APP_TOKEN;
+const USO_SECCIONES_URL = TRACK_URL.replace('type=track&', 'type=usage-secciones&');
+// Quién ha iniciado sesión, para registrar qué pantallas abre (ver registrarSeccion)
+let USUARIO_TRACK_ID = '';
+function registrarSeccion(seccion, tecId){
+  if(!USUARIO_TRACK_ID) return;
+  fetch(TRACK_URL+'&mat='+encodeURIComponent(USUARIO_TRACK_ID)+'&seccion='+seccion+'&tec='+encodeURIComponent(tecId||''), {mode:'no-cors'}).catch(()=>{});
+}
 const USAGE_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=usage&token=" + APP_TOKEN;
 const JERARQUIA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=jerarquia&token=" + APP_TOKEN;
 const MESES_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=meses&token=" + APP_TOKEN;
@@ -1412,7 +1421,7 @@ function switchTab(tab){
     document.getElementById('tabJEs').classList.toggle('active', tab==='jes');
     document.getElementById('tabUso').classList.toggle('active', tab==='uso');
     document.getElementById('tabUsoSms').classList.toggle('active', tab==='usoSms');
-    if(tab==='uso'){ showPanel('usagePanel'); renderUsagePanel(); }
+    if(tab==='uso'){ showPanel('usagePanel'); renderUsagePanel(); renderUsoSecciones(); }
     else if(tab==='usoSms'){ showPanel('usoSmsPanel'); renderUsoSmsPanel(); }
     else { showPanel('jrPanel'); }
   }
@@ -2564,12 +2573,14 @@ let _dashJeId = null;   // jeId usado si _dashBackPanel==='equipoPanel'
 let _rmBackPanel = 'detailPanel';
 function showRMDashFromTec(tecId){
   _rmBackPanel = 'tecDetailPanel';
+  registrarSeccion('rm', tecId);
   _openRMDash(tecId);
 }
 
 // showRMDashFromEquipoDash: abre el dashboard RM individual desde el ranking del equipo (JE)
 function showRMDashFromEquipoDash(tecId){
   _rmBackPanel = 'equipoDashPanel';
+  registrarSeccion('rm', tecId);
   _openRMDash(tecId);
 }
 
@@ -2578,6 +2589,7 @@ function showRMDashFromEquipoDash(tecId){
 // ══════════════════════════════════════════════
 function showRMDash(tecId){
   _rmBackPanel = 'mainPanel';
+  registrarSeccion('rm', tecId);
   _openRMDash(tecId);
 }
 
@@ -2628,6 +2640,7 @@ function renderMananaCard(tecId, containerId, backPanel){
 }
 
 function showManana(tecId, backPanel){
+  registrarSeccion('sugerencias', tecId);
   _mananaBack = backPanel || 'mainPanel';
   const filas = rsFilasDe(tecId);
   const tec = (CURRENT_DATA.tecnicos||[]).find(t=>rsMat(t.id)===rsMat(tecId));
@@ -3759,6 +3772,100 @@ function nombreMesUsage(clave){
   const nombresMeses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const [anio, mes] = clave.split('-');
   return nombresMeses[parseInt(mes,10)-1] + ' ' + anio;
+}
+
+// ── Sugerencias y dashboard de RM: cuántas veces abre cada persona cada pantalla ──
+let USO_SECCIONES = null;
+let USO_SECCIONES_DIA = null;
+const USO_SECCIONES_DIAS_ATRAS = 31;
+
+function fechaIsoUsoSeccion(diasAtras){
+  const d = new Date(); d.setDate(d.getDate()-diasAtras);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+async function renderUsoSecciones(recargar){
+  const el = document.getElementById('usoSeccionesContent');
+  const cab = '<div style="font-weight:800;color:var(--gold2);font-size:.9rem;margin-bottom:8px">🧰 Sugerencias y 📊 dashboard de RM</div>';
+  if(recargar || !USO_SECCIONES){
+    el.innerHTML = cab+'<div style="color:var(--text2);font-size:.78rem;padding:6px 0">Cargando…</div>';
+    try{
+      const res = await fetchConReintento(USO_SECCIONES_URL+'&desde='+fechaIsoUsoSeccion(USO_SECCIONES_DIAS_ATRAS)+'&t='+Date.now(),{cache:'no-store'});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const txt = await res.text();
+      if(!/^fecha,hora,mat,seccion,tec/.test(txt.trim())) throw new Error('respuesta inesperada');
+      USO_SECCIONES = parseCSV(txt);
+    }catch(e){
+      el.innerHTML = cab+'<div style="color:var(--text2);font-size:.78rem;padding:6px 0">No se pudieron cargar los datos. <a href="#" onclick="renderUsoSecciones(true);return false" style="color:var(--gold2)">Reintentar</a></div>';
+      return;
+    }
+  }
+  const hoy = fechaIsoUsoSeccion(0);
+  const dias = [...new Set(USO_SECCIONES.map(r=>r.fecha).concat(hoy))].sort().reverse();
+  if(!USO_SECCIONES_DIA || (USO_SECCIONES_DIA!=='todo' && !dias.includes(USO_SECCIONES_DIA))) USO_SECCIONES_DIA = hoy;
+  const dia = USO_SECCIONES_DIA;
+  const ev = dia==='todo' ? USO_SECCIONES : USO_SECCIONES.filter(r=>r.fecha===dia);
+
+  const por = {};
+  ev.forEach(r=>{
+    const m = rsMat(r.mat);
+    const x = por[m] || (por[m] = {sug:0, rm:0, ultimo:''});
+    if(r.seccion==='sugerencias') x.sug++;
+    else if(r.seccion==='rm') x.rm++;
+    if(dia!=='todo' && r.hora>x.ultimo) x.ultimo = r.hora;
+  });
+
+  // Equipos: los mismos que en "Uso confirmaciones" (Tenerife con GD5381); los
+  // coordinadores tienen a los JE dentro de JERARQUIA y aquí no son un equipo.
+  const COORD = ['JR9426','CM9651','JN4767','BLAS.ALVAREZ','BA8006'];
+  const base = {};
+  Object.keys(JERARQUIA).filter(je=>!COORD.includes(je)).forEach(je=>{ base[je] = [je].concat(JERARQUIA[je]||[]); });
+  const jer = jerarquiaUsoSms({jerarquia:base});
+  const nombre = m => ROSTER_NOMBRES[m] || JE_NAMES[m] || m;
+  const celda = (v,color) => `<td style="padding:5px 6px;text-align:center;${v?'font-weight:700;color:'+color:'color:var(--text2)'}">${v||0}</td>`;
+  const fila = (m,esJE) => {
+    const x = por[rsMat(m)] || {sug:0,rm:0,ultimo:''};
+    return `<tr style="border-top:1px solid var(--border2)">
+      <td style="padding:5px 8px;font-size:.78rem">${esJE?'⭐ ':''}${nombre(m)}<div style="font-size:.66rem;color:var(--text2)">${m}${x.ultimo?' · '+x.ultimo:''}</div></td>
+      ${celda(x.sug,'var(--gold2)')}${celda(x.rm,'#4a90e2')}</tr>`;
+  };
+  const cabT = '<tr style="background:var(--s2);color:var(--text2);font-size:.64rem;text-transform:uppercase;letter-spacing:.04em"><th style="padding:5px 8px;text-align:left">Persona</th><th style="padding:5px 6px">🧰 Sug.</th><th style="padding:5px 6px">📊 RM</th></tr>';
+  const vistos = new Set();
+  const tarjetas = Object.keys(jer).filter(je=>(jer[je]||[]).length>1)
+    .sort((a,b)=>nombre(a).localeCompare(nombre(b))).map(je=>{
+      const tecs = [...new Set(jer[je])].filter(m=>m!==je);
+      tecs.concat(je).forEach(m=>vistos.add(rsMat(m)));
+      // Primero los que menos han abierto, para ver quién no lo revisa
+      const total = m => { const x=por[rsMat(m)]; return x?x.sug+x.rm:0; };
+      tecs.sort((a,b)=>total(a)-total(b) || nombre(a).localeCompare(nombre(b)));
+      const conSug = tecs.filter(m=>(por[rsMat(m)]||{}).sug).length, conRm = tecs.filter(m=>(por[rsMat(m)]||{}).rm).length;
+      return `<details style="background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:8px 10px;margin-bottom:6px">
+        <summary style="cursor:pointer;font-size:.8rem;display:flex;justify-content:space-between;gap:8px">
+          <b style="color:var(--gold2)">${nombre(je)}</b>
+          <span style="font-size:.72rem;white-space:nowrap">🧰 ${conSug}/${tecs.length} · 📊 ${conRm}/${tecs.length}</span>
+        </summary>
+        <div style="overflow-x:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse">${cabT}${fila(je,true)}${tecs.map(m=>fila(m,false)).join('')}</table></div>
+      </details>`;
+    }).join('');
+  const otros = Object.keys(por).filter(m=>!vistos.has(m)).sort();
+  const bloqueOtros = otros.length ? `<details style="background:var(--s1);border:1px solid var(--border2);border-radius:10px;padding:8px 10px;margin-bottom:6px">
+      <summary style="cursor:pointer;font-size:.8rem;font-weight:700;color:var(--gold2)">Coordinadores y otros (${otros.length})</summary>
+      <div style="overflow-x:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse">${cabT}${otros.map(m=>fila(m,false)).join('')}</table></div>
+    </details>` : '';
+
+  const totSug = ev.filter(r=>r.seccion==='sugerencias').length, totRm = ev.filter(r=>r.seccion==='rm').length;
+  const opciones = dias.map(f=>`<option value="${f}" ${f===dia?'selected':''}>${f===hoy?'Hoy · ':''}${fechaCortaUsoSms(f)}</option>`).join('')
+    + `<option value="todo" ${dia==='todo'?'selected':''}>Últimos ${USO_SECCIONES_DIAS_ATRAS} días (total)</option>`;
+  const estilo = 'flex:1;background:var(--s1);border-radius:12px;padding:10px;border:1px solid var(--border2);text-align:center';
+  el.innerHTML = cab + `
+    <select onchange="USO_SECCIONES_DIA=this.value;renderUsoSecciones()" style="width:100%;margin-bottom:10px;padding:9px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700">${opciones}</select>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div style="${estilo}"><div style="font-size:1.3rem;font-weight:800;color:var(--gold2)">${totSug}</div><div style="font-size:.7rem;color:var(--text2)">Veces en sugerencias</div></div>
+      <div style="${estilo}"><div style="font-size:1.3rem;font-weight:800;color:#4a90e2">${totRm}</div><div style="font-size:.7rem;color:var(--text2)">Veces en dashboard RM</div></div>
+    </div>
+    ${tarjetas}${bloqueOtros}
+    <div style="font-size:.68rem;color:var(--text2);margin:4px 0 8px">Las veces que cada persona abrió cada pantalla, desde que se empezó a registrar (02/11/2026). Si el JE lo abre en la ficha de un técnico, cuenta para el JE. Un técnico sin ruta cargada no tiene tarjeta de sugerencias ese día.</div>
+    <button onclick="renderUsoSecciones(true)" style="width:100%;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.78rem;cursor:pointer">↻ Actualizar</button>`;
 }
 
 function renderUsagePanel(mesSeleccionado){
@@ -6583,6 +6690,7 @@ async function doLogin(){
 
   // Registrar acceso (fire-and-forget)
   const _trackId = found.type==='tecnico' ? found.tec.id : found.id;
+  USUARIO_TRACK_ID = _trackId;
   fetch(TRACK_URL + '&mat=' + encodeURIComponent(_trackId), {mode:'no-cors'}).catch(()=>{});
 
   if(found.type==='control-fichajes'){
