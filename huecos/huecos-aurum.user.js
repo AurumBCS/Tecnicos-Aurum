@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Huecos Aurum
 // @namespace    https://aurumbcs.github.io/Tecnicos-Aurum/
-// @version      2026.11.02.1532
+// @version      2026.11.02.1645
 // @description  Lista de llamadas para rellenar huecos de técnicos y asignar a la hora pedida, encima de Oracle Field Service.
 // @author       Aurum BC Security SL
 // @match        https://securitasdirect.fs.ocs.oraclecloud.com/*
@@ -356,14 +356,22 @@ function panelHuecos(soloGanchos) {
 
     var lista = [], prev = null;   // prev = actividad después de la que irá la nueva
     function finDe(x) { return x.eta + (x.length || 0); }
+    function ahoraMin() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+    // Solo se puede colocar detrás de lo ya hecho o empezado, nunca entre medias
+    function ajustar(x) {
+      var ult = null;
+      lista.forEach(function (y) { if (y.status !== 'pending') ult = y; });
+      if (!ult) return x;
+      return !x || lista.indexOf(x) < lista.indexOf(ult) ? ult : x;
+    }
     function pintarRuta() {
       ruta.textContent = '';
       var h = aMin(inHora.value.trim());
       lista.forEach(function (x) {
         var fila = el('div', { class: 'fila' + (x === prev ? ' sel' : '') }, hhmm(x.eta) + '–' + hhmm(finDe(x)) + '  ' + etiqueta(x));
-        fila.onclick = function () { prev = x; actualizar(); };
+        fila.onclick = function () { prev = ajustar(x); actualizar(); };
         ruta.appendChild(fila);
-        if (x === prev) ruta.appendChild(el('div', { class: 'aqui' }, '▶ Aquí va la nueva: Mto ' + a.mto + ', hacia las ' + hhmm(Math.max(finDe(x), h == null ? 0 : h))));
+        if (x === prev) ruta.appendChild(el('div', { class: 'aqui' }, '▶ Aquí va la nueva: Mto ' + a.mto + ', hacia las ' + hhmm(Math.max(finDe(x), ahoraMin(), h == null ? 0 : h))));
       });
     }
     // Aviso previo: si no encaja con la hora pedida o si lo que viene detrás se va a retrasar
@@ -374,8 +382,9 @@ function panelHuecos(soloGanchos) {
       if (!prev) return;
       var h = aMin(inHora.value.trim()), sig = lista[lista.indexOf(prev) + 1], avisos = [];
       if (h != null && finDe(prev) > h + 30) avisos.push('Esa actividad termina a las ' + hhmm(finDe(prev)) + ', más tarde de la hora que pide el cliente.');
-      if (h != null && h > finDe(prev) + 30) avisos.push('La anterior termina a las ' + hhmm(finDe(prev)) + ': Oracle puede ponerla antes de las ' + hhmm(h) + '. Lo verás al asignar.');
-      var fin = Math.max(finDe(prev), h == null ? 0 : h) + (a.min || 45);
+      var libre = Math.max(finDe(prev), ahoraMin());
+      if (h != null && h > libre + 30) avisos.push('El técnico queda libre a las ' + hhmm(libre) + ': Oracle puede ponerla antes de las ' + hhmm(h) + '. Lo verás al asignar.');
+      var fin = Math.max(libre, h == null ? 0 : h) + (a.min || 45);
       if (sig && sig.eta < fin) avisos.push('Lo siguiente (' + hhmm(sig.eta) + ' ' + etiqueta(sig) + ') se retrasará unos ' + (fin - sig.eta) + ' min o más (sin contar el viaje).');
       if (avisos.length) { res.className = 'mal'; res.textContent = 'Ojo: ' + avisos.join(' '); }
     }
@@ -387,7 +396,7 @@ function panelHuecos(soloGanchos) {
     inHora.oninput = function () {
       var h = aMin(inHora.value.trim());
       if (h == null) { actualizar(); return; }
-      prev = propuesta(lista, h);
+      prev = ajustar(propuesta(lista, h));
       actualizar();
       if (!prev && lista.length) { res.className = 'mal'; res.textContent = 'A esa hora el técnico aún no ha terminado ninguna actividad: pulsa en la ruta después de cuál va.'; }
     };
@@ -401,9 +410,9 @@ function panelHuecos(soloGanchos) {
       post('index.php?m=activity&a=assignment', empaquetar({
         pid: A.pid, target_pid: tecnico.pid, loadListOnly: 1, listType: 'providers', target_date: hoyISO(),
         get_data: false, form_submitted: true,
-        moving_activities: [{ aid: a.aid, prev: prev.aid, date: '3000-01-01', pid: String(a.bucket) }]
+        moving_activities: [{ aid: a.aid, prev: prev.status === 'pending' ? prev.aid : 0, date: '3000-01-01', pid: String(a.bucket) }]
       })).then(function (j) {
-        if (!j || j.result !== 'success') throw new Error('Oracle no ha permitido la asignación' + (j && (j.message || j.error) ? ': ' + (j.message || j.error) : '.'));
+        if (!j || j.errors || j.result !== 'success') throw new Error('Oracle no ha permitido la asignación. Respuesta de Oracle: ' + JSON.stringify(j).slice(0, 400));
         return rutaHoy(tecnico.pid);
       }).then(function (l) {
         var nueva = l.filter(function (x) { return x.aid === a.aid; })[0];
@@ -711,7 +720,7 @@ function botonHuecos() {
   var b = document.createElement('button');
   b.id = 'aurum-huecos-boton';
   b.textContent = 'Huecos';
-  b.title = 'Abrir o cerrar el panel de huecos (v2026.11.02.1532)';
+  b.title = 'Abrir o cerrar el panel de huecos (v2026.11.02.1645)';
   b.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147482999;padding:8px 14px;border-radius:18px;border:0;background:#1d1d1f;color:#fff;font:600 13px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
   b.onclick = function () { panelHuecos(false); };
   document.body.appendChild(b);
