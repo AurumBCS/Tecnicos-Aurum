@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Huecos Aurum
 // @namespace    https://aurumbcs.github.io/Tecnicos-Aurum/
-// @version      2026.11.02.1025
+// @version      2026.11.02.1130
 // @description  Lista de llamadas para rellenar huecos de técnicos y asignar a la hora pedida, encima de Oracle Field Service.
 // @author       Aurum BC Security SL
 // @match        https://securitasdirect.fs.ocs.oraclecloud.com/*
@@ -35,6 +35,10 @@ function panelHuecos(soloGanchos) {
     XMLHttpRequest.prototype.open = function (m, u) { this.__aurumUrl = u; return oOpen.apply(this, arguments); };
     XMLHttpRequest.prototype.setRequestHeader = function (k, v) { if (k === 'X-OFS-CSRF-SECURE') A.csrf = v; return oHdr.apply(this, arguments); };
     XMLHttpRequest.prototype.send = function (b) {
+      // La sincronización de Oracle lleva un dato de sesión ("trust") que hace falta para leer la ficha completa
+      if (typeof FormData !== 'undefined' && b instanceof FormData && /m=sync/.test(this.__aurumUrl || '')) {
+        try { if (b.get('trust')) A.trust = b.get('trust'); if (b.get('u')) A.login = b.get('u'); } catch (e) {}
+      }
       if (typeof b === 'string') {
         try {
           if (/nearbyjobs&a=list/.test(this.__aurumUrl || '')) A.pid = JSON.parse(decodeURIComponent(b.replace(/^_ajax_json_packed_data=/, '').replace(/\+/g, ' '))).pid;
@@ -274,6 +278,20 @@ function panelHuecos(soloGanchos) {
   [['ultima', 'su última actividad de hoy'], ['vivo', 'su posición en vivo'], ['habitual', 'su zona habitual']].forEach(function (o) { selCentro.appendChild(el('option', { value: o[0] }, o[1])); });
   fila2.appendChild(selCentro);
   head.appendChild(fila2);
+  // Pestañas para ver solo negocios o solo residencias (p. ej. en festivo los negocios están cerrados)
+  var filtro = 'todos';
+  try { filtro = localStorage.getItem(KEY + '.filtro') || 'todos'; } catch (e) {}
+  var pestanas = el('div'); pestanas.style.cssText = 'display:flex;gap:0;flex:1 1 100%;border:1px solid #bbb;border-radius:6px;overflow:hidden';
+  [['todos', 'Todos'], ['negocios', '★ Negocios'], ['residencias', 'Residencias']].forEach(function (o) {
+    var b = el('button', { 'data-f': o[0] }, o[1]); b.style.cssText = 'flex:1;border:0;border-radius:0;margin:0';
+    b.onclick = function () { filtro = o[0]; try { localStorage.setItem(KEY + '.filtro', filtro); } catch (e) {} marcarPestana(); pintar(); };
+    pestanas.appendChild(b);
+  });
+  function marcarPestana() {
+    Array.prototype.forEach.call(pestanas.children, function (b) { var on = b.getAttribute('data-f') === filtro; b.style.background = on ? '#1d1d1f' : '#f5f5f5'; b.style.color = on ? '#fff' : '#1d1d1f'; });
+  }
+  marcarPestana();
+  head.appendChild(pestanas);
   var tec = el('div', { class: 'tec' });
   var lst = el('div', { class: 'lst' });
   var pie = el('div', { class: 'pie' });
@@ -392,6 +410,104 @@ function panelHuecos(soloGanchos) {
     };
   }
 
+  // ---------- todos los contactos (los de la ficha completa: móvil, fijo y personas de contacto) ----------
+  function fichaCompleta(a) {
+    var md = window.$md || {};
+    var f = new FormData();
+    [['__protocol', '7'], ['dv', A.dvSync || '{}'], ['pid', String(a.bucket)], ['u', A.login || (md.offline && md.offline.login) || ''], ['f', 'json'],
+      ['pids', '[]'], ['aids', '[]'], ['restriction', '0'], ['qid', 'undefined'], ['fakeIds', '{}'], ['trust', A.trust], ['fakeIdsClean', '0'],
+      ['dq', hoyISO()], ['date', hoyISO()], ['dispatcher', '1'], ['requestedAid', String(a.aid)], ['requestedDate', hoyISO()], ['skip_delta', '0']
+    ].forEach(function (x) { f.append(x[0], x[1]); });
+    var h = cabeceras(); delete h['Content-Type'];
+    return fetch('?m=sync&a=write&ajax=1', { method: 'POST', headers: h, body: f, credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.delta && j.delta.version) A.dvSync = JSON.stringify(j.delta.version);   // las siguientes peticiones vienen mucho más ligeras
+      return ((j.delta && j.delta.Activity) || {})[a.aid] || null;
+    });
+  }
+  function camposBasicos(a) {
+    var campos = ['cname', 'ccell', 'cphone'].map(function (c) { return '&data%5Bfields%5D%5B%5D=' + c; }).join('');
+    return post('index.php?m=supervisor&a=get', 'entity=activity&action=get&data%5Baid%5D=' + a.aid + campos + '&f=json').then(function (j) { return (j.data && j.data.activity) || null; });
+  }
+  // Una sola petición por actividad para contactos y zonas
+  var fichas = {};
+  function ficha(a) {
+    if (!fichas[a.aid]) fichas[a.aid] = (A.trust && a.bucket ? fichaCompleta(a).then(function (f) { return f || camposBasicos(a); }) : camposBasicos(a))
+      .catch(function (e) { delete fichas[a.aid]; throw e; });
+    return fichas[a.aid];
+  }
+  function contactos(a) {
+    return ficha(a).then(function (f) {
+      var lista = [];
+      if (!f) return lista;
+      if (f.ccell) lista.push({ etiqueta: 'Móvil', nombre: f.cname, tel: f.ccell });
+      if (f.cphone) lista.push({ etiqueta: 'Fijo', nombre: f.cname, tel: f.cphone });
+      // Propiedad 154 = "Personas de Contacto": tabla HTML con nombre y teléfono
+      if (f['154']) {
+        var doc = new DOMParser().parseFromString(String(f['154']), 'text/html');
+        Array.prototype.forEach.call(doc.querySelectorAll('tr'), function (tr) {
+          var td = tr.querySelectorAll('td');
+          if (td.length >= 2) lista.push({ etiqueta: 'Contacto', nombre: td[0].textContent.trim(), tel: td[1].textContent.trim() });
+        });
+      }
+      var vistos = {};
+      return lista.filter(function (c) { var t = String(c.tel).replace(/\D/g, ''); if (!t || vistos[t]) return false; vistos[t] = 1; return true; });
+    });
+  }
+  function pintarContactos(a, caja) {
+    caja.textContent = 'Cargando contactos…';
+    contactos(a).then(function (lista) {
+      caja.textContent = '';
+      if (!lista.length) { caja.textContent = 'Oracle no devuelve más contactos.'; return; }
+      lista.forEach(function (c) {
+        var fila = el('div'); fila.style.cssText = 'display:flex;gap:8px;align-items:baseline;flex-wrap:wrap';
+        fila.appendChild(el('span', { class: 'sub' }, c.etiqueta));
+        fila.appendChild(el('span', null, c.nombre || ''));
+        fila.appendChild(el('a', { class: 'tel', href: 'tel:' + String(c.tel).replace(/\s/g, '') }, c.tel));
+        caja.appendChild(fila);
+      });
+    }).catch(function () { caja.textContent = 'No se pudieron leer los contactos.'; });
+  }
+
+  // ---------- zonas de la instalación (propiedad 186: ID, versión, tipo, detector, descripción) ----------
+  function zonas(f) {
+    if (!f || !f['186']) return null;
+    var doc = new DOMParser().parseFromString(String(f['186']), 'text/html');
+    return Array.prototype.map.call(doc.querySelectorAll('tr'), function (tr) {
+      var td = Array.prototype.map.call(tr.querySelectorAll('td'), function (x) { return x.textContent.trim(); });
+      return td.length >= 6 ? { id: td[1], tipo: td[3], detector: td[4], descripcion: td[5] } : null;
+    }).filter(Boolean);
+  }
+  function desplegableZonas(a) {
+    var d = el('details'); d.style.margin = '4px 0';
+    var s = el('summary', null, 'Zonas (ver)'); s.style.cursor = 'pointer';
+    var cuerpo = el('div', { class: 'sub' });
+    d.appendChild(s); d.appendChild(cuerpo);
+    var cargado = false;
+    function cargar() {
+      if (cargado) return; cargado = true;
+      cuerpo.textContent = 'Cargando zonas…';
+      ficha(a).then(function (f) {
+        var z = zonas(f);
+        cuerpo.textContent = '';
+        if (!z) { s.textContent = 'Zonas (sin datos)'; cuerpo.textContent = 'Oracle no devuelve las zonas. Recarga Oracle y vuelve a buscar.'; cargado = false; return; }
+        // Resumen por código de zona ("MG ×3 · QR ×2 · FR ×1"): el detector a veces viene vacío, el código siempre
+        var cuenta = {};
+        z.forEach(function (x) { var k = (x.id || '').replace(/\d+$/, '') || (x.detector.split(' - ')[0] || '?').trim(); cuenta[k] = (cuenta[k] || 0) + 1; });
+        s.textContent = 'Zonas (' + z.length + '): ' + Object.keys(cuenta).map(function (k) { return k + ' ×' + cuenta[k]; }).join(' · ');
+        var t = el('table'); t.style.cssText = 'border-collapse:collapse;width:100%;font-size:12px;margin-top:4px';
+        z.forEach(function (x) {
+          var tr = el('tr');
+          [x.id, x.descripcion, x.detector].forEach(function (v) { var td = el('td', null, v); td.style.cssText = 'border-top:1px solid #eee;padding:2px 4px;vertical-align:top'; tr.appendChild(td); });
+          t.appendChild(tr);
+        });
+        cuerpo.appendChild(t);
+      }).catch(function () { cuerpo.textContent = 'No se pudieron leer las zonas.'; cargado = false; });
+    }
+    d.addEventListener('toggle', function () { if (d.open) cargar(); });
+    d.cargar = cargar;
+    return d;
+  }
+
   // ---------- aviso tras asignar: texto para el grupo de WhatsApp y fila para la hoja ----------
   function numeroInstalacion(a) {
     return post('index.php?m=supervisor&a=get', 'entity=activity&action=get&data%5Baid%5D=' + a.aid + '&f=json').then(function (j) {
@@ -436,7 +552,7 @@ function panelHuecos(soloGanchos) {
   }
 
   // ---------- tarjetas ----------
-  function tarjeta(a, reg) {
+  function tarjeta(a, reg, posicion) {
     var r = reg[a.mto] || {};
     var c = el('div', { class: 'act' + (a.negocio ? ' neg' : '') + (r.estado === 'cita' ? ' cita' : '') });
     var top = el('div', { class: 'top' });
@@ -446,10 +562,20 @@ function panelHuecos(soloGanchos) {
     c.appendChild(el('div', { class: 'sub' }, [a.km != null ? a.km.toFixed(1) + ' km' : '', a.items ? a.items + ' items' : '', a.min ? a.min + ' min' : '', a.inmueble].filter(Boolean).join(' · ')));
     if (r.estado === 'cita') c.appendChild(el('div', { class: 'nota' }, 'El cliente pidió cita el ' + r.fecha.split('-').reverse().join('/') + ' a las ' + r.hora));
     if (r.intentos && r.intentos.length) c.appendChild(el('div', { class: 'nota' }, 'No contestó: ' + r.intentos.join(', ')));
-    c.appendChild(el('div', null, a.nombre || '(sin nombre)'));
-    if (a.tlf) c.appendChild(el('a', { class: 'tel', href: 'tel:' + a.tlf }, a.tlf));
+    // Contactos: de entrada el de la lista; las primeras actividades cargan todos solas, el resto con el botón
+    var cont = el('div');
+    cont.appendChild(el('div', null, a.nombre || '(sin nombre)'));
+    if (a.tlf) cont.appendChild(el('a', { class: 'tel', href: 'tel:' + a.tlf }, a.tlf));
+    var bCont = el('button', null, 'Ver todos los contactos'); bCont.style.marginLeft = '8px';
+    bCont.onclick = function () { pintarContactos(a, cont); };
+    cont.appendChild(bCont);
+    c.appendChild(cont);
     c.appendChild(el('div', { class: 'sub' }, [a.calle, a.pueblo, a.cp].filter(Boolean).join(', ')));
     c.appendChild(el('div', { class: 'mot' }, 'Motivo: ' + (a.motivo || '—')));
+    var dz = desplegableZonas(a);
+    c.appendChild(dz);
+    // Las primeras actividades cargan solas contactos y resumen de zonas (es la misma petición)
+    if (posicion < 8) { pintarContactos(a, cont); dz.cargar(); }
     if (a.ultimoTrabajo) c.appendChild(el('div', { class: 'sub' }, 'Última visita: ' + a.ultimoTrabajo));
 
     var bs = el('div', { class: 'btns' });
@@ -475,14 +601,20 @@ function panelHuecos(soloGanchos) {
 
   function pintar() {
     var reg = leerReg();
-    var lista = ordenar(datos.filter(function (a) { return visible(a, reg); }), reg);
+    var lista = ordenar(datos.filter(function (a) {
+      return visible(a, reg) && (filtro === 'todos' || (filtro === 'negocios') === a.negocio);
+    }), reg);
     lst.innerHTML = '';
     if (!tecnico) { lst.appendChild(el('p', null, 'Escribe la matrícula del técnico y pulsa Buscar.')); return; }
-    if (!lista.length) lst.appendChild(el('p', null, datos.length ? 'Todas las actividades de esta zona ya están gestionadas. Prueba con más km.' : 'No hay actividades sin cita en esta zona. Prueba con más km.'));
-    lista.forEach(function (a) { lst.appendChild(tarjeta(a, reg)); });
-    var ocultas = datos.length - lista.length;
-    var neg = lista.filter(function (a) { return a.negocio; }).length;
-    pie.textContent = lista.length + ' para llamar (' + neg + ' negocios)' + (ocultas ? ' · ' + ocultas + ' ocultas (asignadas, no quieren o cita otro día)' : '') + '. Los teléfonos no se guardan.';
+    var pendientes = datos.filter(function (a) { return visible(a, reg); });
+    var neg = pendientes.filter(function (a) { return a.negocio; }).length;
+    if (!lista.length) lst.appendChild(el('p', null, !datos.length ? 'No hay actividades sin cita en esta zona. Prueba con más km.' :
+      pendientes.length ? 'No hay ' + (filtro === 'negocios' ? 'negocios' : 'residencias') + ' pendientes en esta zona. Cambia de pestaña o prueba con más km.' :
+      'Todas las actividades de esta zona ya están gestionadas. Prueba con más km.'));
+    lista.forEach(function (a, i) { lst.appendChild(tarjeta(a, reg, i)); });
+    var gestionadas = datos.length - pendientes.length;
+    pie.textContent = lista.length + ' para llamar · pendientes en la zona: ' + neg + ' negocios y ' + (pendientes.length - neg) + ' residencias' +
+      (gestionadas ? ' · ' + gestionadas + ' ya gestionadas' : '') + '. Los teléfonos no se guardan.';
   }
 
   function resumenHoy(hoy) {
@@ -547,7 +679,7 @@ function botonHuecos() {
   var b = document.createElement('button');
   b.id = 'aurum-huecos-boton';
   b.textContent = 'Huecos';
-  b.title = 'Abrir o cerrar el panel de huecos (v2026.11.02.1025)';
+  b.title = 'Abrir o cerrar el panel de huecos (v2026.11.02.1130)';
   b.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147482999;padding:8px 14px;border-radius:18px;border:0;background:#1d1d1f;color:#fff;font:600 13px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
   b.onclick = function () { panelHuecos(false); };
   document.body.appendChild(b);
