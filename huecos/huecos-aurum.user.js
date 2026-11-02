@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Huecos Aurum
 // @namespace    https://aurumbcs.github.io/Tecnicos-Aurum/
-// @version      2026.11.02.1511
+// @version      2026.11.02.1532
 // @description  Lista de llamadas para rellenar huecos de técnicos y asignar a la hora pedida, encima de Oracle Field Service.
 // @author       Aurum BC Security SL
 // @match        https://securitasdirect.fs.ocs.oraclecloud.com/*
@@ -252,6 +252,10 @@ function panelHuecos(soloGanchos) {
     '#' + ID + ' .caja{margin-top:8px;padding:8px;border:1px dashed #999;border-radius:8px;background:#fafafa}' +
     '#' + ID + ' .ruta{margin:4px 0;font-size:12px}' +
     '#' + ID + ' .ruta div{padding:1px 0}' +
+    '#' + ID + ' .ruta .fila{padding:3px 4px;border-radius:4px;cursor:pointer}' +
+    '#' + ID + ' .ruta .fila:hover{background:#eee}' +
+    '#' + ID + ' .ruta .fila.sel{background:#e3e3e3;font-weight:600}' +
+    '#' + ID + ' .ruta .aqui{margin:2px 0;padding:4px;border-radius:4px;background:#e6f4ea;color:#1a7f37;font-weight:600}' +
     '#' + ID + ' .pie{padding:6px 12px;border-top:1px solid #e5e5e5;color:#666;font-size:12px}';
 
   function el(tag, attrs, txt) {
@@ -337,74 +341,79 @@ function panelHuecos(soloGanchos) {
   function abrirAsignar(a, tarjetaEl) {
     var previa = tarjetaEl.querySelector('.caja.asig'); if (previa) { previa.remove(); return; }
     var caja = el('div', { class: 'caja asig' });
-    caja.appendChild(el('div', null, 'Ruta de hoy de ' + tecnico.nombre + ':'));
-    var ruta = el('div', { class: 'ruta' }, 'Cargando…'); caja.appendChild(ruta);
-    var f1 = el('div'); f1.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px';
-    f1.appendChild(el('span', null, 'Hora que pide'));
+    var f1 = el('div'); f1.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap';
+    f1.appendChild(el('span', null, 'Hora que pide el cliente'));
     var inHora = el('input', { placeholder: '13:00', size: '5' });
     f1.appendChild(inHora);
-    f1.appendChild(el('span', null, 'detrás de'));
-    var selPrev = el('select'); selPrev.style.maxWidth = '230px';
-    f1.appendChild(selPrev);
     caja.appendChild(f1);
-    var bAsig = el('button', { class: 'pri' }, 'Asignar');
+    caja.appendChild(el('div', { class: 'sub' }, 'Escribe la hora y se coloca sola, o pulsa en la ruta la actividad después de la que va.'));
+    caja.appendChild(el('div', null, 'Ruta de hoy de ' + tecnico.nombre + ':'));
+    var ruta = el('div', { class: 'ruta' }, 'Cargando…'); caja.appendChild(ruta);
+    var bAsig = el('button', { class: 'pri' }, 'Asignar'); bAsig.disabled = true;
     var res = el('div'); res.style.marginTop = '6px';
     var bs = el('div', { class: 'btns' }); bs.appendChild(bAsig); caja.appendChild(bs); caja.appendChild(res);
     tarjetaEl.appendChild(caja);
 
-    var lista = [];
+    var lista = [], prev = null;   // prev = actividad después de la que irá la nueva
+    function finDe(x) { return x.eta + (x.length || 0); }
+    function pintarRuta() {
+      ruta.textContent = '';
+      var h = aMin(inHora.value.trim());
+      lista.forEach(function (x) {
+        var fila = el('div', { class: 'fila' + (x === prev ? ' sel' : '') }, hhmm(x.eta) + '–' + hhmm(finDe(x)) + '  ' + etiqueta(x));
+        fila.onclick = function () { prev = x; actualizar(); };
+        ruta.appendChild(fila);
+        if (x === prev) ruta.appendChild(el('div', { class: 'aqui' }, '▶ Aquí va la nueva: Mto ' + a.mto + ', hacia las ' + hhmm(Math.max(finDe(x), h == null ? 0 : h))));
+      });
+    }
+    // Aviso previo: si no encaja con la hora pedida o si lo que viene detrás se va a retrasar
+    function actualizar() {
+      pintarRuta();
+      bAsig.disabled = !prev;
+      res.className = ''; res.textContent = '';
+      if (!prev) return;
+      var h = aMin(inHora.value.trim()), sig = lista[lista.indexOf(prev) + 1], avisos = [];
+      if (h != null && finDe(prev) > h + 30) avisos.push('Esa actividad termina a las ' + hhmm(finDe(prev)) + ', más tarde de la hora que pide el cliente.');
+      if (h != null && h > finDe(prev) + 30) avisos.push('La anterior termina a las ' + hhmm(finDe(prev)) + ': Oracle puede ponerla antes de las ' + hhmm(h) + '. Lo verás al asignar.');
+      var fin = Math.max(finDe(prev), h == null ? 0 : h) + (a.min || 45);
+      if (sig && sig.eta < fin) avisos.push('Lo siguiente (' + hhmm(sig.eta) + ' ' + etiqueta(sig) + ') se retrasará unos ' + (fin - sig.eta) + ' min o más (sin contar el viaje).');
+      if (avisos.length) { res.className = 'mal'; res.textContent = 'Ojo: ' + avisos.join(' '); }
+    }
     rutaHoy(tecnico.pid).then(function (l) {
       lista = enRuta(l);
-      ruta.textContent = '';
-      if (!lista.length) { ruta.textContent = 'No tiene actividades hoy en Oracle.'; bAsig.disabled = true; return; }
-      lista.forEach(function (x) {
-        ruta.appendChild(el('div', null, hhmm(x.eta) + '–' + hhmm(x.eta + (x.length || 0)) + '  ' + etiqueta(x)));
-        selPrev.appendChild(el('option', { value: x.aid }, 'termina ' + hhmm(x.eta + (x.length || 0)) + ' · ' + etiqueta(x)));
-      });
+      if (!lista.length) { ruta.textContent = 'No tiene actividades hoy en Oracle.'; return; }
+      actualizar();
     }).catch(function (e) { ruta.textContent = e.message; });
-
-    // Aviso previo: si lo que viene detrás empieza antes de que el técnico pueda acabar la nueva, se retrasará
-    function revisar() {
-      var h = aMin(inHora.value.trim()), prev = +selPrev.value;
-      var i = lista.map(function (x) { return x.aid; }).indexOf(prev), sig = lista[i + 1], prevAct = lista[i];
-      res.className = ''; res.textContent = '';
-      if (h == null || !prevAct) return;
-      var fin = Math.max(prevAct.eta + (prevAct.length || 0), h) + (a.min || 45);
-      if (sig && sig.eta < fin) { res.className = 'mal'; res.textContent = 'Ojo: lo siguiente (' + hhmm(sig.eta) + ' ' + etiqueta(sig) + ') se retrasará unos ' + (fin - sig.eta) + ' min o más (sin contar el viaje).'; }
-    }
     inHora.oninput = function () {
-      var h = aMin(inHora.value.trim()); if (h == null) return;
-      var prop = propuesta(lista, h);
-      if (prop) selPrev.value = prop.aid;
-      revisar();
-      if (!prop) { res.className = 'mal'; res.textContent = 'A esa hora el técnico aún no ha empezado: elige tú detrás de qué actividad va.'; }
+      var h = aMin(inHora.value.trim());
+      if (h == null) { actualizar(); return; }
+      prev = propuesta(lista, h);
+      actualizar();
+      if (!prev && lista.length) { res.className = 'mal'; res.textContent = 'A esa hora el técnico aún no ha terminado ninguna actividad: pulsa en la ruta después de cuál va.'; }
     };
-    selPrev.onchange = revisar;
 
     bAsig.onclick = function () {
       var h = aMin(inHora.value.trim());
-      if (h == null) { alert('Escribe la hora que pide el cliente (p. ej. 13:00).'); inHora.focus(); return; }
-      var prev = +selPrev.value, prevAct = lista.filter(function (x) { return x.aid === prev; })[0];
-      if (!prevAct) return;
-      if (!confirm('¿Asignar el Mto ' + a.mto + ' a ' + tecnico.nombre + '?\n\nDetrás de: ' + etiqueta(prevAct) + ' (termina ' + hhmm(prevAct.eta + (prevAct.length || 0)) + ')\nHora que pide el cliente: ' + hhmm(h))) return;
+      if (!prev) return;
+      if (!confirm('¿Asignar el Mto ' + a.mto + ' a ' + tecnico.nombre + '?\n\nVa después de: ' + etiqueta(prev) + ' (termina ' + hhmm(finDe(prev)) + ')' + (h == null ? '' : '\nHora que pide el cliente: ' + hhmm(h)))) return;
       bAsig.disabled = true; res.className = ''; res.textContent = 'Asignando en Oracle…';
       var antes = {}; lista.forEach(function (x) { antes[x.aid] = x.eta; });
       post('index.php?m=activity&a=assignment', empaquetar({
         pid: A.pid, target_pid: tecnico.pid, loadListOnly: 1, listType: 'providers', target_date: hoyISO(),
         get_data: false, form_submitted: true,
-        moving_activities: [{ aid: a.aid, prev: prev, date: '3000-01-01', pid: String(a.bucket) }]
+        moving_activities: [{ aid: a.aid, prev: prev.aid, date: '3000-01-01', pid: String(a.bucket) }]
       })).then(function (j) {
         if (!j || j.result !== 'success') throw new Error('Oracle no ha permitido la asignación' + (j && (j.message || j.error) ? ': ' + (j.message || j.error) : '.'));
         return rutaHoy(tecnico.pid);
       }).then(function (l) {
         var nueva = l.filter(function (x) { return x.aid === a.aid; })[0];
         if (!nueva) throw new Error('Oracle dice que la ha asignado, pero no aparece en la ruta del técnico. Revísalo en Oracle.');
-        var eta = nueva.eta, dif = eta - h;
+        var eta = nueva.eta, dif = h == null ? 0 : eta - h;
         res.className = Math.abs(dif) <= 30 ? 'bien' : 'mal';
         // Qué actividades del técnico ha movido Oracle al meter la nueva (la comida no cuenta)
         var movidas = enRuta(l).filter(function (x) { return antes[x.aid] != null && Math.abs(x.eta - antes[x.aid]) >= 15 && !/Comida/i.test(x.identifier || x.label || ''); })
           .map(function (x) { return etiqueta(x) + ' ' + hhmm(antes[x.aid]) + '→' + hhmm(x.eta); });
-        res.textContent = 'Asignada. Oracle la pone a las ' + hhmm(eta) + ' (el cliente pidió ' + hhmm(h) + ').' +
+        res.textContent = 'Asignada. Oracle la pone a las ' + hhmm(eta) + (h == null ? '.' : ' (el cliente pidió ' + hhmm(h) + ').') +
           (Math.abs(dif) > 30 ? ' Ojo: hay ' + Math.abs(dif) + ' min de diferencia; cámbiala en Oracle o avisa al cliente.' : '') +
           (movidas.length ? ' Se han movido: ' + movidas.join('; ') + '.' : '');
         if (movidas.length) res.className = 'mal';
@@ -702,7 +711,7 @@ function botonHuecos() {
   var b = document.createElement('button');
   b.id = 'aurum-huecos-boton';
   b.textContent = 'Huecos';
-  b.title = 'Abrir o cerrar el panel de huecos (v2026.11.02.1511)';
+  b.title = 'Abrir o cerrar el panel de huecos (v2026.11.02.1532)';
   b.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147482999;padding:8px 14px;border-radius:18px;border:0;background:#1d1d1f;color:#fff;font:600 13px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
   b.onclick = function () { panelHuecos(false); };
   document.body.appendChild(b);
