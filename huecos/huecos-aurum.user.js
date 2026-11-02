@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Huecos Aurum
 // @namespace    https://aurumbcs.github.io/Tecnicos-Aurum/
-// @version      2026.11.02.1130
+// @version      2026.11.02.1344
 // @description  Lista de llamadas para rellenar huecos de técnicos y asignar a la hora pedida, encima de Oracle Field Service.
 // @author       Aurum BC Security SL
 // @match        https://securitasdirect.fs.ocs.oraclecloud.com/*
@@ -192,6 +192,8 @@ function panelHuecos(soloGanchos) {
     return {
       mto: mto, aid: p && p.aid, bucket: p && p.pid, tipo: tipo,
       negocio: /^\s*-?\s*N-/.test(inicio),
+      // Naves, oficinas, talleres…: en el mapa de Oracle no salen con estrella, pero atienden en horario laboral
+      oficina: /^\s*-?\s*N-/.test(inicio) && /nave|oficina|empresa|industrial|taller|almac|pol[ií]gono|obra/i.test(g(inicio, /^\s*-?\s*N-([^-]+?)\s*-/)),
       inmueble: g(inicio, /^\s*-?\s*([PN]-[^-]+?)\s*-/),
       pueblo: (partes[1] || '').trim(), calle: partes.slice(2).join('-').trim(), cp: g(t, /CP:\s*(\d{5})/),
       nombre: g(t, /Nombre:\s*(.*?)Tlf:/), tlf: g(t, /Tlf:\s*([\d\s+]{6,})/).replace(/\s/g, ''),
@@ -272,17 +274,21 @@ function panelHuecos(soloGanchos) {
   var bBuscar = el('button', { class: 'pri' }, 'Buscar');
   fila.appendChild(inMat); fila.appendChild(selKm); fila.appendChild(bBuscar);
   head.appendChild(fila);
-  var fila2 = el('div'); fila2.style.cssText = 'display:flex;gap:6px;align-items:center;flex:1 1 100%';
+  var fila2 = el('div'); fila2.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1 1 100%';
   fila2.appendChild(el('span', null, 'Buscar cerca de'));
   var selCentro = el('select');
-  [['ultima', 'su última actividad de hoy'], ['vivo', 'su posición en vivo'], ['habitual', 'su zona habitual']].forEach(function (o) { selCentro.appendChild(el('option', { value: o[0] }, o[1])); });
+  [['ultima', 'su última actividad de hoy'], ['vivo', 'su posición en vivo'], ['habitual', 'su zona habitual'], ['sitio', 'un sitio que escribo…']].forEach(function (o) { selCentro.appendChild(el('option', { value: o[0] }, o[1])); });
   fila2.appendChild(selCentro);
+  // Para cuando la supervisora pide mandarlo fuera de su zona (p. ej. "Aranjuez")
+  var inSitio = el('input', { placeholder: 'Pueblo, calle o CP (p. ej. Aranjuez)', size: '24' });
+  inSitio.style.display = 'none';
+  fila2.appendChild(inSitio);
   head.appendChild(fila2);
   // Pestañas para ver solo negocios o solo residencias (p. ej. en festivo los negocios están cerrados)
   var filtro = 'todos';
   try { filtro = localStorage.getItem(KEY + '.filtro') || 'todos'; } catch (e) {}
   var pestanas = el('div'); pestanas.style.cssText = 'display:flex;gap:0;flex:1 1 100%;border:1px solid #bbb;border-radius:6px;overflow:hidden';
-  [['todos', 'Todos'], ['negocios', '★ Negocios'], ['residencias', 'Residencias']].forEach(function (o) {
+  [['todos', 'Todos'], ['negocios', '★ Tiendas y locales'], ['naves', '🏢 Naves y oficinas'], ['residencias', 'Residencias']].forEach(function (o) {
     var b = el('button', { 'data-f': o[0] }, o[1]); b.style.cssText = 'flex:1;border:0;border-radius:0;margin:0';
     b.onclick = function () { filtro = o[0]; try { localStorage.setItem(KEY + '.filtro', filtro); } catch (e) {} marcarPestana(); pintar(); };
     pestanas.appendChild(b);
@@ -556,7 +562,7 @@ function panelHuecos(soloGanchos) {
     var r = reg[a.mto] || {};
     var c = el('div', { class: 'act' + (a.negocio ? ' neg' : '') + (r.estado === 'cita' ? ' cita' : '') });
     var top = el('div', { class: 'top' });
-    top.appendChild(el('span', null, (a.negocio ? '★ ' : '') + a.tipo));
+    top.appendChild(el('span', null, (a.oficina ? '🏢 ' : a.negocio ? '★ ' : '') + a.tipo));
     top.appendChild(el('span', null, 'Mto ' + a.mto));
     c.appendChild(top);
     c.appendChild(el('div', { class: 'sub' }, [a.km != null ? a.km.toFixed(1) + ' km' : '', a.items ? a.items + ' items' : '', a.min ? a.min + ' min' : '', a.inmueble].filter(Boolean).join(' · ')));
@@ -601,19 +607,22 @@ function panelHuecos(soloGanchos) {
 
   function pintar() {
     var reg = leerReg();
+    function clase(a) { return a.oficina ? 'naves' : a.negocio ? 'negocios' : 'residencias'; }
     var lista = ordenar(datos.filter(function (a) {
-      return visible(a, reg) && (filtro === 'todos' || (filtro === 'negocios') === a.negocio);
+      return visible(a, reg) && (filtro === 'todos' || filtro === clase(a));
     }), reg);
     lst.innerHTML = '';
     if (!tecnico) { lst.appendChild(el('p', null, 'Escribe la matrícula del técnico y pulsa Buscar.')); return; }
     var pendientes = datos.filter(function (a) { return visible(a, reg); });
-    var neg = pendientes.filter(function (a) { return a.negocio; }).length;
+    var cuenta = { negocios: 0, naves: 0, residencias: 0 };
+    pendientes.forEach(function (a) { cuenta[clase(a)]++; });
+    var nombres = { negocios: 'tiendas y locales', naves: 'naves ni oficinas', residencias: 'residencias' };
     if (!lista.length) lst.appendChild(el('p', null, !datos.length ? 'No hay actividades sin cita en esta zona. Prueba con más km.' :
-      pendientes.length ? 'No hay ' + (filtro === 'negocios' ? 'negocios' : 'residencias') + ' pendientes en esta zona. Cambia de pestaña o prueba con más km.' :
+      pendientes.length ? 'No hay ' + nombres[filtro] + ' pendientes en esta zona. Cambia de pestaña o prueba con más km.' :
       'Todas las actividades de esta zona ya están gestionadas. Prueba con más km.'));
     lista.forEach(function (a, i) { lst.appendChild(tarjeta(a, reg, i)); });
     var gestionadas = datos.length - pendientes.length;
-    pie.textContent = lista.length + ' para llamar · pendientes en la zona: ' + neg + ' negocios y ' + (pendientes.length - neg) + ' residencias' +
+    pie.textContent = lista.length + ' para llamar · pendientes en la zona: ' + cuenta.negocios + ' tiendas y locales, ' + cuenta.naves + ' naves y oficinas, ' + cuenta.residencias + ' residencias' +
       (gestionadas ? ' · ' + gestionadas + ' ya gestionadas' : '') + '. Los teléfonos no se guardan.';
   }
 
@@ -637,6 +646,14 @@ function panelHuecos(soloGanchos) {
       var vivo = res[0], ru = res[1];
       tecnico.hoy = resumenHoy(ru.hoy);
       // Orden de preferencia según el selector; si una opción no está disponible se pasa a la siguiente
+      if (selCentro.value === 'sitio') {
+        var sitio = inSitio.value.trim();
+        if (!sitio) return Promise.reject(new Error('Escribe el sitio donde buscar (p. ej. Aranjuez).'));
+        return geocodificarCP(sitio).then(function (c) {
+          if (!c) throw new Error('No encuentro «' + sitio + '». Prueba con el pueblo y la provincia (p. ej. Aranjuez, Madrid).');
+          tecnico.centro = c; tecnico.origen = sitio + ' (elegido a mano)';
+        });
+      }
       var orden = { ultima: ['ultima', 'vivo', 'habitual'], vivo: ['vivo', 'ultima', 'habitual'], habitual: ['habitual', 'ultima', 'vivo'] }[selCentro.value];
       function probar(i) {
         if (i >= orden.length) return Promise.reject(new Error('No sé dónde está ' + tecnico.nombre + ': no tiene posición en vivo ni rutas recientes.'));
@@ -663,7 +680,13 @@ function panelHuecos(soloGanchos) {
   }
 
   bBuscar.onclick = buscar;
-  selKm.onchange = selCentro.onchange = function () { if (tecnico) buscar(); };
+  selKm.onchange = function () { if (tecnico) buscar(); };
+  selCentro.onchange = function () {
+    inSitio.style.display = selCentro.value === 'sitio' ? '' : 'none';
+    if (selCentro.value === 'sitio') { inSitio.focus(); return; }   // se busca al pulsar Buscar o Enter
+    if (tecnico) buscar();
+  };
+  inSitio.onkeydown = function (e) { if (e.key === 'Enter') buscar(); };
   pintar();
   pie.textContent = 'Escribe la matrícula del técnico y pulsa Buscar.';
   if (inMat.value) inMat.select();
@@ -679,7 +702,7 @@ function botonHuecos() {
   var b = document.createElement('button');
   b.id = 'aurum-huecos-boton';
   b.textContent = 'Huecos';
-  b.title = 'Abrir o cerrar el panel de huecos (v2026.11.02.1130)';
+  b.title = 'Abrir o cerrar el panel de huecos (v2026.11.02.1344)';
   b.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147482999;padding:8px 14px;border-radius:18px;border:0;background:#1d1d1f;color:#fff;font:600 13px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
   b.onclick = function () { panelHuecos(false); };
   document.body.appendChild(b);
