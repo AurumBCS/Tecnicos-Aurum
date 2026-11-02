@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Huecos Aurum
 // @namespace    https://aurumbcs.github.io/Tecnicos-Aurum/
-// @version      2026.11.02.1344
+// @version      2026.11.02.1511
 // @description  Lista de llamadas para rellenar huecos de técnicos y asignar a la hora pedida, encima de Oracle Field Service.
 // @author       Aurum BC Security SL
 // @match        https://securitasdirect.fs.ocs.oraclecloud.com/*
@@ -552,7 +552,7 @@ function panelHuecos(soloGanchos) {
     };
     bX.onclick = function () {
       var d = new Date(), f = ('0' + d.getDate()).slice(-2) + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + String(d.getFullYear()).slice(-2);
-      copiar([f, nombreTecnico().toUpperCase(), inst.value.trim(), a.mto, estado.value.trim(), obs.value.replace(/\s+/g, ' ').trim()].join('\t'), bX);
+      copiar([f, nombreTecnico().toUpperCase(), inst.value.trim(), a.mto, '', ''].join('\t'), bX);
     };
     bOk.onclick = function () { registrar(a.mto, { estado: 'asignado', fecha: hoyISO() }); };
   }
@@ -702,7 +702,7 @@ function botonHuecos() {
   var b = document.createElement('button');
   b.id = 'aurum-huecos-boton';
   b.textContent = 'Huecos';
-  b.title = 'Abrir o cerrar el panel de huecos (v2026.11.02.1344)';
+  b.title = 'Abrir o cerrar el panel de huecos (v2026.11.02.1511)';
   b.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147482999;padding:8px 14px;border-radius:18px;border:0;background:#1d1d1f;color:#fff;font:600 13px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
   b.onclick = function () { panelHuecos(false); };
   document.body.appendChild(b);
