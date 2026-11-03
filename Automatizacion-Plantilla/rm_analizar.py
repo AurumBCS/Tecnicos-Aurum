@@ -83,6 +83,12 @@ def _enviar(filas):
 
 def pendientes(mes, tecnicos=None):
     """RM del mes (repetidas) que todavia no tienen analisis."""
+    # Sin pestaña "RM <mes>" (aun no ha llegado su Excel) type=rm devuelve el ultimo Excel, que es de otro mes
+    url = _entorno("RECUENTOS_SCRIPT_URL") + "?" + urllib.parse.urlencode(
+        {"type": "rm-meses", "token": _entorno("RECUENTOS_APP_TOKEN")})
+    with urllib.request.urlopen(url, timeout=120) as r:
+        if mes not in r.read().decode("utf-8").strip().split(","):
+            return []
     rm = _get_csv("rm", mes)
     hechas = {f.get("nMant", "").strip() for f in _get_csv("rm-analisis", mes)}
     tecs = {t.strip().upper() for t in (tecnicos or []) if t}
