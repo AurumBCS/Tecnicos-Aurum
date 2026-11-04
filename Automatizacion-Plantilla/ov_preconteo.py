@@ -174,10 +174,10 @@ def cargar_lista(mats, modo="subir"):
     hoy = datetime.now(ZoneInfo("Europe/Madrid")).strftime("%Y-%m-%d")
     mats = list(dict.fromkeys(str(m).strip().upper() for m in mats if str(m).strip()))
     CARPETA.mkdir(parents=True, exist_ok=True)
-    catalogo = json.loads((AQUI / "items_catalogo.json").read_text(encoding="utf-8"))
-    cat = {k: {"d": v.get("d", ""), "p": v.get("p", 0)} for k, v in catalogo.items()}
     bien, mal = [], []
     try:
+        catalogo = json.loads((AQUI / "items_catalogo.json").read_text(encoding="utf-8"))
+        cat = {k: {"d": v.get("d", ""), "p": v.get("p", 0)} for k, v in catalogo.items()}
         jefes, bajas = _cuadrante()
         with sync_playwright() as p:
             browser, context, page = abrir_ov(p, ver="--ver" in sys.argv)
@@ -234,8 +234,8 @@ def main(modo=None):
     modo = modo or _arg("--modo") or os.environ.get("PRECONTEO_MODO", "subir")
     hoy = datetime.now(ZoneInfo("Europe/Madrid")).strftime("%Y-%m-%d")
     CARPETA.mkdir(parents=True, exist_ok=True)
-    catalogo = json.loads((AQUI / "items_catalogo.json").read_text(encoding="utf-8"))
     try:
+        catalogo = json.loads((AQUI / "items_catalogo.json").read_text(encoding="utf-8"))
         jefes, bajas = _cuadrante()
         with sync_playwright() as p:
             browser, context, page = abrir_ov(p, ver="--ver" in sys.argv)

@@ -29,6 +29,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # listar_buckets, ...). Se copian con *.py para no tener que actualizar
 # esta linea cada vez que se agrega un script nuevo.
 COPY *.py ./
+# Catalogo de referencias del pre-conteo (ov_preconteo.py)
+COPY items_catalogo.json ./
 
 ENTRYPOINT ["python", "-m", "awslambdaric"]
 CMD ["lambda_handler.handler"]
