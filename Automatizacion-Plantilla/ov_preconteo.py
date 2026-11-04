@@ -14,7 +14,11 @@ Pre-conteo: stock del sistema de cada técnico con un conteo PERIÓDICO pendient
      (items_catalogo.json, sacado de los conteos ya hechos) y el jefe de equipo de cada técnico.
   6. Resumen a Gustavo.
 
+Conteos no planificados: cargar_lista(mats) hace lo mismo con una lista de matrículas (Gustavo la pega en la
+app, tarjeta Pre-conteo). Con conteo creado usa su código; si no, uno provisional MANUAL-<matrícula>.
+
 Uso local:  python3 ov_preconteo.py [--modo prueba] [--mat 318921 --org PESIAU]   (prueba: no sube nada)
+            python3 ov_preconteo.py [--modo prueba] --lista "356444 LQ1546"
 Variables: RECUENTOS_SCRIPT_URL, RECUENTOS_APP_TOKEN, RECUENTOS_KEY y las del login.
 """
 
@@ -22,6 +26,8 @@ import csv
 import io
 import json
 import os
+import re
+import shutil
 import sys
 import urllib.parse
 import urllib.request
@@ -151,6 +157,76 @@ def _subir(fecha, tecnicos, catalogo):
     return res
 
 
+def _nombre_tecnico(mat):
+    url = os.environ["RECUENTOS_SCRIPT_URL"].strip() + "?type=recuentos&token=" + os.environ["RECUENTOS_APP_TOKEN"].strip()
+    with urllib.request.urlopen(url, timeout=120) as r:
+        for f in csv.DictReader(io.StringIO(r.read().decode())):
+            if f.get("Matricula", "").strip().upper() == mat:
+                return f"{f.get('Nombre(S)', '').strip()} {f.get('Apellidos(S)', '').strip()}".strip()
+    return ""
+
+
+def cargar_lista(mats, modo="subir"):
+    """Pre-conteo de las matrículas pedidas. Una que falle no para las demás; cada una se sube al terminarla."""
+    from playwright.sync_api import sync_playwright
+    from ov_comun import abrir_ov
+
+    hoy = datetime.now(ZoneInfo("Europe/Madrid")).strftime("%Y-%m-%d")
+    mats = list(dict.fromkeys(str(m).strip().upper() for m in mats if str(m).strip()))
+    CARPETA.mkdir(parents=True, exist_ok=True)
+    catalogo = json.loads((AQUI / "items_catalogo.json").read_text(encoding="utf-8"))
+    cat = {k: {"d": v.get("d", ""), "p": v.get("p", 0)} for k, v in catalogo.items()}
+    bien, mal = [], []
+    try:
+        jefes, bajas = _cuadrante()
+        with sync_playwright() as p:
+            browser, context, page = abrir_ov(p, ver="--ver" in sys.argv)
+            try:
+                reales = {c["mat"]: c for c in conteos_pendientes(page)}
+                pend = pendientes_por_tecnico(page)
+                for mat in mats:
+                    try:
+                        if not jefes.get(mat):
+                            raise RuntimeError("no tiene jefe de equipo en el cuadrante")
+                        if mat in bajas:
+                            raise RuntimeError("está de baja en el cuadrante")
+                        c = reales.get(mat) or {"conteo": f"MANUAL-{mat}", "org": "PESIAU", "mat": mat,
+                                                "nombre": _nombre_tecnico(mat), "creado": hoy}
+                        try:
+                            c["lineas"], c["valor"] = stock_tecnico(page, c["org"], mat)
+                        except Exception:
+                            if mat in reales:
+                                raise
+                            c["org"] = "PESIAT"  # sin conteo no se sabe la organización: Tenerife si no sale en la península
+                            c["lineas"], c["valor"] = stock_tecnico(page, c["org"], mat)
+                        c["je"], c["pendientes"] = jefes[mat], pend.get(mat, [])
+                        for l in c["lineas"]:
+                            l["desc"] = catalogo.get(l["item"], {}).get("d", "")
+                            if l["cant"]:
+                                cat.setdefault(l["item"], {"d": l["desc"], "p": 0})["p"] = round(l["importe"] / l["cant"], 4)
+                        if modo != "prueba":
+                            _subir(hoy, [c], cat)
+                        bien.append(f"- {c['conteo']} {mat} {c['nombre']} (JE {c['je']}): {len(c['lineas'])} líneas, "
+                                    f"valor {c['valor']}; pendientes: {len(c['pendientes'])}")
+                    except Exception as e:
+                        print(f"[preconteo] {mat}: {e}")
+                        mal.append(f"- {mat}: {str(e).splitlines()[0][:150]}")
+            finally:
+                browser.close()
+        texto = (("Stock subido a la app (Mi equipo -> Pre-conteo), visible solo hoy:\n\n" + "\n".join(bien)) if bien else "No se cargó ninguna.") \
+            + (("\n\nNo se pudieron cargar:\n" + "\n".join(mal)) if mal else "")
+        if modo == "prueba":
+            print(texto)
+            return
+        enviar_aviso(("⚠️ " if mal else "") + f"Pre-conteo no planificado: {len(bien)} de {len(mats)} cargados", texto)
+    except Exception as e:
+        registrar_error("ov_preconteo", str(e))
+        enviar_aviso("Pre-conteo no planificado: fallo", f"No se pudo cargar la lista {', '.join(mats)}:\n\n{e}")
+        raise
+    finally:
+        shutil.rmtree(CARPETA, ignore_errors=True)
+
+
 def main(modo=None):
     from playwright.sync_api import sync_playwright
     from ov_comun import abrir_ov
@@ -207,4 +283,7 @@ def main(modo=None):
 
 
 if __name__ == "__main__":
-    main()
+    if _arg("--lista"):
+        cargar_lista(re.split(r"[\s,;]+", _arg("--lista")), _arg("--modo") or "subir")
+    else:
+        main()

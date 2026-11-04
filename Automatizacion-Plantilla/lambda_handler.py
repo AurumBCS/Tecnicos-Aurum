@@ -25,7 +25,7 @@ Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
 (El correo de la mañana con capturas a Mercedes se retiro el 2026-10-16.)
 
 URL de funcion (Function URL, auth NONE): solo la usa el Apps Script de la app cuando Anna pulsa
-"Enviar al Form" en Upselling. Solo acepta {"tarea": "upselling_envio", "token": UPS_TOKEN}; cualquier
+"Enviar al Form" en Upselling. Solo acepta {"tarea": "upselling_envio" o "preconteo_lista", "token": UPS_TOKEN}; cualquier
 otra cosa -> 403. Responde enseguida y se arranca a si misma de forma asincrona para enviar.
 
 IMPORTANTE sobre reintentos (configurar en la consola, ver README): EventBridge
@@ -55,8 +55,8 @@ def _correr(fn, nombre):
 
 
 def _desde_url(event, context):
-    """Llamada por la URL de funcion (boton "Enviar al Form" de la app): comprobar la clave y arrancar
-    upselling_envio de forma asincrona, para contestar al Apps Script sin esperar al envio."""
+    """Llamada por la URL de funcion (botones "Enviar al Form" y "Cargar lista" de pre-conteo de la app): comprobar
+    la clave y arrancar la tarea de forma asincrona, para contestar al Apps Script sin esperar."""
     import base64
     import hmac
     import json
@@ -70,22 +70,22 @@ def _desde_url(event, context):
     except ValueError:
         datos = {}
     clave = os.environ.get("UPS_TOKEN", "")
-    if datos.get("tarea") != "upselling_envio" or not clave or not hmac.compare_digest(str(datos.get("token", "")), clave):
+    if datos.get("tarea") not in ("upselling_envio", "preconteo_lista") or not clave or not hmac.compare_digest(str(datos.get("token", "")), clave):
         return {"statusCode": 403, "body": "sin permiso"}
     import boto3
 
     boto3.client("lambda").invoke(FunctionName=context.function_name, InvocationType="Event",
-                                  Payload=json.dumps({"tarea": "upselling_envio"}).encode())
-    return {"statusCode": 202, "body": "envio arrancado"}
+                                  Payload=json.dumps({"tarea": datos["tarea"], "mats": datos.get("mats") or []}).encode())
+    return {"statusCode": 202, "body": "tarea arrancada"}
 
 
 def handler(event, context):
     if isinstance(event, dict) and "requestContext" in event:
         return _desde_url(event, context)
     tarea = (event or {}).get("tarea")
-    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "preconteo", "ofs_rm_prueba", "rm_analizar", "upselling_envio"):
+    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "preconteo", "preconteo_lista", "ofs_rm_prueba", "rm_analizar", "upselling_envio"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/preconteo/ofs_rm_prueba/rm_analizar/upselling_envio): {event}"
+            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/preconteo/preconteo_lista/ofs_rm_prueba/rm_analizar/upselling_envio): {event}"
         )
 
     if (event or {}).get("respaldo"):
@@ -137,6 +137,10 @@ def handler(event, context):
         import ov_preconteo
 
         _correr(ov_preconteo.main, "ov_preconteo")
+    elif tarea == "preconteo_lista":
+        import ov_preconteo
+
+        _correr(lambda: ov_preconteo.cargar_lista(event.get("mats") or []), "ov_preconteo")
     elif tarea == "ofs_rm_prueba":
         # Busca unos mantenimientos repetidos en Oracle y manda capturas/observaciones/historial.
         import ofs_rm_prueba

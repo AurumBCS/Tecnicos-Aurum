@@ -4005,6 +4005,7 @@ function fechaCortaUsoSms(iso){
 // quedar en ±PC_OBJETIVO €. Las confusiones de referencia que se compensan (F250SP/F252SP...) se dejan así.
 const PRECONTEO_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=preconteo&token=" + APP_TOKEN;
 const PRECONTEO_POST_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=preconteo-fisico";
+const PRECONTEO_LISTA_URL = PRECONTEO_POST_URL.replace("preconteo-fisico","preconteo-lista");
 const PC_OBJETIVO = 100, PC_LIMITE = 300;
 const PC_FAMILIAS = [
   ['Magnéticos Moonshot',['121272','121295']], ['Cámaras Arlo',['322050V','322070V']],
@@ -4049,7 +4050,35 @@ async function renderPreconteo(jeId, recargar){
   el.innerHTML = cab + `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
     <div style="font-size:.78rem;color:var(--text2)">Cuenta el coche del técnico <b>antes</b> del conteo periódico: te digo el descuadre y qué dejarle o quitarle para quedar en ±${PC_OBJETIVO} €.</div>
     ${lista || '<div style="font-size:.8rem;margin-top:8px">No hay conteos periódicos pendientes en tu equipo.</div>'}
+    ${(CURRENT_JE_ID||'').toUpperCase()==='GD5381' ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border2)">
+      <div style="font-size:.78rem;font-weight:700;margin-bottom:4px">Conteo no planificado</div>
+      <textarea id="pcLista" rows="3" placeholder="Pega las matrículas (una por línea, o separadas por espacios o comas)" style="width:100%;box-sizing:border-box;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.8rem;font-family:inherit"></textarea>
+      <button id="pcListaBtn" onclick="pcCargarLista()" style="margin-top:6px;width:100%;padding:8px;background:var(--gold);border:none;border-radius:8px;color:#000;font-weight:700;font-size:.78rem;cursor:pointer">Cargar lista</button>
+      <div id="pcListaEstado" style="font-size:.72rem;color:var(--text2);margin-top:6px"></div>
+    </div>` : ''}
     <button onclick="renderPreconteo('${jeId}',true)" style="margin-top:10px;width:100%;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.78rem;cursor:pointer">↻ Actualizar</button></div>`;
+}
+
+// Lista pegada: se quedan las palabras con algún número (matrículas), sin nombres ni repetidas
+function pcMatriculasDe(texto){
+  return [...new Set(String(texto||'').toUpperCase().split(/[\s,;]+/).filter(x=>/^[A-Z0-9.]{5,12}$/.test(x) && /\d/.test(x)))];
+}
+
+async function pcCargarLista(){
+  const est = document.getElementById('pcListaEstado'), btn = document.getElementById('pcListaBtn');
+  const mats = pcMatriculasDe(document.getElementById('pcLista').value);
+  if(!mats.length){ est.textContent = 'No veo ninguna matrícula en la lista.'; return; }
+  if(mats.length > 30){ est.textContent = `Son ${mats.length} matrículas; el máximo son 30 de una vez.`; return; }
+  btn.disabled = true;
+  est.textContent = 'Pidiendo…';
+  try{
+    const res = await fetch(PRECONTEO_LISTA_URL, {method:'POST', body: JSON.stringify({token: APP_TOKEN, je: CURRENT_JE_ID, mats})});
+    const r = await res.json();
+    if(!r.ok) throw new Error(r.error);
+    document.getElementById('pcLista').value = '';
+    est.textContent = `Pedidas ${r.mats.length}: ${r.mats.join(', ')}. Tarda 1-2 min por técnico; te llega un correo al terminar y luego pulsa actualizar.`;
+  }catch(e){ est.textContent = 'No se pudo pedir: ' + e.message; }
+  btn.disabled = false;
 }
 
 function pcLineas(t, cat){
