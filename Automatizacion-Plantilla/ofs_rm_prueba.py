@@ -28,7 +28,10 @@ Por defecto, dos parejas de agosto del Excel "RM Septiembre" (tecnico 361439):
 """
 
 import json
+import os
+import socket
 import sys
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -122,16 +125,56 @@ def _buscar_mantenimiento(page, numero, capturas):
     return ficha
 
 
-def _leer(page, numero, capturas, errores):
+def _hay_internet():
+    try:
+        socket.create_connection(("1.1.1.1", 443), timeout=4).close()
+        return True
+    except OSError:
+        return False
+
+
+def esperar_internet(max_min=45):
+    """Mac con el internet del movil (tuneles, sin cobertura): espera a que vuelva. True si hubo corte y ya volvio."""
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or _hay_internet():
+        return False
+    print("[red] sin internet, esperando a que vuelva...", flush=True)
+    inicio = time.time()
+    while not _hay_internet():
+        if time.time() - inicio > max_min * 60:
+            print(f"[red] {max_min} min sin internet, sigo sin esperar mas", flush=True)
+            return False
+        time.sleep(15)
+    print(f"[red] internet de vuelta tras {int(time.time() - inicio)} s", flush=True)
+    return True
+
+
+def _reanudar_si_corte(page):
+    """Si el fallo fue por un corte de internet, espera a que vuelva y recarga la pagina (misma sesion)."""
+    if not esperar_internet():
+        return False
+    try:
+        page.reload(wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(8000)
+    except Exception as e:
+        print(f"[red] no se pudo recargar: {e}", flush=True)
+    return True
+
+
+def _leer(page, numero, capturas, errores, reintento=True):
     """Ficha filtrada, "no visible" si no sale en la busqueda, o None si fallo."""
     try:
         ficha = _buscar_mantenimiento(page, numero, capturas)
         print(f"[rm] {numero}: ficha leida")
         return ficha
     except NoVisible:
+        # Sin internet la busqueda tampoco encuentra nada: no confundirlo con "otra empresa"
+        if reintento and _reanudar_si_corte(page):
+            return _leer(page, numero, capturas, errores, reintento=False)
         print(f"[rm] {numero}: no sale en la busqueda (otra empresa)")
         return "no visible"
     except Exception as e:
+        if reintento and _reanudar_si_corte(page):
+            return _leer(page, numero, capturas, errores, reintento=False)
         errores.append(f"{numero}: {e}")
         registrar_error("ofs_rm_prueba", f"{numero}: {e}")
         return None

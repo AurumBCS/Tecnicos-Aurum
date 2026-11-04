@@ -42,6 +42,10 @@ def leer(fecha_iso, grupo=""):
     from playwright.sync_api import sync_playwright
     correo, clave = consola_sso.leer_credenciales_sso()
     errores, capturas, datos = [], [], []
+    # Avance guardado cada 10 partes: si se corta (cobertura, tapa cerrada), al relanzar solo lee lo que falta
+    CARPETA.mkdir(parents=True, exist_ok=True)
+    parcial = CARPETA / f"parcial_{fecha_iso}_{grupo or 'todos'}.json"
+    hechas = {d["numero"]: d for d in json.loads(parcial.read_text(encoding="utf-8")) if d.get("ficha")} if parcial.exists() else {}
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
         ctx, page, _ = _entrar(browser, correo, clave)
@@ -49,18 +53,24 @@ def leer(fecha_iso, grupo=""):
             csvs = [c for c in consola_sso.descargar_csv_grupos(page, fecha_iso) if grupo.lower() in c[0].lower()]
             filas = ruta_sugerencias._filas_ruta(csvs, fecha_iso)
             print(f"[cod] {len(filas)} mantenimientos el {fecha_iso} ({grupo or 'todos'})", flush=True)
+            if hechas:
+                print(f"[cod] {len(hechas)} ya leidos en el intento anterior", flush=True)
             for i, f in enumerate(filas, 1):
+                if f["numero"] in hechas:
+                    datos.append(hechas[f["numero"]])
+                    continue
                 ficha = ofs_rm_prueba._leer(page, f["numero"], capturas, errores)
                 datos.append(dict(f, ficha=ficha if isinstance(ficha, dict) else None))
                 if i % 10 == 0:
                     print(f"[cod] {i}/{len(filas)}", flush=True)
+                    parcial.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
             ctx.storage_state(path=str(SESION_MAC))
         finally:
             browser.close()
-    CARPETA.mkdir(parents=True, exist_ok=True)
     salida = CARPETA / f"fichas_{fecha_iso}_{grupo or 'todos'}.json"
     salida.write_text(json.dumps(datos, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"[cod] {sum(1 for d in datos if d['ficha'])}/{len(datos)} fichas leidas ({len(errores)} errores) -> {salida}")
+    parcial.unlink(missing_ok=True)
     return datos
 
 
@@ -179,4 +189,5 @@ if __name__ == "__main__":
     else:
         datos = leer(fecha, a.grupo)
     if not a.solo_leer:
+        ofs_rm_prueba.esperar_internet()
         revisar_y_mandar(fecha, datos, a.modo)

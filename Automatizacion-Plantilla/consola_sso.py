@@ -74,12 +74,25 @@ def entrar_a_consola(page, correo, clave):
     page.wait_for_timeout(2000)
 
     if not es_pagina_microsoft(page) and page.locator(SELECTOR_GRUPOS).count() == 0:
-        boton_sso = page.get_by_role("button", name="Sign in with SSO")
-        if boton_sso.count() == 0:
-            boton_sso = page.get_by_text("Sign in with SSO")
-        if boton_sso.count() > 0:
+        # Con red lenta (internet del movil) el primer clic puede perderse si la pagina aun
+        # no ha terminado de cargar (visto 2026-11-04): esperar a que cargue y reintentar
+        try:
+            page.wait_for_load_state("networkidle", timeout=20000)
+        except Exception:
+            pass
+        for _ in range(3):
+            boton_sso = page.get_by_role("button", name="Sign in with SSO")
+            if boton_sso.count() == 0:
+                boton_sso = page.get_by_text("Sign in with SSO")
+            if boton_sso.count() == 0:
+                break
             boton_sso.first.click()
-            page.wait_for_timeout(3000)
+            for _ in range(20):
+                page.wait_for_timeout(1000)
+                if es_pagina_microsoft(page) or not boton_sso.count():
+                    break
+            if es_pagina_microsoft(page) or not boton_sso.count():
+                break
 
     if es_pagina_microsoft(page):
         iniciar_sesion_microsoft(page, correo, clave)

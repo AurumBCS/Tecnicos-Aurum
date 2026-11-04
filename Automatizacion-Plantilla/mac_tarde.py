@@ -100,6 +100,7 @@ def _proxima_ruta(page, fechas_iso, errores, capturas, reutilizar=False):
     (ruta_sugerencias.CARPETA_SALIDA / f"ruta_{'_'.join(fechas_iso)}_{sufijo}.json").write_text(
         json.dumps(datos, ensure_ascii=False, indent=1), encoding="utf-8")
     sug = ruta_sugerencias.sugerencias(datos)
+    ofs_rm_prueba.esperar_internet()
     ruta_sugerencias.enviar(fechas_iso, sug)
     return (f"Ruta {', '.join(fechas_iso)}: {len(sug)} mantenimientos con sugerencias, "
             f"{sum(1 for s in sug if s['alertas'])} con riesgo de RM"
