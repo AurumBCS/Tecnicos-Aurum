@@ -239,8 +239,24 @@ def sugerir(ficha, hoy=None):
                          "verifica que queda en 3G; 3) cambio a FAST 4 a coste 0 (AMPL F049) según zonas y riesgo en ruta: "
                          "LLAMA OBLIGATORIAMENTE AL JE antes.")
 
-    # ── caducidad: IMA no deja salir de programacion con humo caducado o a menos de 1 año ──
     f_inst = _fecha(ficha.get("fecha_instalacion"))
+
+    # ── cambio a 4PRO: los 3 motivos de RM de este panel (análisis recibido el 05/11/2026) ──
+    if panel == "Fast" and "vf4" not in _n(ficha.get("version_panel")):
+        hay_cambio = bool(re.search(r"\b[or]xvsf4", pet) or "ampliacion vf4" in tipo
+                          or ("vf2" in _n(ficha.get("version_panel"))
+                              and re.search(r"bloqueo|fallo (de )?(la )?central|central (no|bloque)", tipo + " " + pet)))
+        puede_venderse = "vf2" in _n(ficha.get("version_panel")) and (
+            re.search(r"4 ?pro\b|fast ?4|\bvf4\b|\bf049\b|\b2g\b", pet)
+            or (f_inst is not None and _meses(f_inst, hoy) >= 96))
+        if hay_cambio or puede_venderse:
+            hacer.append(("Cambio a 4PRO" if hay_cambio else "Si vendes el cambio a 4PRO")
+                         + ", para que no se repita: 1) batería nueva del panel (F013, nunca la 9082); "
+                         "2) ancla y atornilla el panel siempre que se pueda (obligatorio en negocios); "
+                         "3) revisa con el cliente que quedan programados todos los dispositivos, incluidos mandos y llaves "
+                         "(ojo donde hay que programar por avería y no se puede clonar).")
+
+    # ── caducidad: IMA no deja salir de programacion con humo caducado o a menos de 1 año ──
     if f_inst and _cuenta(zonas, ("FR",)) and _meses(f_inst, hoy) >= 108:
         hacer.append(f"Detector de humo de hace {_meses(f_inst, hoy) // 12} años: si está caducado o le queda menos de 1 año, "
                      "IMA no te deja salir de programación. Lleva uno nuevo.")
