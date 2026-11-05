@@ -8,6 +8,8 @@ PROTOTIPO: revision de la codificacion de los mantenimientos hechos el dia anter
   4. Un correo corto por jefe de equipo (una linea por parte mal codificado) con el detalle
      en Excel, por el Apps Script (type=recuentos-borradores): mismos destinatarios y copias
      que conteos. Registro en COD_REVISION_DIR/enviados.json para no repetir un dia.
+     El equipo de Nicola Morsa (Tenerife) no va al JE: un correo a cada tecnico, sin Excel, con
+     el error explicado y solo Nicola en copia.
 
 Uso:
   python3 cod_revision.py                                  -> dia laborable anterior, toda la empresa, enviar
@@ -18,6 +20,7 @@ Uso:
 import argparse
 import json
 import os
+import urllib.request
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -75,6 +78,7 @@ def leer(fecha_iso, grupo=""):
 
 
 REGISTRO = CARPETA / "enviados.json"
+JE_POR_TECNICO = "302154"   # Nicola Morsa
 
 
 def _registro():
@@ -104,6 +108,18 @@ def _excel(filas, destino):
     return destino
 
 
+def _mandar_tecnicos(tecnicos, modo):
+    datos = {"key": os.environ["RECUENTOS_KEY"].strip(), "tipo": "tecnicos", "modo": modo,
+             "copia_mat": JE_POR_TECNICO, "tecnicos": tecnicos}
+    req = urllib.request.Request(os.environ["RECUENTOS_SCRIPT_URL"].strip() + "?type=recuentos-borradores",
+                                 data=json.dumps(datos).encode(), headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as r:
+        res = json.loads(r.read().decode())
+    if not res.get("ok"):
+        raise RuntimeError(res.get("error") or "respuesta sin ok")
+    return res
+
+
 def revisar_y_mandar(fecha_iso, datos, modo="enviar"):
     import base64
     import re
@@ -128,16 +144,20 @@ def revisar_y_mandar(fecha_iso, datos, modo="enviar"):
         mat = (d.get("tecnico") or f.get("tecnico") or "").upper()
         p = jer.get(mat) or jer.get(re.sub(r"^[A-Z]{2}(?=\d{6}$)", "", mat)) or {}
         je = (p.get("JE") or "").strip().upper() or "SIN JE"
-        if je == "302154":
-            je = "GD5381"   # los de Nicola Morsa: a Gustavo con Nicola en CCO (CORREO_FORZADO / CCO_JEFE del Apps Script)
-        fin_je[je][mat] += 1
+        fin_je[je][(p.get("Matricula") or mat).strip().upper()] += 1
         h = cr.revisar(f)
         if not h:
             continue
         total += 1
-        por_je[je][(p.get("Nombre") or mat, mat)].append((d["numero"], f, h))
+        por_je[je][(p.get("Nombre") or mat, (p.get("Matricula") or mat).strip().upper())].append((d["numero"], f, h))
     fecha_txt = "/".join(reversed(fecha_iso.split("-")))
     jefes, resumen = [], []
+    tecs_tf, fin_tf = por_je.pop(JE_POR_TECNICO, {}), fin_je.pop(JE_POR_TECNICO, {})
+    tecnicos = []
+    for (nombre, mat), ms in tecs_tf.items():
+        html = cr.correo_html_tecnico(fecha_txt, nombre, [(num, f.get("tipo"), h) for num, f, h in ms], fin_tf.get(mat, len(ms)))
+        tecnicos.append({"mat": mat, "asunto": f"Tus partes del {fecha_txt} con la codificación mal ({len(ms)})", "html": html,
+                         "texto": f"Tus partes del {fecha_txt} con la codificación mal: {len(ms)}."})
     for je, tecs in por_je.items():
         if je == "SIN JE":
             resumen.append(f"Sin jefe de equipo en el cuadrante: {', '.join(m for _, m in tecs)}")
@@ -161,7 +181,18 @@ def revisar_y_mandar(fecha_iso, datos, modo="enviar"):
         errores = [f"JE {r.get('jde')}: {r.get('error')}" for r in res.get("resultado", []) if not r.get("ok")]
         resumen.insert(0, f"{fecha_txt}: {finl} partes finalizados, {total} con la codificación mal ({cr._pct(total, finl)}). "
                           f"Modo {res.get('modo')}: {ok}/{len(jefes)} correos ok.")
-    if modo == "enviar" and jefes:
+    if tecnicos or fin_tf:
+        n_p, n_f = sum(len(ms) for ms in tecs_tf.values()), sum(fin_tf.values())
+        ok_t = 0
+        if tecnicos:
+            try:
+                res = _mandar_tecnicos(tecnicos, modo)
+                ok_t = sum(1 for r in res.get("resultado", []) if r.get("ok"))
+                errores += [f"Técnico {r.get('mat')}: {r.get('error')}" for r in res.get("resultado", []) if not r.get("ok")]
+            except Exception as e:
+                errores.append(f"Correos a técnicos de JE {JE_POR_TECNICO}: {e}")
+        resumen.append(f"JE {JE_POR_TECNICO} (a cada técnico): {n_p} de {n_f} partes mal ({cr._pct(n_p, n_f)}), {ok_t}/{len(tecnicos)} correos ok")
+    if modo == "enviar" and (jefes or tecnicos):
         from datetime import datetime
         reg = _registro()
         reg[fecha_iso] = datetime.now().strftime("%Y-%m-%d %H:%M")

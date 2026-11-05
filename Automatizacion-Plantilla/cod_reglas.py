@@ -313,6 +313,26 @@ def _pct(a, b):
     return f"{round(100 * a / b)} %" if b else "-"
 
 
+def correo_html_tecnico(fecha, nombre, partes, n_fin):
+    """Correo a un técnico con sus partes mal codificados. partes: [(numero, tipo, [hallazgos])]."""
+    n = len(partes)
+    if n_fin == 1:
+        frase = f'El mantenimiento que finalizaste el <b>{_e(fecha)}</b> tiene la codificación mal. Por favor, corrígelo:'
+    else:
+        frase = (f'De los <b>{n_fin}</b> mantenimientos que finalizaste el <b>{_e(fecha)}</b>, <b>{n}</b> '
+                 f'{"tiene" if n == 1 else "tienen"} la codificación mal. Por favor, {"corrígelo" if n == 1 else "corrígelos"}:')
+    bloques = ""
+    for num, tipo, hall in partes:
+        lineas = "".join(f'<li style="margin:2px 0">{_e(t)}</li>' for t in dict.fromkeys(h["texto"].strip() for h in hall))
+        bloques += (f'<p style="margin:14px 0 4px"><b>{_e(num)}</b> · {_e(tipo or "")}</p>'
+                    f'<ul style="margin:0;padding-left:18px">{lineas}</ul>')
+    return f"""<div style="font-family:Arial,sans-serif;font-size:14px;color:#222;max-width:680px;line-height:1.45">
+<p>Hola {_e(nombre.split()[0])},</p>
+<p>{frase}</p>
+{bloques}
+<p>Gustavo Perez<br>Aurum BC Security SL</p></div>"""
+
+
 def correo_html_corto(fecha, tecnicos, finalizados=None):
     """tecnicos: lista de (nombre, matricula, [(numero, [hallazgos])]). Una línea por mantenimiento.
     finalizados: {matricula: partes FINL del dia} del equipo, para el porcentaje de partes mal codificados."""
