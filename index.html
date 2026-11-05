@@ -493,6 +493,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <button class="tab-btn active" id="tabJEs" onclick="switchTab(&#39;jes&#39;)">Jefes de equipo</button>
     <button class="tab-btn" id="tabUso" onclick="switchTab(&#39;uso&#39;)">Uso de la app</button>
     <button class="tab-btn" id="tabUsoSms" style="display:none" onclick="switchTab(&#39;usoSms&#39;)">📲 Uso confirmaciones</button>
+    <button class="tab-btn" id="tabAgenda" style="display:none" onclick="switchTab(&#39;agenda&#39;)">🕗 Agenda 8:00</button>
   </div>
 
   <!-- Panel técnico normal -->
@@ -671,6 +672,15 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <option value="mes">Este mes</option>
     </select>
     <div id="usoSmsContent"><div style="text-align:center;color:var(--text2);padding:40px 0">Cargando…</div></div>
+  </div>
+
+  <!-- Panel agenda de las 8:00 (AGENDA_VISIBLE_PARA: GD5381, CM9651) -->
+  <div id="agendaPanel" style="display:none;padding:14px 13px 48px;max-width:680px;margin:0 auto">
+    <div class="data-banner" style="margin-bottom:14px">
+      <div class="sync-dot"></div>
+      Actividades con las que salen los técnicos a las 8:00 y cuántas terminan ese día
+    </div>
+    <div id="agendaContent"><div style="text-align:center;color:var(--muted);padding:40px 0">Cargando…</div></div>
   </div>
 
   <!-- Panel detalle KPI (técnico individual) -->
@@ -1359,7 +1369,7 @@ async function cambiarMes(mes){
 //  PANELS VISIBILITY
 // ══════════════════════════════════════════════
 function hideAllPanels(){
-  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','upsellingPanel','usagePanel','usoSmsPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','mananaPanel','cumDashPanel','historicoPanel']
+  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','upsellingPanel','usagePanel','usoSmsPanel','agendaPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','mananaPanel','cumDashPanel','historicoPanel']
     .forEach(id=>document.getElementById(id).style.display='none');
 }
 function showPanel(id){
@@ -1421,8 +1431,10 @@ function switchTab(tab){
     document.getElementById('tabJEs').classList.toggle('active', tab==='jes');
     document.getElementById('tabUso').classList.toggle('active', tab==='uso');
     document.getElementById('tabUsoSms').classList.toggle('active', tab==='usoSms');
+    document.getElementById('tabAgenda').classList.toggle('active', tab==='agenda');
     if(tab==='uso'){ showPanel('usagePanel'); renderUsagePanel(); renderUsoSecciones(); }
     else if(tab==='usoSms'){ showPanel('usoSmsPanel'); renderUsoSmsPanel(); }
+    else if(tab==='agenda'){ showPanel('agendaPanel'); renderAgendaPanel(); }
     else { showPanel('jrPanel'); }
   }
 }
@@ -4376,6 +4388,217 @@ function noEntraronPorEquipo(d, nombre, jeDe, soloJE){
   return cab + selector + resumen + tarjetas + '<div style="height:10px"></div>';
 }
 
+// ══════════════════════════════════════════════
+//  AGENDA DE LAS 8:00 (pestaña solo para AGENDA_VISIBLE_PARA)
+// ══════════════════════════════════════════════
+// Actividades con las que salen los técnicos a la apertura y cuántas están
+// terminadas al cierre del mismo día. Lo calcula agenda_cruce.py en el Mac cada
+// mañana con los dos correos de Verisure (agenda a la apertura y al cierre) y lo
+// sube al Apps Script (type=agenda). Verisure pasa actividades a otras contratas
+// durante el día: las que no aparecen al cierre y no vuelven a salir en ningún
+// correo de Aurum se cuentan como "otra contrata" y no pesan en el porcentaje.
+const AGENDA_VISIBLE_PARA = ['GD5381', 'CM9651'];
+const AGENDA_URL = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec?type=agenda&token=" + APP_TOKEN;
+const AGENDA_CACHE = {};
+let AGENDA_MES = '';
+let AGENDA_JDE = 'todos';
+
+async function pedirAgenda(mes){
+  const clave = mes || '_ultimo';
+  if(AGENDA_CACHE[clave]) return AGENDA_CACHE[clave];
+  const res = await fetch(AGENDA_URL + (mes ? '&mes=' + encodeURIComponent(mes) : '') + '&t=' + Date.now(), {cache:'no-store'});
+  const d = JSON.parse(await res.text());
+  if(!d.ok) throw new Error(d.error || 'error');
+  AGENDA_CACHE[d.mes] = d;
+  if(!mes) AGENDA_CACHE._ultimo = d;
+  return d;
+}
+
+function escAgenda(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function pctAgenda(v){ return (v == null || !isFinite(v)) ? '—' : (v*100).toFixed(1).replace('.', ',') + ' %'; }
+function numAgenda(v){ return (Number(v)||0).toLocaleString('es-ES'); }
+function mesLargoAgenda(m){ const [a, n] = m.split('-'); return NOMBRES_MESES_ES[Number(n)-1] + ' ' + a; }
+function colorAgenda(p){ return !isFinite(p) ? 'var(--muted)' : p >= 0.9 ? 'var(--green2)' : p >= 0.85 ? 'var(--gold2)' : '#e05a4a'; }
+
+const AGENDA_CAMPOS = ['salen','hecha_mismo','hecha_otro','suspendido','cancelado','no_aparece','otra_contrata','sin_estado','anadidas','completadas_cierre'];
+
+// Filas del Apps Script (arrays) -> objetos con números
+function filasAgenda(d){
+  return (d.filas || []).map(r => {
+    const o = {};
+    d.cols.forEach((c, i) => { o[c] = AGENDA_CAMPOS.includes(c) || c === 'provisional' ? Number(r[i]) || 0 : r[i]; });
+    return o;
+  });
+}
+function sumarAgenda(filas){
+  const t = {}; AGENDA_CAMPOS.forEach(c => t[c] = 0);
+  filas.forEach(r => AGENDA_CAMPOS.forEach(c => t[c] += r[c]));
+  t.terminadas = t.hecha_mismo + t.hecha_otro;
+  t.no_terminadas = t.suspendido + t.cancelado + t.no_aparece + t.sin_estado;
+  t.pct = t.salen ? t.terminadas / t.salen : NaN;
+  t.pct_sin = (t.salen - t.otra_contrata) ? t.terminadas / (t.salen - t.otra_contrata) : NaN;
+  return t;
+}
+
+function cambiarMesAgenda(m){ AGENDA_MES = m; renderAgendaPanel(); }
+function cambiarEquipoAgenda(j){ AGENDA_JDE = j || 'todos'; renderAgendaPanel(); }
+
+async function renderAgendaPanel(recargar){
+  const el = document.getElementById('agendaContent');
+  if(recargar) Object.keys(AGENDA_CACHE).forEach(k => delete AGENDA_CACHE[k]);
+  let d;
+  if(!AGENDA_CACHE[AGENDA_MES || '_ultimo']) el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px 0">Cargando…</div>';
+  try{
+    d = await pedirAgenda(AGENDA_MES);
+  }catch(e){
+    el.innerHTML = '<div style="text-align:center;color:var(--red);padding:30px 0">No se pudieron cargar los datos ('+escAgenda(e.message)+').</div>'+
+      '<button onclick="renderAgendaPanel(true)" style="width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text);cursor:pointer">↻ Reintentar</button>';
+    return;
+  }
+  AGENDA_MES = d.mes;
+  if(!d.mes){
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px 0">Todavía no hay datos. Se cargan cada mañana después de las 8:00.</div>';
+    return;
+  }
+  // Mes anterior para comparar (si existe)
+  const iMes = d.meses.indexOf(d.mes);
+  let dPrev = null;
+  if(iMes > 0){ try{ dPrev = await pedirAgenda(d.meses[iMes-1]); }catch(e){ dPrev = null; } }
+
+  const todas = filasAgenda(d);
+  const equipos = {};
+  todas.forEach(r => { if(r.jde && r.jde !== '?') equipos[r.jde] = {jefe: r.jefe, provincia: r.provincia}; });
+  if(AGENDA_JDE !== 'todos' && !equipos[AGENDA_JDE]) AGENDA_JDE = 'todos';
+  const delEquipo = f => AGENDA_JDE === 'todos' ? f : f.filter(r => r.jde === AGENDA_JDE);
+  const filas = delEquipo(todas);
+  const t = sumarAgenda(filas);
+  const tPrev = dPrev ? sumarAgenda(delEquipo(filasAgenda(dPrev))) : null;
+  const dias = [...new Set(filas.map(r => r.dia))].sort();
+  const provisional = filas.some(r => r.provisional);
+
+  const sel = (id, onchange, opciones) => `<select id="${id}" onchange="${onchange}" style="flex:1;min-width:0;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">${opciones}</select>`;
+  const optMes = d.meses.slice().reverse().map(m => `<option value="${m}" ${m===d.mes?'selected':''}>${mesLargoAgenda(m)}</option>`).join('');
+  const optEq = '<option value="todos">Todos los equipos</option>' + Object.keys(equipos)
+    .sort((a,b) => equipos[a].jefe.localeCompare(equipos[b].jefe, 'es'))
+    .map(j => `<option value="${j}" ${j===AGENDA_JDE?'selected':''}>${escAgenda(equipos[j].jefe)}${equipos[j].provincia?' · '+escAgenda(equipos[j].provincia.charAt(0)+equipos[j].provincia.slice(1).toLowerCase()):''}</option>`).join('');
+
+  const tarjeta = (valor, texto, color, extra) => `
+    <div style="flex:1;min-width:120px;background:var(--s1);border-radius:12px;padding:10px 8px;border:1px solid var(--border2);text-align:center">
+      <div style="font-size:1.4rem;font-weight:800;color:${color}">${valor}</div>
+      <div style="font-size:.7rem;color:var(--muted)">${texto}</div>
+      ${extra ? `<div style="font-size:.66rem;color:var(--muted);margin-top:3px">${extra}</div>` : ''}
+    </div>`;
+  let comparar = '';
+  if(tPrev && isFinite(tPrev.pct_sin) && isFinite(t.pct_sin)){
+    const dif = (t.pct_sin - tPrev.pct_sin) * 100;
+    comparar = `<span style="color:${dif>=0?'var(--green2)':'#e05a4a'};font-weight:700">${dif>=0?'+':''}${dif.toFixed(1).replace('.', ',')} puntos</span> frente a ${NOMBRES_MESES_ES[Number(dPrev.mes.slice(5))-1].toLowerCase()}`;
+  }
+
+  // Porcentaje por día: barras
+  const porDia = dias.map(f => ({dia: f, ...sumarAgenda(filas.filter(r => r.dia === f)), provisional: filas.some(r => r.dia === f && r.provisional)}));
+  const W = 640, H = 170, ml = 44, mb = 24, mt = 8;
+  const vals = porDia.map(x => x.pct_sin).filter(isFinite);
+  const lo = vals.length ? Math.max(0, Math.floor((Math.min(...vals) - 0.03) * 20) / 20) : 0.5;
+  const y = v => mt + (1 - (v - lo) / (1 - lo)) * (H - mt - mb);
+  const paso = (W - ml) / Math.max(1, porDia.length);
+  const bw = Math.min(22, paso * 0.7);
+  const ticks = []; for(let v = 1; v >= lo - 1e-9; v -= 0.05) ticks.push(Math.round(v*100)/100);
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Porcentaje de terminadas por día" style="display:block">
+    ${ticks.map(v => `<line x1="${ml}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(201,168,76,.12)"/><text x="${ml-5}" y="${y(v)+3}" text-anchor="end" font-size="13" fill="#7a6840">${Math.round(v*100)}%</text>`).join('')}
+    ${porDia.map((x, i) => {
+      const cx = ml + paso * i + paso / 2;
+      const v = isFinite(x.pct_sin) ? x.pct_sin : lo;
+      return `<g><title>${x.dia.slice(8)}/${x.dia.slice(5,7)}: ${pctAgenda(x.pct_sin)} sin otra contrata · ${pctAgenda(x.pct)} contando todo · ${numAgenda(x.salen)} salen${x.provisional?' · provisional':''}</title>
+        <rect x="${cx-bw/2}" y="${y(v)}" width="${bw}" height="${Math.max(0, H-mb-y(v))}" rx="3" fill="${colorAgenda(x.pct_sin)}" opacity="${x.provisional?0.45:0.9}"/>
+        ${(i % Math.max(1, Math.ceil(porDia.length/16))) ? '' : `<text x="${cx}" y="${H-6}" text-anchor="middle" font-size="13" fill="#7a6840">${Number(x.dia.slice(8))}</text>`}</g>`;
+    }).join('')}
+  </svg>`;
+
+  const barra = (nombre, parte, valor, sub, color, onclick, activo) => `
+    <div ${onclick?`onclick="${onclick}" style="cursor:pointer;`:'style="'}display:grid;grid-template-columns:minmax(0,11rem) minmax(0,1fr) 4.6rem;gap:8px;align-items:center;padding:4px 2px;font-size:.76rem;${activo?'font-weight:800;':''}">
+      <span style="overflow-wrap:anywhere">${nombre}</span>
+      <span style="height:10px;background:rgba(201,168,76,.12);border-radius:5px;overflow:hidden"><span style="display:block;height:100%;width:${Math.max(0,Math.min(1,parte))*100}%;background:${color};border-radius:5px"></span></span>
+      <span style="text-align:right">${valor}${sub?`<div style="font-size:.66rem;color:var(--muted)">${sub}</div>`:''}</span>
+    </div>`;
+  const caja = (titulo, nota, cuerpo) => `
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-weight:800;color:var(--gold2);margin-bottom:4px">${titulo}</div>
+      ${nota?`<div style="font-size:.7rem;color:var(--muted);margin-bottom:8px">${nota}</div>`:''}
+      ${cuerpo}
+    </div>`;
+
+  const cats = [
+    ['hecha_mismo','Terminada por su técnico','var(--green2)'],
+    ['hecha_otro','Terminada por otro técnico','var(--green2)'],
+    ['suspendido','Suspendida','#e05a4a'],
+    ['cancelado','Cancelada','#e05a4a'],
+    ['sin_estado','Sin estado al cierre','var(--orange)'],
+    ['no_aparece','No aparece al cierre, vuelve otro día','var(--orange)'],
+    ['otra_contrata','Pasada a otra contrata (estimado)','var(--muted)'],
+  ];
+  const reparto = cats.map(([c, n, col]) => barra(n, t.salen ? t[c]/t.salen : 0, pctAgenda(t.salen ? t[c]/t.salen : NaN), numAgenda(t[c]), col)).join('');
+
+  // Ranking de equipos (siempre todos, el elegido resaltado)
+  const rank = Object.keys(equipos).map(j => ({jde: j, ...equipos[j], ...sumarAgenda(todas.filter(r => r.jde === j))}))
+    .filter(x => x.salen).sort((a,b) => b.pct_sin - a.pct_sin);
+  const loR = rank.length ? Math.max(0, Math.floor((Math.min(...rank.map(x=>x.pct_sin)) - 0.05) * 20) / 20) : 0;
+  const ranking = rank.map(x => barra(escAgenda(x.jefe), (x.pct_sin - loR)/(1 - loR), pctAgenda(x.pct_sin), numAgenda(x.salen)+' act.',
+    colorAgenda(x.pct_sin), `cambiarEquipoAgenda('${x.jde===AGENDA_JDE?'todos':x.jde}')`, x.jde===AGENDA_JDE)).join('');
+
+  // Técnicos
+  const porTec = {};
+  filas.forEach(r => (porTec[r.mat] = porTec[r.mat] || {mat: r.mat, tecnico: r.tecnico, jefe: r.jefe, filas: []}).filas.push(r));
+  // Con menos de 20 actividades el porcentaje dice poco: van al final
+  const tecs = Object.values(porTec).map(x => ({...x, ...sumarAgenda(x.filas)})).filter(x => x.salen > 0)
+    .sort((a,b) => ((a.salen<20)-(b.salen<20)) || ((a.pct_sin||0) - (b.pct_sin||0)));
+  const tabla = `<div style="overflow-x:auto;max-height:28rem;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:.76rem">
+    <thead><tr style="color:var(--muted);font-size:.68rem;text-align:right">
+      <th style="text-align:left;padding:4px 6px;position:sticky;top:0;background:var(--s1)">Técnico</th>
+      <th style="padding:4px 6px;position:sticky;top:0;background:var(--s1)">Salen</th>
+      <th style="padding:4px 6px;position:sticky;top:0;background:var(--s1)">Terminadas</th>
+      <th style="padding:4px 6px;position:sticky;top:0;background:var(--s1)">Susp.</th>
+      <th style="padding:4px 6px;position:sticky;top:0;background:var(--s1)">Otra contrata</th>
+    </tr></thead><tbody>
+    ${tecs.map(x => `<tr style="border-top:1px solid var(--border2)">
+      <td style="padding:5px 6px">${escAgenda(x.tecnico || x.mat)}<div style="font-size:.66rem;color:var(--muted)">${escAgenda(x.mat)}${AGENDA_JDE==='todos'&&x.jefe?' · '+escAgenda(x.jefe):''}</div></td>
+      <td style="padding:5px 6px;text-align:right">${numAgenda(x.salen)}</td>
+      <td style="padding:5px 6px;text-align:right;font-weight:700;color:${x.salen>=20?colorAgenda(x.pct_sin):'var(--text)'}">${pctAgenda(x.pct_sin)}</td>
+      <td style="padding:5px 6px;text-align:right">${numAgenda(x.suspendido)}</td>
+      <td style="padding:5px 6px;text-align:right;color:var(--muted)">${numAgenda(x.otra_contrata)}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+
+  // Razones de suspensión del mes
+  const raz = {};
+  (d.razones || []).forEach(r => { if(AGENDA_JDE === 'todos' || r[1] === AGENDA_JDE) raz[r[2]] = (raz[r[2]]||0) + (Number(r[3])||0); });
+  const razOrden = Object.entries(raz).sort((a,b) => b[1]-a[1]).slice(0, 6);
+  const maxR = razOrden.length ? razOrden[0][1] : 1;
+  const razones = razOrden.length ? razOrden.map(([r, n]) => barra(escAgenda(r), n/maxR, numAgenda(n), '', '#e05a4a')).join('')
+    : '<div style="font-size:.76rem;color:var(--muted)">Sin suspensiones este mes.</div>';
+
+  const nombreEq = AGENDA_JDE === 'todos' ? 'Toda la empresa' : 'Equipo de ' + escAgenda(equipos[AGENDA_JDE].jefe);
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:10px">${sel('agendaMes', 'cambiarMesAgenda(this.value)', optMes)}${sel('agendaEquipo', 'cambiarEquipoAgenda(this.value)', optEq)}</div>
+    <div style="font-size:.7rem;color:var(--muted);margin-bottom:12px">${nombreEq} · ${dias.length} días con los dos correos (${dias.length?dias[0].slice(8)+'/'+dias[0].slice(5,7)+' a '+dias[dias.length-1].slice(8)+'/'+dias[dias.length-1].slice(5,7):'—'})${d.actualizado?' · actualizado '+escAgenda(d.actualizado.slice(8,10)+'/'+d.actualizado.slice(5,7)+' '+d.actualizado.slice(11)):''}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      ${tarjeta(pctAgenda(t.pct_sin), 'Terminadas el mismo día', colorAgenda(t.pct_sin), comparar || ('Contando todo: '+pctAgenda(t.pct)))}
+      ${tarjeta(numAgenda(t.salen), 'Salen a las 8:00', 'var(--gold2)', numAgenda(t.anadidas)+' añadidas durante el día')}
+      ${tarjeta(numAgenda(t.no_terminadas), 'No terminadas', '#e05a4a', numAgenda(t.suspendido)+' suspendidas')}
+      ${tarjeta(numAgenda(t.otra_contrata), 'Otra contrata (estimado)', 'var(--muted)', 'No cuentan en el %')}
+    </div>
+    ${caja('Terminadas por día', 'Sin contar otra contrata. Verde desde el 90 %, dorado desde el 85 %.'+(provisional?' Las barras claras son de los últimos 7 días: aún pueden bajar un poco.':''), svg)}
+    ${caja('Qué pasa con lo que sale a las 8:00', 'Estado al cierre del mismo día.', reparto)}
+    ${caja('Equipos', 'Terminadas sin contar otra contrata. Pulsa un equipo para ver solo el suyo.', ranking)}
+    ${caja('Técnicos', 'Del que menos termina al que más. Los que tienen menos de 20 actividades en el mes van al final y sin color.', tabla)}
+    ${caja('Razones de suspensión', '', razones)}
+    <div style="font-size:.68rem;color:var(--muted);line-height:1.5;padding:0 2px">
+      Se cruzan por número de mantenimiento los dos correos diarios de Verisure: los agendados a la apertura y los del cierre. Una actividad cuenta como terminada si al cierre está completada, por su técnico o por otro de Aurum.
+      Verisure pasa actividades a otras contratas durante el día: se toman como otra contrata las que no aparecen al cierre y no vuelven a salir en ningún correo de Aurum. Es una estimación algo alta: en una muestra de 120 revisada en Oracle (05/11) eran el 67,5 % de las desaparecidas, y por este criterio salen el 80 %.
+    </div>`;
+}
+
 // Histórico diario (resumen guardado cada noche) para la pestaña de GD5381
 function historicoDiarioUsoSms(d, nombre, jeDe){
   const porDia = {};
@@ -6767,6 +6990,7 @@ async function doLogin(){
     document.getElementById('tabsBar').style.display='none';
     document.getElementById('btnEquipoTF').style.display = found.id==='GD5381' ? 'block' : 'none';
     document.getElementById('tabUsoSms').style.display = USO_SMS_VISIBLE_PARA.includes(found.id) ? '' : 'none';
+    document.getElementById('tabAgenda').style.display = AGENDA_VISIBLE_PARA.includes(found.id) ? '' : 'none';
     renderJRPanel();
     Promise.all([loadMedialiaCoord(), loadMedaliaDetalle()]).then(()=>renderMedialiaCoord());
     showPanel('jrPanel');
