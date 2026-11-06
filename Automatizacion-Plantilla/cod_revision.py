@@ -12,7 +12,7 @@ PROTOTIPO: revision de la codificacion de los mantenimientos hechos el dia anter
      el error explicado y solo Nicola en copia.
 
 Uso:
-  python3 cod_revision.py                                  -> dia laborable anterior, toda la empresa, enviar
+  python3 cod_revision.py                                  -> dia laborable anterior (el lunes, viernes y sabado), toda la empresa, enviar
   python3 cod_revision.py --fecha 2026-10-26 --grupo Tenerife --modo prueba
   python3 cod_revision.py --fecha 2026-10-26 --solo-enviar  -> usa las fichas ya leidas
 
@@ -206,6 +206,46 @@ def revisar_y_mandar(fecha_iso, datos, modo="enviar"):
     print("\n".join(resumen + errores))
 
 
+def dias_a_revisar(hoy=None):
+    """El dia laborable anterior; el lunes, el viernes y tambien el sabado (Gustavo, 06/11)."""
+    hoy = hoy or date.today()
+    if hoy.weekday() == 0:
+        return [hoy - timedelta(days=3), hoy - timedelta(days=2)]
+    return [dia_anterior(hoy)]
+
+
+def procesar(fecha, a):
+    import rm_ejecucion
+    # El correo de RM solo sale si tarde_mac.sh exporta RM_CORREO=si
+    rm_activo = os.environ.get("RM_CORREO", "").lower() in ("si", "sí", "1") and not a.grupo
+    rm_hecho = not rm_activo or fecha in rm_ejecucion._registro()
+    if a.modo == "enviar" and not a.solo_leer and fecha in _registro() and rm_hecho:
+        print(f"[cod] los partes del {fecha} ya se enviaron ({_registro()[fecha]}): nada que hacer")
+        return
+    fichas = CARPETA / f"fichas_{fecha}_{a.grupo or 'todos'}.json"
+    if a.solo_enviar or (a.modo == "enviar" and fecha in _registro() and fichas.exists()):
+        # (si la codificacion ya salio y falta el correo de RM, se usan las fichas guardadas: no se abre Oracle)
+        datos = json.loads(fichas.read_text(encoding="utf-8"))
+    else:
+        datos = leer(fecha, a.grupo)
+    if a.solo_leer:
+        return
+    if not datos:
+        print(f"[cod] {fecha}: no hay mantenimientos en la ruta, nada que mandar")
+        return
+    ofs_rm_prueba.esperar_internet()
+    if fecha not in _registro() or a.modo != "enviar":
+        revisar_y_mandar(fecha, datos, a.modo)
+    if rm_activo:   # solo con la empresa entera (los porcentajes por JE salen de todas las fichas)
+        try:
+            rm_ejecucion.revisar_y_mandar(fecha, datos, a.modo)
+        except Exception as e:
+            from comun_ofs import enviar_aviso
+            print(f"[rm] fallo el correo de riesgo de RM: {e}")
+            if a.modo != "prueba":
+                enviar_aviso(f"⚠️ Riesgo de RM del {fecha}: no se pudo mandar", str(e))
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--fecha")
@@ -214,29 +254,12 @@ if __name__ == "__main__":
     ap.add_argument("--solo-leer", action="store_true")
     ap.add_argument("--solo-enviar", action="store_true")
     a = ap.parse_args()
-    fecha = a.fecha or dia_anterior().isoformat()
-    import rm_ejecucion
-    # El correo de RM solo sale si tarde_mac.sh exporta RM_CORREO=si (apagado hasta que Gustavo lo apruebe)
-    rm_activo = os.environ.get("RM_CORREO", "").lower() in ("si", "sí", "1") and not a.grupo
-    rm_hecho = not rm_activo or fecha in rm_ejecucion._registro()
-    if a.modo == "enviar" and not a.solo_leer and fecha in _registro() and rm_hecho:
-        print(f"[cod] los partes del {fecha} ya se enviaron ({_registro()[fecha]}): nada que hacer")
-        raise SystemExit(0)
-    fichas = CARPETA / f"fichas_{fecha}_{a.grupo or 'todos'}.json"
-    if a.solo_enviar or (a.modo == "enviar" and fecha in _registro() and fichas.exists()):
-        # (si la codificacion ya salio y falta el correo de RM, se usan las fichas guardadas: no se abre Oracle)
-        datos = json.loads(fichas.read_text(encoding="utf-8"))
-    else:
-        datos = leer(fecha, a.grupo)
-    if not a.solo_leer:
-        ofs_rm_prueba.esperar_internet()
-        if fecha not in _registro() or a.modo != "enviar":
-            revisar_y_mandar(fecha, datos, a.modo)
-        if rm_activo:   # solo con la empresa entera (los porcentajes por JE salen de todas las fichas)
-            try:
-                rm_ejecucion.revisar_y_mandar(fecha, datos, a.modo)
-            except Exception as e:
-                from comun_ofs import enviar_aviso
-                print(f"[rm] fallo el correo de riesgo de RM: {e}")
-                if a.modo != "prueba":
-                    enviar_aviso(f"⚠️ Riesgo de RM del {fecha}: no se pudo mandar", str(e))
+    # una lectura detras de otra (nunca dos sesiones de Oracle a la vez); si un dia falla, se sigue con el otro
+    fallos = 0
+    for fecha in ([a.fecha] if a.fecha else [d.isoformat() for d in dias_a_revisar()]):
+        try:
+            procesar(fecha, a)
+        except Exception as e:
+            fallos += 1
+            print(f"[cod] {fecha}: fallo: {e}", flush=True)
+    raise SystemExit(1 if fallos else 0)

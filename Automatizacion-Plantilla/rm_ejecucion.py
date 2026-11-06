@@ -240,7 +240,7 @@ CONSEJOS = {
     "pilas": "Más de 1 año sin cambiar pilas: todas (instalación pequeña) o como mínimo teclado, sirena, foto y MG de la entrada. "
              "Entre 6 meses y 1 año: teclado o tag reader, sirena y MG1.",
     "comunicaciones": "En avisos de comunicaciones: probar SIM de otros operadores, revisar cobertura y dejar la central conectada a internet.",
-    "4PRO": "Al pasar a 4PRO: batería nueva F013, panel anclado y atornillado, y comprobar con el cliente mandos y llaves.",
+    "4PRO": "Al pasar a 4PRO: batería nueva F013 (SUST), panel anclado y atornillado en negocios, y comprobar con el cliente mandos y llaves.",
     "pendiente": "No cerrar con cosas pendientes: lo que queda sin hacer vuelve como mantenimiento repetido.",
 }
 
