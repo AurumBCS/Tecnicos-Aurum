@@ -149,6 +149,11 @@ def revisar(ficha):
     # ── SIM ──
     if _dice(obs, r"\bsim\b") and _dice(obs, r"sustitu|camb|coloca|pone") and not items & SIMS:
         mal("SIM", "Cambia la SIM y no la codifica: Añadir trabajos → referencia de la SIM → MONT.")
+    # SIM nueva sin el desmontaje de la vieja: son referencias distintas, va DESM de la vieja + MONT de la nueva,
+    # tambien al pasar a 4PRO (Gustavo, 06/11; corrige el feedback del JE del 29/10 de que la SIM no se desmonta)
+    if any(l["item"] in SIMS and l["res"] in ("MONT", "AMPL") for l in lin) \
+            and not any(l["item"] in SIMS and l["res"] in ("DESM", "DESU") for l in lin):
+        mal("SIM", "Monta una SIM nueva y no codifica el DESM de la SIM vieja: son referencias distintas, va DESM de la vieja + MONT de la nueva.")
     if any(l["causa"] in ("2500", "2501") for l in lin):
         mal("SIM", "Usa la causa 2500/2501 (Upgrade): bloquea la facturación, no se usa en mantenimientos.")
 
@@ -218,7 +223,7 @@ MEJORAS = {
             "se codifican también F055 y F057. Siempre DESM de la Fast 2 y MONT de la SIM nueva; si se cambia la batería, SUST de la F013.",
     "sustitución": "Misma referencia → SUST. Otra referencia → MONT del nuevo + DESM (te lo llevas) o DESU (se lo queda el cliente).",
     "pilas": "'Añadir pilas' solo en los dispositivos en los que únicamente se cambian pilas: lo sustituido o ampliado ya lleva las suyas.",
-    "SIM": "La SIM se codifica en Añadir trabajos con su referencia y resolución MONT (nunca 'Datos de SIM' ni causa 2500/2501).",
+    "SIM": "La SIM se codifica en Añadir trabajos: DESM de la SIM vieja y MONT de la nueva, cada una con su referencia (nunca 'Datos de SIM' ni causa 2500/2501).",
     "reubicación": "Todo lo que se reubica va codificado como REUB.",
     "desmontaje": "Todo lo que se retira va como DESM (o DESU si se lo queda el cliente), con las unidades exactas.",
     "ampliación": "Lo que se amplía (mandos, llaves…) va como AMPL con su referencia.",
@@ -283,6 +288,7 @@ CORTO = [
     (r"ZeroVision / la cánula", "ZV/cánula sin codificar"),
     (r"fuente o batería de la central", "Fuente/batería central sin codificar"),
     (r"Cambia la SIM y no la codifica", "SIM sin codificar (MONT)"),
+    (r"DESM de la SIM vieja", "SIM: falta DESM de la vieja"),
     (r"2500/2501", "Causa 2500/2501 prohibida"),
     (r"Bloqueo GSM: falta indicar", "Bloqueo GSM: indicar en observaciones si se conectó a internet"),
     (r"no codifica la REUB", "Falta REUB"),

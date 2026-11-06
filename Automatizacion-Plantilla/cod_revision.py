@@ -15,6 +15,9 @@ Uso:
   python3 cod_revision.py                                  -> dia laborable anterior, toda la empresa, enviar
   python3 cod_revision.py --fecha 2026-10-26 --grupo Tenerife --modo prueba
   python3 cod_revision.py --fecha 2026-10-26 --solo-enviar  -> usa las fichas ya leidas
+
+Despues manda el segundo correo (rm_ejecucion.py): lo que el tecnico no hizo y puede acabar en RM, con las mismas
+fichas (sin otra lectura de Oracle), los mismos destinatarios y su propio registro (rm_enviados.json).
 """
 
 import argparse
@@ -212,13 +215,28 @@ if __name__ == "__main__":
     ap.add_argument("--solo-enviar", action="store_true")
     a = ap.parse_args()
     fecha = a.fecha or dia_anterior().isoformat()
-    if a.modo == "enviar" and not a.solo_leer and fecha in _registro():
+    import rm_ejecucion
+    # El correo de RM solo sale si tarde_mac.sh exporta RM_CORREO=si (apagado hasta que Gustavo lo apruebe)
+    rm_activo = os.environ.get("RM_CORREO", "").lower() in ("si", "sí", "1") and not a.grupo
+    rm_hecho = not rm_activo or fecha in rm_ejecucion._registro()
+    if a.modo == "enviar" and not a.solo_leer and fecha in _registro() and rm_hecho:
         print(f"[cod] los partes del {fecha} ya se enviaron ({_registro()[fecha]}): nada que hacer")
         raise SystemExit(0)
-    if a.solo_enviar:
-        datos = json.loads((CARPETA / f"fichas_{fecha}_{a.grupo or 'todos'}.json").read_text(encoding="utf-8"))
+    fichas = CARPETA / f"fichas_{fecha}_{a.grupo or 'todos'}.json"
+    if a.solo_enviar or (a.modo == "enviar" and fecha in _registro() and fichas.exists()):
+        # (si la codificacion ya salio y falta el correo de RM, se usan las fichas guardadas: no se abre Oracle)
+        datos = json.loads(fichas.read_text(encoding="utf-8"))
     else:
         datos = leer(fecha, a.grupo)
     if not a.solo_leer:
         ofs_rm_prueba.esperar_internet()
-        revisar_y_mandar(fecha, datos, a.modo)
+        if fecha not in _registro() or a.modo != "enviar":
+            revisar_y_mandar(fecha, datos, a.modo)
+        if rm_activo:   # solo con la empresa entera (los porcentajes por JE salen de todas las fichas)
+            try:
+                rm_ejecucion.revisar_y_mandar(fecha, datos, a.modo)
+            except Exception as e:
+                from comun_ofs import enviar_aviso
+                print(f"[rm] fallo el correo de riesgo de RM: {e}")
+                if a.modo != "prueba":
+                    enviar_aviso(f"⚠️ Riesgo de RM del {fecha}: no se pudo mandar", str(e))
