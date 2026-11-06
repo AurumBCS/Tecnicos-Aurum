@@ -182,6 +182,20 @@ def main(fecha=None, codigos=None, excluir=(), modo=None):
                     cab = {"codigo": cod, "fecha": (_fecha(c.get("Creado")) or fecha).strftime("%d/%m/%Y"),
                            "ajuste_neto": str(c.get("Aju. Neto", "")).strip(), "lineas": c.get("Líneas"),
                            "lineas_dif": c.get("Líneas Dif.")}
+                    if not re.search(r"\d", mat):
+                        # Almacen general ("GE Partner Technicians ..."): no tiene JE, va solo a Gustavo
+                        nombre = c.get("Nombre Organización") or nombre
+                        archivo = CARPETA / f"Conteo {cod} {nombre}.xlsx"
+                        cc.excel_detalle(hall, archivo)
+                        fallos = len([h for h in hall if h["tipo"] != "sobra"])
+                        if modo == "enviar":
+                            enviar_aviso(f"Conteo de almacén {cod}: {nombre}",
+                                         f"Conteo periódico {cod} del almacén general {nombre} ({cab['fecha']}).\n"
+                                         f"Ajuste neto: {cab['ajuste_neto']} · líneas con diferencia: {cab['lineas_dif']} de {cab['lineas']} · "
+                                         f"{fallos} fallos.\n\nDetalle en el Excel adjunto.", adjunto=archivo)
+                            _apuntar([cod], "almacen enviado")
+                        resumen.append(f"{cod} almacén {nombre} · ajuste {cab['ajuste_neto']} · {fallos} fallos (a Gustavo)")
+                        continue
                     if not jde:
                         errores.append(f"{cod} {mat}: sin jefe de equipo en el cuadrante")
                         continue

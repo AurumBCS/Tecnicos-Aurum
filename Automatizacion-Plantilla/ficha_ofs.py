@@ -31,6 +31,9 @@ CAMPOS = {
     "Historial atípico": "historial_atipico",
     "Tipología de visita": "tipologia",
     "Fecha de la Instalación": "fecha_instalacion",
+    # Quién asignó la actividad, p. ej. "JE-BCN-GD5381-Gustavo ...": si es un JE o Gustavo,
+    # la colocó uno de nosotros durante el día (no cuenta para el cumplimiento). Desde el 06/11/2026.
+    "Operador": "operador",
 }
 
 _RE_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
