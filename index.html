@@ -628,6 +628,15 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
     </div>
   </div>
 
+  <!-- Usuarios con el acceso pausado (USUARIOS_DESACTIVADOS): no ven ningún dato -->
+  <div id="desactivadoPanel" style="display:none">
+    <div style="padding:60px 20px;max-width:480px;margin:0 auto;text-align:center">
+      <div style="font-size:2rem;margin-bottom:12px">⏸️</div>
+      <div style="font-size:1rem;font-weight:700;color:var(--gold2);margin-bottom:8px">Estamos preparando tu usuario</div>
+      <div style="font-size:.8rem;color:var(--muted)">De momento no hay información disponible. Te avisaremos cuando esté lista. Para cualquier duda, habla con Gustavo Pérez.</div>
+    </div>
+  </div>
+
   <!-- Panel de control de fichajes Odoo + Líneas de Comunicación (CONTROL_FICHAJES_IDS) -->
   <div id="controlFichajesPanel">
     <div style="padding:14px 13px 90px;max-width:680px;margin:0 auto">
@@ -1388,7 +1397,7 @@ async function cambiarMes(mes){
 //  PANELS VISIBILITY
 // ══════════════════════════════════════════════
 function hideAllPanels(){
-  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','upsellingPanel','usagePanel','usoSmsPanel','agendaPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','mananaPanel','cumDashPanel','historicoPanel']
+  ['mainPanel','equipoPanel','jrPanel','fichajeAdminPanel','controlFichajesPanel','upsellingPanel','usagePanel','usoSmsPanel','agendaPanel','detailPanel','tecDetailPanel','jrDetailPanel','equipoDashPanel','rmDashPanel','mananaPanel','cumDashPanel','historicoPanel','desactivadoPanel']
     .forEach(id=>document.getElementById(id).style.display='none');
 }
 function showPanel(id){
@@ -5037,7 +5046,9 @@ function fichajeEnCooldown(mat){
 
 function pintarBotonFichaje(){
   const btn=document.getElementById('fichajeBtn');
-  if(!btn || !FICHAJE_ID) return;
+  if(!btn) return;
+  if(CURRENT_USER_TYPE==='desactivado'){ btn.style.display='none'; return; }
+  if(!FICHAJE_ID) return;
   if(CURRENT_USER_TYPE==='tecnico' && !FICHAJE_TECNICOS_HABILITADO){
     btn.style.display='none';
     return;
@@ -6249,6 +6260,8 @@ function renderVacacionesJE(jeId, containerId){
 //  vuelve a comprobar contra el Cuadrante.
 // ══════════════════════════════════════════════
 const CONTROL_FICHAJES_IDS=['314298'];
+// Usuarios con el acceso pausado: entran pero no ven ningún dato. Para reactivar, quitar la matrícula.
+const USUARIOS_DESACTIVADOS=['314298'];
 const CONTROL_FICHAJES_NOMBRES={'314298':'Anna Gabriela Liberati'};
 const CF_TARJETAS=[
   ['Operativo','Operativos','var(--green2)'],
@@ -7006,7 +7019,16 @@ async function doLogin(){
   USUARIO_TRACK_ID = _trackId;
   fetch(TRACK_URL + '&mat=' + encodeURIComponent(_trackId), {mode:'no-cors'}).catch(()=>{});
 
-  if(found.type==='control-fichajes'){
+  if(USUARIOS_DESACTIVADOS.includes(String(found.id||'').toUpperCase())){
+    CURRENT_USER_TYPE='desactivado';
+    document.getElementById('topbarName').textContent=CONTROL_FICHAJES_NOMBRES[found.id]||found.id;
+    document.getElementById('topbarId').textContent=found.id;
+    document.getElementById('tabsBarJR').style.display='none';
+    document.getElementById('tabsBar').style.display='none';
+    ['btnCargaExcel','fichajeBtn','refreshBtn'].forEach(b=>{ const e=document.getElementById(b); if(e) e.style.display='none'; });
+    showPanel('desactivadoPanel');
+
+  } else if(found.type==='control-fichajes'){
     CURRENT_USER_TYPE='control-fichajes';
     const nombreCF=CONTROL_FICHAJES_NOMBRES[found.id]||'Control de fichajes';
     document.getElementById('topbarName').textContent=nombreCF;
@@ -7598,6 +7620,7 @@ function doLogout(){
   document.getElementById('matInput').value='';
   document.getElementById('dniInput').value='';
   rellenarAccesoGuardado();
+  ['fichajeBtn','refreshBtn'].forEach(b=>{ document.getElementById(b).style.display=''; });
   document.getElementById('tabsBar').style.display='none';
   document.getElementById('tabsBarJR').style.display='none';
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
