@@ -2,12 +2,12 @@
 <!-- saved from url=(0053)file:///C:/Users/Viatek/Downloads/aurum_bc_v2_20.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Aurum">
-<meta name="theme-color" content="#c9a84c">
+<meta name="theme-color" content="#0a0a0a">
 <title>Aurum BC Security</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-192.png">
@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com/">
 <link href="./Index_files/css2" rel="stylesheet">
 <style>
-:root{
+:root{color-scheme:dark;
   --bg:#0a0a0a;--s1:#111;--s2:#181818;
   --border:#2a2200;--border2:#3d3300;
   --gold:#c9a84c;--gold2:#e8c96a;--gold3:#a07830;
@@ -67,6 +67,15 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   box-shadow:0 4px 20px rgba(201,168,76,.2)}
 .login-btn:hover{background-position:0 0;box-shadow:0 6px 28px rgba(201,168,76,.35)}
 .login-btn:active{transform:scale(.98)}
+/* ── Accesibilidad y móvil ── */
+a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-action:manipulation}
+:focus-visible{outline:2px solid var(--gold2);outline-offset:2px}
+.login-input:focus-visible{outline:none}
+[onclick]:not(button):not(a):not(input):not(select):not(textarea):focus-visible{outline:2px solid var(--gold2);outline-offset:2px;border-radius:8px}
+@supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px!important}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+.login-recordar{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;font-size:.75rem;color:var(--muted);cursor:pointer}
+.login-recordar input{width:18px;height:18px;accent-color:var(--gold)}
 .login-error{margin-top:10px;text-align:center;font-size:.78rem;color:#e05a4a;display:none}
 .login-footer{margin-top:18px;text-align:center;font-size:.67rem;color:var(--muted);
   border-top:1px solid var(--border);padding-top:14px;letter-spacing:.03em;line-height:1.7}
@@ -104,7 +113,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .tabs-bar{display:flex;background:var(--s1);border-bottom:1px solid var(--border);padding:0 14px}
 .tab-btn{flex:1;padding:11px 8px;font-size:.72rem;font-weight:700;font-family:var(--font);
   text-transform:uppercase;letter-spacing:.1em;color:var(--muted);background:transparent;
-  border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .2s;text-align:center}
+  border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .2s,border-color .2s;text-align:center}
 .tab-btn.active{color:var(--gold2);border-bottom-color:var(--gold)}
 .tab-btn:hover{color:var(--text)}
 
@@ -202,7 +211,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .detail-back{display:flex;align-items:center;gap:8px;background:transparent;
   border:1px solid var(--border2);color:var(--gold);border-radius:10px;
   padding:8px 14px;font-size:.8rem;font-family:var(--font);cursor:pointer;
-  letter-spacing:.06em;margin-bottom:16px;transition:all .2s}
+  letter-spacing:.06em;margin-bottom:16px;transition:border-color .2s,background-color .2s}
 .detail-back:hover{border-color:var(--gold);background:rgba(201,168,76,.06)}
 .detail-hero{background:var(--s1);border:1px solid var(--border2);border-radius:16px;
   padding:18px;margin-bottom:16px;position:relative;overflow:hidden}
@@ -328,7 +337,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .cf-obs{font-size:.66rem;color:var(--muted);margin-top:6px;line-height:1.4}
 .cf-rev{display:flex;align-items:center;gap:6px;font-size:.66rem;color:var(--muted)}
 .cf-rev b{color:var(--green2)}
-.cf-guardar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--s2);border-top:1px solid var(--gold);padding:10px 14px;display:none;align-items:center;gap:8px;justify-content:flex-end}
+.cf-guardar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--s2);border-top:1px solid var(--gold);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:none;align-items:center;gap:8px;justify-content:flex-end}
 .cf-guardar.on{display:flex}
 .cf-guardar span{margin-right:auto;font-size:.75rem;font-weight:700;color:var(--gold2)}
 .cf-vacio{padding:26px;text-align:center;color:var(--muted);font-size:.75rem}
@@ -434,18 +443,21 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-header">
-      <img class="login-logo-img" src="data:image/jpeg;base64,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" alt="Aurum BC Security">
+      <img class="login-logo-img" src="data:image/jpeg;base64,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" alt="Aurum BC Security" width="90" height="90">
       <h1>Aurum BC Security</h1>
       <p>Portal Técnico · Acceso privado</p>
     </div>
     <div class="login-body">
       <label class="login-label" for="matInput">Matrícula</label>
-      <input class="login-input" id="matInput" type="text" placeholder="Introduce tu matrícula…" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="text">
+      <form id="loginForm" autocomplete="on" onsubmit="event.preventDefault();doLogin();">
+      <input class="login-input" id="matInput" name="username" type="text" placeholder="Introduce tu matrícula…" autocomplete="username" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text">
       <label class="login-label" for="dniInput" style="margin-top:10px">Contraseña (DNI)</label>
-      <input class="login-input" id="dniInput" type="password" placeholder="Introduce tu DNI…" autocomplete="off">
-      <button class="login-btn" id="loginBtn">Acceder</button>
-      <div class="spinner" id="spinner"></div>
-      <div class="login-error" id="loginError">❌ Matrícula o contraseña incorrecta.</div>
+      <input class="login-input" id="dniInput" name="password" type="password" placeholder="Introduce tu DNI…" autocomplete="current-password" autocapitalize="characters" spellcheck="false">
+      <label class="login-recordar"><input type="checkbox" id="recordarInput" checked> Recordarme en este móvil</label>
+      <button class="login-btn" id="loginBtn" type="submit">Acceder</button>
+      </form>
+      <div class="spinner" id="spinner" role="status" aria-label="Cargando…"></div>
+      <div class="login-error" id="loginError" role="alert">❌ Matrícula o contraseña incorrecta.</div>
       <div class="login-footer">Datos desde Google Sheets · Aurum BC Security<br>Confidencial · Solo para uso interno</div>
     </div>
   </div>
@@ -455,7 +467,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 <div id="appScreen">
   <div class="topbar">
     <div class="topbar-left">
-      <img class="topbar-logo" src="data:image/jpeg;base64,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" alt="logo">
+      <img class="topbar-logo" src="data:image/jpeg;base64,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" alt="" width="34" height="34">
       <div>
         <div class="topbar-name" id="topbarName">—</div>
         <div class="topbar-id" id="topbarId">—</div>
@@ -464,7 +476,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div style="display:flex;gap:6px">
       <button class="topbar-logout" id="btnCargaExcel" onclick="abrirCargaExcel()" style="display:none;color:#0a0a0a;background:linear-gradient(135deg,#7a5c10,#c9a84c,#e8c96a);border:none;font-weight:700">📂 Cargar Excel</button>
       <button class="topbar-logout" id="fichajeBtn" style="color:var(--gold);border-color:var(--gold3);font-weight:700">🕐 Empezar jornada</button>
-      <button class="topbar-logout" id="refreshBtn" style="color:var(--gold);border-color:var(--gold3)">🔄</button>
+      <button class="topbar-logout" id="refreshBtn" aria-label="Actualizar datos" title="Actualizar datos" style="color:var(--gold);border-color:var(--gold3)">🔄</button>
       <button class="topbar-logout" id="logoutBtn">Salir</button>
     </div>
   </div>
@@ -512,7 +524,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       </div>
     </div>
     <div id="mananaMain"></div>
-    <select id="mesSelectorMain" onchange="cambiarMes(this.value)" style="width:100%;margin:8px 0 14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+    <select id="mesSelectorMain" aria-label="Mes" onchange="cambiarMes(this.value)" style="width:100%;margin:8px 0 14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
       <option value="">Cargando meses…</option>
     </select>
     <div class="section-head">Indicadores de calidad</div>
@@ -534,7 +546,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         <div style="display:flex;align-items:center;gap:8px"><div class="sync-dot"></div><span id="equipoBanner">—</span></div>
         <span class="fecha-datos" style="font-size:.62rem;color:var(--muted)"></span>
       </div>
-      <select id="mesSelectorEquipo" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+      <select id="mesSelectorEquipo" aria-label="Mes" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
         <option value="">Cargando meses…</option>
       </select>
       <button onclick="showHistoricoEquipo(CURRENT_JE_ID,'equipoPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico del equipo</button>
@@ -582,7 +594,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         <div style="display:flex;align-items:center;gap:8px"><div class="sync-dot"></div>Vista global · Todos los jefes de equipo</div>
         <span class="fecha-datos" style="font-size:.62rem;color:var(--muted)"></span>
       </div>
-      <select id="mesSelectorJR" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+      <select id="mesSelectorJR" aria-label="Mes" onchange="cambiarMes(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
         <option value="">Cargando meses…</option>
       </select>
       <button onclick="showHistoricoEquipo(null,'jrPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico de todos los técnicos</button>
@@ -655,7 +667,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     </div>
     <div id="usoSeccionesContent" style="margin-bottom:18px"></div>
     <div style="font-weight:800;color:var(--gold2);font-size:.9rem;margin-bottom:8px">🔌 Conexiones a la app</div>
-    <select id="mesSelectorUsage" onchange="renderUsagePanel(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+    <select id="mesSelectorUsage" aria-label="Mes" onchange="renderUsagePanel(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
       <option value="">Total (todo el histórico)</option>
     </select>
     <div id="usageContent"><div style="text-align:center;color:var(--text2);padding:40px 0">Cargando datos de uso…</div></div>
@@ -667,7 +679,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       <div class="sync-dot"></div>
       Quién entra en Confirmaciones SMS, envía los SMS y marca las respuestas
     </div>
-    <select id="periodoUsoSms" onchange="renderUsoSmsPanel(true)" style="display:none;width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+    <select id="periodoUsoSms" aria-label="Periodo" onchange="renderUsoSmsPanel(true)" style="display:none;width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
       <option value="hoy">Hoy</option>
       <option value="7">Últimos 7 días</option>
       <option value="mes">Este mes</option>
@@ -3332,7 +3344,7 @@ function _renderDashRanking(type, tecs){
   const colHeaders=cfg.cols.map(c=>`<th style="padding:6px 4px;font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:center">${c.label}</th>`).join('');
 
   document.getElementById('equipoDashContent').innerHTML=`
-    <select id="mesSelectorDash" onchange="cambiarMesDash(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
+    <select id="mesSelectorDash" aria-label="Mes" onchange="cambiarMesDash(this.value)" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
       ${opcionesMesesHTML()}
     </select>
     <div class="detail-hero">
@@ -4072,7 +4084,7 @@ async function renderPreconteo(jeId, recargar){
     ${lista || '<div style="font-size:.8rem;margin-top:8px">No hay conteos periódicos pendientes en tu equipo.</div>'}
     ${PC_CARGAN_APP.includes(pcUsuario()) ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border2)">
       <div style="font-size:.78rem;font-weight:700;margin-bottom:4px">Conteo no planificado</div>
-      <textarea id="pcLista" rows="3" placeholder="Pega las matrículas (una por línea, o separadas por espacios o comas)" style="width:100%;box-sizing:border-box;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.8rem;font-family:inherit"></textarea>
+      <textarea id="pcLista" rows="3" aria-label="Matrículas" spellcheck="false" placeholder="Pega las matrículas (una por línea, o separadas por espacios o comas)…" style="width:100%;box-sizing:border-box;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.8rem;font-family:inherit"></textarea>
       <button id="pcListaBtn" onclick="pcCargarLista()" style="margin-top:6px;width:100%;padding:8px;background:var(--gold);border:none;border-radius:8px;color:#000;font-weight:700;font-size:.78rem;cursor:pointer">Cargar lista</button>
       <div id="pcListaEstado" style="font-size:.72rem;color:var(--text2);margin-top:6px"></div>
     </div>` : ''}
@@ -4126,7 +4138,7 @@ function pcEditor(jeId, conteo){
         <div style="font-size:.66rem;color:var(--text2)">${pcEsc(l.desc)}</div></td>
       <td style="padding:4px 6px;border-top:1px solid var(--border2);text-align:right;${l.sis<0?'color:#e05a4a;font-weight:700':''}">${l.sis}</td>
       <td style="padding:4px 6px;border-top:1px solid var(--border2);text-align:right">
-        <input data-k="${pcEsc(l.k)}" type="number" inputmode="numeric" min="0" step="1" value="${fis[l.k]!=null?fis[l.k]:''}"
+        <input data-k="${pcEsc(l.k)}" aria-label="Cantidad contada" type="number" inputmode="numeric" min="0" step="1" value="${fis[l.k]!=null?fis[l.k]:''}"
           style="width:64px;padding:5px;background:var(--s2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);text-align:right"></td></tr>`).join('');
   const opciones = Object.keys(cat).sort().map(i=>`<option value="${pcEsc(i)}">${pcEsc(cat[i].d||'')}</option>`).join('');
   document.getElementById(PC_CONT).innerHTML = `<div class="section-head" style="margin-top:0">🧮 Pre-conteo</div>
@@ -4140,9 +4152,9 @@ function pcEditor(jeId, conteo){
     <div style="overflow-x:auto;margin-top:8px"><table id="pcTabla" style="width:100%;border-collapse:collapse;font-size:.78rem">
       <tr style="color:var(--text2);font-size:.68rem"><th style="text-align:left;padding:4px 6px">Referencia</th><th style="text-align:right;padding:4px 6px">Sistema</th><th style="text-align:right;padding:4px 6px">En el coche</th></tr>${filas}</table></div>
     <div style="display:flex;gap:6px;margin-top:8px">
-      <input id="pcNueva" list="pcCatalogo" placeholder="Añadir referencia" style="flex:1;padding:6px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:.75rem">
-      <select id="pcNuevaSub" style="padding:6px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:.75rem"><option value="${pcEsc(t.mat)}">Bueno</option><option value="${pcEsc(t.mat)}DF">DF</option></select>
-      <button onclick="pcAnadir('${jeId}')" style="padding:6px 10px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:.75rem;cursor:pointer">+</button>
+      <input id="pcNueva" list="pcCatalogo" aria-label="Añadir referencia" autocomplete="off" spellcheck="false" placeholder="Añadir referencia…" style="flex:1;padding:6px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:.75rem">
+      <select id="pcNuevaSub" aria-label="Subinventario" style="padding:6px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:.75rem"><option value="${pcEsc(t.mat)}">Bueno</option><option value="${pcEsc(t.mat)}DF">DF</option></select>
+      <button onclick="pcAnadir('${jeId}')" aria-label="Añadir referencia" style="padding:6px 10px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:.75rem;cursor:pointer">+</button>
       <datalist id="pcCatalogo">${opciones}</datalist></div>
     <div style="display:flex;gap:6px;margin-top:12px">
       <button onclick="pcCalcular('${jeId}')" style="flex:1;padding:10px;background:var(--gold2);border:none;border-radius:10px;color:#111;font-weight:800;cursor:pointer">Calcular</button>
@@ -5519,16 +5531,16 @@ function renderFichajeJR(containerId){
         <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:var(--dim)">
-          <button onclick="cambiarFechaFichaje(-1)" style="padding:7px 11px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">←</button>
+          <button onclick="cambiarFechaFichaje(-1)" aria-label="Día anterior" style="padding:7px 11px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">←</button>
           <div style="flex:1;text-align:center">
             <div style="font-size:.72rem;font-weight:700;color:var(--text);text-transform:capitalize">${formatearFechaLegible(fechaVista)}</div>
             ${!esHoy?`<a onclick="cambiarFechaFichaje(0)" style="font-size:.6rem;color:var(--gold2);cursor:pointer;text-decoration:underline">Volver a hoy</a>`:''}
           </div>
-          <button onclick="cambiarFechaFichaje(1)" ${esHoy?'disabled':''} style="padding:7px 11px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:${esHoy?'var(--muted)':'var(--gold2)'};font-family:var(--font);font-size:.75rem;font-weight:700;cursor:${esHoy?'default':'pointer'}">→</button>
+          <button onclick="cambiarFechaFichaje(1)" aria-label="Día siguiente" ${esHoy?'disabled':''} style="padding:7px 11px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:${esHoy?'var(--muted)':'var(--gold2)'};font-family:var(--font);font-size:.75rem;font-weight:700;cursor:${esHoy?'default':'pointer'}">→</button>
         </div>
 
         <div style="padding:8px 12px;background:var(--dim)">
-          <input type="text" placeholder="Buscar técnico por nombre o matrícula…" oninput="filtrarFichajeGantt(this.value)" style="width:100%;padding:8px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem">
+          <input type="search" aria-label="Buscar técnico" autocomplete="off" spellcheck="false" placeholder="Buscar técnico por nombre o matrícula…" oninput="filtrarFichajeGantt(this.value)" style="width:100%;padding:8px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem">
         </div>
 
         <div style="display:flex;gap:8px;padding:0 12px 10px 12px;background:var(--dim)">
@@ -5548,8 +5560,8 @@ function renderFichajeJR(containerId){
           </div>
           <div id="informeMensualPanel" style="display:none;margin-top:8px">
             <div style="display:flex;gap:6px;margin-bottom:8px">
-              <input type="text" id="informeMatInput" placeholder="Matrícula…" style="flex:1;min-width:0;padding:8px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem">
-              <input type="month" id="informeMesInput" style="padding:8px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem">
+              <input type="text" id="informeMatInput" aria-label="Matrícula" autocomplete="off" spellcheck="false" placeholder="Matrícula…" style="flex:1;min-width:0;padding:8px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem">
+              <input type="month" id="informeMesInput" aria-label="Mes" style="padding:8px 10px;background:var(--dim);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:.72rem">
               <button onclick="cargarInformeMensual()" style="padding:8px 12px;background:var(--gold);border:none;border-radius:9px;color:#0a0a0a;font-family:var(--font);font-size:.68rem;font-weight:700;cursor:pointer;white-space:nowrap">Ver</button>
             </div>
             <div id="informeMensualResultado"></div>
@@ -5788,7 +5800,7 @@ async function showHistoricoEquipo(jeId, back){
     ${esTodos?`
     <div class="detail-section">Buscar técnico</div>
     <div style="display:flex;gap:8px;margin-bottom:8px">
-      <input id="histBuscarInput" type="text" placeholder="Nombre o matrícula" onkeydown="if(event.key==='Enter') buscarHistoricoTecnico()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem" />
+      <input id="histBuscarInput" type="search" aria-label="Buscar técnico" autocomplete="off" spellcheck="false" placeholder="Nombre o matrícula…" onkeydown="if(event.key==='Enter') buscarHistoricoTecnico()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem" />
       <button onclick="buscarHistoricoTecnico()" style="padding:9px 16px;background:var(--gold2);color:#1a1608;border:none;border-radius:8px;font-weight:700;font-size:.72rem;cursor:pointer">Buscar</button>
     </div>
     <div id="histBuscarResultados" style="margin-bottom:6px"></div>
@@ -5796,34 +5808,34 @@ async function showHistoricoEquipo(jeId, back){
 
     <div class="detail-section">Periodo a evaluar</div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-      <select id="histDesde" onchange="actualizarVistaHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
+      <select id="histDesde" aria-label="Desde" onchange="actualizarVistaHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
       <span style="color:var(--muted);font-size:.7rem">→</span>
-      <select id="histHasta" onchange="actualizarVistaHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
+      <select id="histHasta" aria-label="Hasta" onchange="actualizarVistaHistoricoEquipo()" style="flex:1;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">${opciones}</select>
     </div>
 
     ${esTodos?`
     <div class="detail-section">Responsable (jefe técnico)</div>
-    <select id="histResponsableFiltro" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
+    <select id="histResponsableFiltro" aria-label="Responsable" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
       <option value="">Todos los responsables</option>
       ${responsableOptions}
     </select>
     `:''}
 
     <div class="detail-section">Provincia</div>
-    <select id="histProvinciaFiltro" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
+    <select id="histProvinciaFiltro" aria-label="Provincia" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
       <option value="">Todas las provincias</option>
       ${provinciaOptions}
     </select>
 
     <div class="detail-section">Cuenta para la empresa</div>
-    <select id="histCuentaFiltro" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
+    <select id="histCuentaFiltro" aria-label="Cuenta" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
       <option value="">Todos los técnicos</option>
       <option value="si">Solo los que cuentan</option>
       <option value="no">Solo los que no cuentan</option>
     </select>
 
     <div class="detail-section">Cuenta para el equipo (JE)</div>
-    <select id="histCuentaJEFiltro" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
+    <select id="histCuentaJEFiltro" aria-label="Cuenta del JE" onchange="actualizarVistaHistoricoEquipo()" style="width:100%;margin-bottom:14px;padding:9px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.72rem">
       <option value="">Todos los técnicos</option>
       <option value="si">Solo los que cuentan</option>
       <option value="no">Solo los que no cuentan</option>
@@ -6314,7 +6326,7 @@ function cfHoyHTML(){
   return `<div class="cf-hoy">
     <div style="display:flex;align-items:center;gap:6px">
       <h3>🚨 Hoy · ${h.sinFichar.length} sin fichar</h3>
-      <button class="cf-btn" onclick="cfCargarHoy()" title="Actualizar ahora">🔄</button>
+      <button class="cf-btn" onclick="cfCargarHoy()" title="Actualizar ahora" aria-label="Actualizar ahora">🔄</button>
     </div>
     <div class="sub">${cfDDMM(h.fecha)} · actualizado a las ${cfEsc(h.hora)} (se actualiza solo cada 5 min) · ${h.fichados} ya fichados${h.todavia?' · '+h.todavia+' aún en su margen de '+h.margen+' min':''}</div>
     ${grupos||'<div class="cf-vacio" style="padding:8px">✅ Todos los que debían empezar ya han fichado</div>'}
@@ -6509,17 +6521,17 @@ function cfRender(){
     <div class="section-head">Registro de días</div>
     <div class="cf-bar">
       <div class="cf-dia">${d.fecha?cfEsc(d.dia)+' '+cfDDMM(d.fecha):'Todavía no hay días registrados'}</div>
-      <button class="cf-btn" ${i<0||i>=d.fechas.length-1?'disabled':''} onclick="cfAbrir('${d.fechas[i+1]||''}')">←</button>
+      <button class="cf-btn" ${i<0||i>=d.fechas.length-1?'disabled':''} onclick="cfAbrir('${d.fechas[i+1]||''}')" aria-label="Día anterior">←</button>
       <select class="cf-input" onchange="cfAbrir(this.value)">${opciones}</select>
-      <button class="cf-btn" ${i<=0?'disabled':''} onclick="cfAbrir('${d.fechas[i-1]||''}')">→</button>
+      <button class="cf-btn" ${i<=0?'disabled':''} onclick="cfAbrir('${d.fechas[i-1]||''}')" aria-label="Día siguiente">→</button>
     </div>
     <div class="cf-bar">
       <button class="cf-btn" onclick="cfCargarDia(CF.datos.fecha)" title="Vuelve a leer Odoo y las Líneas de Comunicación. Lo ya revisado se respeta.">🔄 Actualizar día</button>
-      <input type="date" class="cf-input" title="Cargar otro día" onchange="cfOtraFecha(this.value)">
+      <input type="date" class="cf-input" title="Cargar otro día" aria-label="Cargar otro día" onchange="cfOtraFecha(this.value)">
       <button class="cf-btn prim" onclick="cfInformeDia()" title="Excel del día por zonas: Resumen, Detalle con filtros y Bajas">📥 Informe del día</button>
     </div>
     <div class="cf-bar">
-      <select class="cf-input" id="cfMesExcel">${meses}</select>
+      <select class="cf-input" id="cfMesExcel" aria-label="Mes del Excel">${meses}</select>
       <button class="cf-btn" onclick="cfDescargarExcel(document.getElementById('cfMesExcel').value)">📊 Descargar Excel</button>
     </div>
     ${cfPendientes().length?`<button class="cf-pendbtn" onclick="cfAsistente(false)">❓ Justificar ${cfPendientes().length} técnico${cfPendientes().length>1?'s':''} sin fichar y sin comunicar</button>`:''}
@@ -6684,7 +6696,7 @@ function cfPintarSabado(){
   el.innerHTML=`<div class="caja">
     <h3>📅 Asistencia del sábado</h3>
     <div class="nav"><select class="cf-input" onchange="cfSabado(this.value)">${opciones}</select>
-      <button class="cf-btn" onclick="cfSabado(CF_SAB.fecha)" title="Volver a leer">🔄</button></div>
+      <button class="cf-btn" onclick="cfSabado(CF_SAB.fecha)" title="Volver a leer" aria-label="Volver a leer">🔄</button></div>
     <div class="cf-kpis">
       <div class="cf-kpi" style="--c:#2E7D32;cursor:default"><div class="n">${si.length}</div><div class="t">Ficharon</div></div>
       <div class="cf-kpi" style="--c:#C0392B;cursor:default"><div class="n">${no.length}</div><div class="t">No ficharon</div></div>
@@ -6939,6 +6951,7 @@ async function doLogin(){
     return;
   }
 
+  recordarAcceso(mat, dni);
   const found=findUser(mat);
   if(!found){
     document.getElementById('loginError').style.display='block';
@@ -7492,7 +7505,7 @@ function upsRender(){
     else if(l.estado==='Anulado') accion=`<div class="cf-obs" style="margin-bottom:10px">Lote anulado. ${cfEsc(l.detalle||'')}</div>`;
     lote=`<div class="section-head">Lotes</div>
       <div class="cf-bar"><select class="cf-input" style="flex:1" onchange="upsAbrir(this.value)">${opciones}</select>
-        <button class="cf-btn" onclick="upsAbrir(UPS.lote)">🔄</button></div>
+        <button class="cf-btn" onclick="upsAbrir(UPS.lote)" aria-label="Actualizar" title="Actualizar">🔄</button></div>
       <div class="cf-top" style="margin-bottom:4px"><div class="cf-nom">${cfEsc(l.archivo)} · ${l.filas} filas</div><span class="ups-st ${upsClase(l.estado)}">${cfEsc(l.estado)}</span></div>
       ${['Enviando','Terminado','Terminado con errores','Parado'].includes(l.estado)?`<div class="ups-barra"><div style="width:${pct}%"></div></div>`:''}
       ${accion}
@@ -7543,6 +7556,7 @@ function doLogout(){
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('matInput').value='';
   document.getElementById('dniInput').value='';
+  rellenarAccesoGuardado();
   document.getElementById('tabsBar').style.display='none';
   document.getElementById('tabsBarJR').style.display='none';
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
@@ -7560,8 +7574,6 @@ document.getElementById('refreshBtn').addEventListener('click',()=>doRefreshData
 document.getElementById('fichajeBtn').addEventListener('click',onFichajeBtnClick);
 
 // ── Events ──
-document.getElementById('loginBtn').addEventListener('click',doLogin);
-document.getElementById('matInput').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.getElementById('matInput').addEventListener('input',()=>{
   document.getElementById('loginError').style.display='none';
   document.getElementById('loginError').textContent='❌ Matrícula o contraseña incorrecta.';
@@ -7573,7 +7585,54 @@ document.getElementById('dniInput').addEventListener('input',()=>{
   document.getElementById('loginError').textContent='❌ Matrícula o contraseña incorrecta.';
   document.getElementById('dniInput').style.borderColor='';
 });
-document.getElementById('dniInput').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+// ── Recordar acceso en este móvil ──
+// Con la casilla marcada se guarda la matrícula y el DNI en este dispositivo y al abrir
+// la app se entra sola. Desmarcarla al entrar (o "Salir" y desmarcar) lo olvida.
+const CLAVE_ACCESO = 'aurumAcceso';
+function recordarAcceso(mat, dni){
+  try{
+    if(document.getElementById('recordarInput').checked) localStorage.setItem(CLAVE_ACCESO, JSON.stringify({mat, dni}));
+    else localStorage.removeItem(CLAVE_ACCESO);
+  }catch(e){}
+  // Además, avisar al gestor de contraseñas del móvil para que ofrezca guardarla
+  try{
+    if(window.PasswordCredential && navigator.credentials && navigator.credentials.store)
+      navigator.credentials.store(new PasswordCredential({id: mat, password: dni})).catch(()=>{});
+  }catch(e){}
+}
+function accesoGuardado(){
+  try{ const a = JSON.parse(localStorage.getItem(CLAVE_ACCESO) || 'null'); return a && a.mat && a.dni ? a : null; }
+  catch(e){ return null; }
+}
+function rellenarAccesoGuardado(){
+  const a = accesoGuardado();
+  if(!a) return false;
+  document.getElementById('matInput').value = a.mat;
+  document.getElementById('dniInput').value = a.dni;
+  document.getElementById('recordarInput').checked = true;
+  return true;
+}
+if(rellenarAccesoGuardado()) doLogin();
+
+// ── Teclado en tarjetas y filas que se tocan (div/tr con onclick) ──
+const SEL_CLICABLE = '[onclick]:not(button):not(a):not(input):not(select):not(textarea):not(label):not(option)';
+function marcarClicables(raiz){
+  const els = raiz.querySelectorAll ? raiz.querySelectorAll(SEL_CLICABLE) : [];
+  for(const el of [raiz.matches && raiz.matches(SEL_CLICABLE) ? raiz : null, ...els]){
+    if(!el || el.hasAttribute('tabindex')) continue;
+    el.setAttribute('tabindex', '0');
+    if(el.tagName !== 'TR') el.setAttribute('role', 'button');
+  }
+}
+marcarClicables(document.body);
+new MutationObserver(ms => { for(const m of ms) for(const n of m.addedNodes) if(n.nodeType === 1) marcarClicables(n); })
+  .observe(document.body, {childList: true, subtree: true});
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target;
+  if(el && el.matches && el.matches(SEL_CLICABLE)){ e.preventDefault(); el.click(); }
+});
 
 // Auto-logout 5 min
 let autoLogout;
