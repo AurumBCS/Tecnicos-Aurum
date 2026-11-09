@@ -2401,27 +2401,45 @@ function renderMedialiaCoord(){
         </div>
       </div>` : '';
 
+    const idDet = 'medDet-' + grupo.nombre.replace(/\s+/g,'');
+    const medAbierta = MED_ZONAS_ABIERTAS.has(idDet);
     html+=`
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px;margin-top:10px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${color},transparent)"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-size:.88rem;font-weight:700;color:var(--muted);margin-bottom:6px">${grupo.nombre}</div>
-          <div style="font-size:.72rem;color:var(--muted)">${av.cantidad} encuestas</div>
+      <div onclick="medToggleZona('${idDet}')" aria-expanded="${medAbierta}" style="cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:.88rem;font-weight:700;color:var(--muted);margin-bottom:6px">${grupo.nombre}</div>
+            <div style="font-size:.72rem;color:var(--muted)">${av.cantidad} encuestas</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:2rem;font-weight:800;color:${color}">${av.promedio.toFixed(2)}</div>
+            <div style="font-size:.62rem;color:var(--muted)">Puntuación promedio</div>
+          </div>
         </div>
-        <div style="text-align:right">
-          <div style="font-size:2rem;font-weight:800;color:${color}">${av.promedio.toFixed(2)}</div>
-          <div style="font-size:.62rem;color:var(--muted)">Puntuación promedio</div>
-        </div>
+        <div id="${idDet}-ver" style="margin-top:8px;font-size:.7rem;font-weight:700;color:var(--gold2);text-align:right">${medAbierta?'Ocultar ▾':'Ver objetivo y notas ▸'}</div>
       </div>
-      ${objetivoCFLHTML(cuentan)}
-      ${noHTML}
-      ${notasHTML}
-      ${sinNotasHTML}
+      <div id="${idDet}" style="display:${medAbierta?'block':'none'}">
+        ${objetivoCFLHTML(cuentan)}
+        ${noHTML}
+        ${notasHTML}
+        ${sinNotasHTML}
+      </div>
     </div>`;
   });
 
   container.innerHTML=html;
+}
+// Zonas de Medallia (CFL): cerradas al entrar; al tocar se ve desde el objetivo hacia abajo
+const MED_ZONAS_ABIERTAS = new Set();
+function medToggleZona(id){
+  const det = document.getElementById(id), ver = document.getElementById(id + '-ver');
+  if(!det) return;
+  const abrir = det.style.display === 'none';
+  det.style.display = abrir ? 'block' : 'none';
+  if(ver) ver.textContent = abrir ? 'Ocultar ▾' : 'Ver objetivo y notas ▸';
+  if(ver && ver.parentElement) ver.parentElement.setAttribute('aria-expanded', String(abrir));
+  if(abrir) MED_ZONAS_ABIERTAS.add(id); else MED_ZONAS_ABIERTAS.delete(id);
 }
 
 // Desplegable con el detalle de encuestas de un técnico (mantenimiento +
