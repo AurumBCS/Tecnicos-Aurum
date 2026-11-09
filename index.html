@@ -587,6 +587,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
       </select>
       <button onclick="showHistoricoEquipo(null,'jrPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico de todos los técnicos</button>
       <button id="btnEquipoTF" onclick="showEquipoTF()" style="display:none;width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📍 Equipo TF</button>
+      <div id="jrPreconteo" style="margin-bottom:14px"></div>
       <div class="section-head">Resumen global</div>
       <div class="equipo-kpis" id="jrResumen" style="margin-bottom:14px"></div>
       <div class="section-head">Rankings de la empresa</div>
@@ -1681,6 +1682,7 @@ function renderEquipoPanel(jeId){
   `;
 
   renderConfirmacionesEquipo(jeId);
+  PC_CONT = 'equipoPreconteo';
   renderPreconteo(jeId);
   document.getElementById('equipoKpis').innerHTML = kpiHtml;
 
@@ -4031,12 +4033,18 @@ const PC_FAMILIAS = [
   ['Kit Arlo (cambio del almacén)',['340001V','340004']], ['Cámara Arlo (cambio del almacén)',['322050V','322050']],
 ];
 let PC_DATOS = {}, PC_ACTUAL = null, PC_EXTRA = {};
+// La tarjeta se pinta en "Mi equipo" del JE o en la vista de coordinador (GD5381, CM9651),
+// que entran como coordinadores y nunca llegan a "Mi equipo".
+let PC_CONT = 'equipoPreconteo';
+const PC_COORD_VEN = ['GD5381', 'CM9651'];          // coordinadores con la tarjeta en su vista
+const PC_CARGAN_APP = ['GD5381', 'CM9651'];          // pueden pedir conteos no planificados (en el Apps Script: PC_CARGAN)
+function pcUsuario(){ return String(CURRENT_JE_ID || USUARIO_TRACK_ID || '').toUpperCase(); }
 
 function pcEur(v, signo=true){ const s = Math.round(v).toLocaleString('es-ES'); return (signo && v>0 ? '+' : '') + s + ' €'; }
 function pcEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 async function renderPreconteo(jeId, recargar){
-  const el = document.getElementById('equipoPreconteo');
+  const el = document.getElementById(PC_CONT);
   if(!el || !jeId) return;
   const cab = '<div class="section-head" style="margin-top:0">🧮 Pre-conteo</div>';
   let d = PC_DATOS[jeId];
@@ -4062,7 +4070,7 @@ async function renderPreconteo(jeId, recargar){
   el.innerHTML = cab + `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
     <div style="font-size:.78rem;color:var(--text2)">Cuenta el coche del técnico <b>antes</b> del conteo periódico: te digo el descuadre y qué dejarle o quitarle para quedar en ±${PC_OBJETIVO} €.</div>
     ${lista || '<div style="font-size:.8rem;margin-top:8px">No hay conteos periódicos pendientes en tu equipo.</div>'}
-    ${(CURRENT_JE_ID||'').toUpperCase()==='GD5381' ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border2)">
+    ${PC_CARGAN_APP.includes(pcUsuario()) ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border2)">
       <div style="font-size:.78rem;font-weight:700;margin-bottom:4px">Conteo no planificado</div>
       <textarea id="pcLista" rows="3" placeholder="Pega las matrículas (una por línea, o separadas por espacios o comas)" style="width:100%;box-sizing:border-box;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.8rem;font-family:inherit"></textarea>
       <button id="pcListaBtn" onclick="pcCargarLista()" style="margin-top:6px;width:100%;padding:8px;background:var(--gold);border:none;border-radius:8px;color:#000;font-weight:700;font-size:.78rem;cursor:pointer">Cargar lista</button>
@@ -4084,7 +4092,7 @@ async function pcCargarLista(){
   btn.disabled = true;
   est.textContent = 'Pidiendo…';
   try{
-    const res = await fetch(PRECONTEO_LISTA_URL, {method:'POST', body: JSON.stringify({token: APP_TOKEN, je: CURRENT_JE_ID, mats})});
+    const res = await fetch(PRECONTEO_LISTA_URL, {method:'POST', body: JSON.stringify({token: APP_TOKEN, je: pcUsuario(), mats})});
     const r = await res.json();
     if(!r.ok) throw new Error(r.error);
     document.getElementById('pcLista').value = '';
@@ -4121,7 +4129,7 @@ function pcEditor(jeId, conteo){
         <input data-k="${pcEsc(l.k)}" type="number" inputmode="numeric" min="0" step="1" value="${fis[l.k]!=null?fis[l.k]:''}"
           style="width:64px;padding:5px;background:var(--s2);border:1px solid var(--border2);border-radius:6px;color:var(--text1);text-align:right"></td></tr>`).join('');
   const opciones = Object.keys(cat).sort().map(i=>`<option value="${pcEsc(i)}">${pcEsc(cat[i].d||'')}</option>`).join('');
-  document.getElementById('equipoPreconteo').innerHTML = `<div class="section-head" style="margin-top:0">🧮 Pre-conteo</div>
+  document.getElementById(PC_CONT).innerHTML = `<div class="section-head" style="margin-top:0">🧮 Pre-conteo</div>
   <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
     <button onclick="PC_ACTUAL=null;renderPreconteo('${jeId}')" style="background:none;border:none;color:var(--gold2);font-size:.78rem;cursor:pointer;padding:0">← Volver</button>
     <div style="font-size:.9rem;font-weight:800;margin:6px 0 2px">${pcEsc(t.nombre || ROSTER_NOMBRES[t.mat] || t.mat)} (${pcEsc(t.mat)})</div>
@@ -6992,6 +7000,8 @@ async function doLogin(){
     document.getElementById('tabUsoSms').style.display = USO_SMS_VISIBLE_PARA.includes(found.id) ? '' : 'none';
     document.getElementById('tabAgenda').style.display = AGENDA_VISIBLE_PARA.includes(found.id) ? '' : 'none';
     renderJRPanel();
+    if(PC_COORD_VEN.includes(found.id)){ PC_CONT = 'jrPreconteo'; renderPreconteo(found.id); }
+    else document.getElementById('jrPreconteo').innerHTML = '';
     Promise.all([loadMedialiaCoord(), loadMedaliaDetalle()]).then(()=>renderMedialiaCoord());
     showPanel('jrPanel');
 
