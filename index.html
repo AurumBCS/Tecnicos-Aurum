@@ -76,6 +76,9 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 .login-recordar{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;font-size:.75rem;color:var(--muted);cursor:pointer}
 .login-recordar input{width:18px;height:18px;accent-color:var(--gold)}
+#jrPreconteoDet>summary{list-style:none}#jrPreconteoDet>summary::-webkit-details-marker{display:none}
+#jrPreconteoDet>summary::after{content:"▸";margin-left:auto;padding-left:8px}#jrPreconteoDet[open]>summary::after{content:"▾"}
+#jrPreconteo>.section-head:first-child{display:none}
 .login-error{margin-top:10px;text-align:center;font-size:.78rem;color:#e05a4a;display:none}
 .login-footer{margin-top:18px;text-align:center;font-size:.67rem;color:var(--muted);
   border-top:1px solid var(--border);padding-top:14px;letter-spacing:.03em;line-height:1.7}
@@ -599,7 +602,6 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
       </select>
       <button onclick="showHistoricoEquipo(null,'jrPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico de todos los técnicos</button>
       <button id="btnEquipoTF" onclick="showEquipoTF()" style="display:none;width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📍 Equipo TF</button>
-      <div id="jrPreconteo" style="margin-bottom:14px"></div>
       <div class="section-head">Resumen global</div>
       <div class="equipo-kpis" id="jrResumen" style="margin-bottom:14px"></div>
       <div class="section-head">Rankings de la empresa</div>
@@ -608,6 +610,10 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
       <div class="section-head">Jefes de equipo</div>
       <div class="je-list" id="jeList"></div>
       <div id="medalliaCoordContainer"></div>
+      <details id="jrPreconteoDet" style="display:none;margin-top:14px">
+        <summary class="section-head" style="cursor:pointer">🧮 Pre-conteo <span id="jrPreconteoNum" style="color:var(--text2);font-weight:400"></span></summary>
+        <div id="jrPreconteo" style="margin-bottom:14px"></div>
+      </details>
     </div>
   </div>
 
@@ -4072,6 +4078,7 @@ async function renderPreconteo(jeId, recargar){
       return;
     }
   }
+  if(PC_CONT==='jrPreconteo'){ const n=document.getElementById('jrPreconteoNum'); if(n) n.textContent='· '+d.tecnicos.length+' técnico'+(d.tecnicos.length===1?'':'s'); }
   if(PC_ACTUAL && d.tecnicos.some(t=>t.conteo===PC_ACTUAL)) return pcEditor(jeId, PC_ACTUAL);
   const lista = d.tecnicos.map(t => {
     const hecho = t.fisico ? `<span style="color:var(--green);font-weight:700">Contado ${pcEsc(t.fisico_guardado)}</span>` : '<span style="color:var(--gold2)">Pendiente de contar</span>';
@@ -7013,8 +7020,9 @@ async function doLogin(){
     document.getElementById('tabUsoSms').style.display = USO_SMS_VISIBLE_PARA.includes(found.id) ? '' : 'none';
     document.getElementById('tabAgenda').style.display = AGENDA_VISIBLE_PARA.includes(found.id) ? '' : 'none';
     renderJRPanel();
-    if(PC_COORD_VEN.includes(found.id)){ PC_CONT = 'jrPreconteo'; renderPreconteo(found.id); }
-    else document.getElementById('jrPreconteo').innerHTML = '';
+    const pcDet = document.getElementById('jrPreconteoDet');
+    if(PC_COORD_VEN.includes(found.id)){ pcDet.style.display = ''; pcDet.open = false; PC_CONT = 'jrPreconteo'; renderPreconteo(found.id); }
+    else { pcDet.style.display = 'none'; document.getElementById('jrPreconteo').innerHTML = ''; }
     Promise.all([loadMedialiaCoord(), loadMedaliaDetalle()]).then(()=>renderMedialiaCoord());
     showPanel('jrPanel');
 
