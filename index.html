@@ -606,7 +606,6 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
       <div class="equipo-kpis" id="jrResumen" style="margin-bottom:14px"></div>
       <div class="section-head">Rankings de la empresa</div>
       <div id="jrRankings" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
-      <div id="jrFichajeContainer"></div>
       <div class="section-head">Jefes de equipo</div>
       <div class="je-list" id="jeList"></div>
       <div id="medalliaCoordContainer"></div>
@@ -614,6 +613,7 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
         <summary class="section-head" style="cursor:pointer">🧮 Pre-conteo <span id="jrPreconteoNum" style="color:var(--text2);font-weight:400"></span></summary>
         <div id="jrPreconteo" style="margin-bottom:14px"></div>
       </details>
+      <div id="jrFichajeContainer"></div>
     </div>
   </div>
 
@@ -2051,8 +2051,8 @@ function buildTecDetailHTML(tec){
 // ══════════════════════════════════════════════
 //  RENDER JR (vista director)
 // ══════════════════════════════════════════════
-function renderJRPanel(){
-  renderFichajeJR('jrFichajeContainer');
+function renderJRPanel(soloZonas){
+  if(!soloZonas) renderFichajeJR('jrFichajeContainer');
   const jeIds = JERARQUIA['JR9426']||[];
   const GRUPOS = [
     { nombre:'Zonas 4 y 5', jeIds:['Q29994','Q28224','273371'],                    zonas:['04','05','4','5','3304','3305'], color:'#c9a84c' },
@@ -2115,6 +2115,10 @@ function renderJRPanel(){
 
   // Lista agrupada por zonas
   let jeListHTML = '';
+  // Cada zona es un desplegable: al tocarla se ven sus jefes de equipo (cerradas al entrar)
+  const zonaAbierta = k => JR_ZONAS_ABIERTAS.has(k);
+  const cabZona = (k, n) => ` onclick="jrToggleZona('${k}')" aria-expanded="${zonaAbierta(k)}" style="cursor:pointer;`;
+  const pieZona = (k, n) => `<div style="margin-top:10px;font-size:.7rem;font-weight:700;color:var(--gold2);display:flex;justify-content:space-between"><span>${n} jefes de equipo</span><span>${zonaAbierta(k)?'Ocultar ▾':'Ver ▸'}</span></div>`;
   const tieneCuentaEmp = Object.keys(CUENTA_DATA).length > 0;
   GRUPOS.forEach(grupo => {
     const grupoTecs = tieneZonas ? getTecsPorZona(grupo.zonas) : grupo.jeIds.flatMap(id=>getTecnicosOfJE(id));
@@ -2136,7 +2140,8 @@ function renderJRPanel(){
         </div>
       </div>` : '';
 
-    jeListHTML += `<div style="background:var(--dim);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:8px;position:relative;overflow:hidden">
+    const kZona = grupo.nombre;
+    jeListHTML += `<div${cabZona(kZona)}background:var(--dim);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:8px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${grupo.color},transparent)"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div style="font-size:.88rem;font-weight:800;color:${grupo.color}">${grupo.nombre}</div>
@@ -2149,7 +2154,9 @@ function renderJRPanel(){
         <div class="je-mini"><div class="je-mini-n" style="color:${(grupoAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(grupoAv.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
       </div>
       ${splitHTML}
+      ${pieZona(kZona, grupo.jeIds.length)}
     </div>`;
+    if(!zonaAbierta(kZona)) return;
 
     // JEs individuales del grupo
     const jeSummaries = grupo.jeIds.map(id=>{
@@ -2194,7 +2201,7 @@ function renderJRPanel(){
     const sinGrupoTecs = sinGrupo.flatMap(id=>getTecnicosOfJE(id));
     const sinGrupoAv = calcAvg(sinGrupoTecs);
     const sgCol = sinGrupoAv.mlv>=7?'var(--green2)':sinGrupoAv.mlv>=6.5?'var(--orange)':'#e05a4a';
-    jeListHTML += `<div style="background:var(--dim);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:8px;position:relative;overflow:hidden">
+    jeListHTML += `<div${cabZona('otros')}background:var(--dim);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:8px;position:relative;overflow:hidden">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold3),transparent)"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div style="font-size:.88rem;font-weight:800;color:var(--gold3)">Otros equipos</div>
@@ -2206,8 +2213,9 @@ function renderJRPanel(){
         <div class="je-mini"><div class="je-mini-n" style="color:${(sinGrupoAv.pCum||0)>=90?'var(--green2)':'#e05a4a'}">${(sinGrupoAv.pCum||0).toFixed(1)}%</div><div class="je-mini-l">%Cum</div></div>
         <div class="je-mini"><div class="je-mini-n" style="color:${(sinGrupoAv.conv||0)>=15?'var(--green2)':'#e05a4a'}">${(sinGrupoAv.conv||0).toFixed(1)}%</div><div class="je-mini-l">Conv</div></div>
       </div>
+      ${pieZona('otros', sinGrupo.length)}
     </div>`;
-    jeListHTML += sinGrupo.map(id=>{
+    if(zonaAbierta('otros')) jeListHTML += sinGrupo.map(id=>{
       const tecs=getTecnicosOfJE(id);
       const av=calcAvg(tecs);
       const g=getGrade(av.mlv||0);
@@ -2238,6 +2246,13 @@ function renderJRPanel(){
   }
 
   document.getElementById('jeList').innerHTML=jeListHTML;
+}
+const JR_ZONAS_ABIERTAS = new Set();
+function jrToggleZona(k){
+  if(JR_ZONAS_ABIERTAS.has(k)) JR_ZONAS_ABIERTAS.delete(k); else JR_ZONAS_ABIERTAS.add(k);
+  const y = window.scrollY;
+  renderJRPanel(true);
+  window.scrollTo(0, y);
 }
 
 // ══════════════════════════════════════════════
