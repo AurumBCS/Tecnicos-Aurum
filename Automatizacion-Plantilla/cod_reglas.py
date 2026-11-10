@@ -35,6 +35,24 @@ PILAS_POR_ZONA = {
 }
 
 
+NUM_PALABRA = {"un": 1, "una": 1, "uno": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6,
+               "siete": 7, "ocho": 8, "nueve": 9, "diez": 10}
+
+
+def magneticos_de(item):
+    """Magneticos que lleva una referencia (suelta o pack del catalogo Pharus); 0 si no es de magneticos."""
+    base = re.sub(r"(X|R)\d$", "", item)            # 121295X0, F252SPX0, 121272R0 = 1 magnetico a coste 0
+    if item in MAGNETICOS or base in MAGNETICOS:
+        return 1
+    for patron, n in ((r"^(?:DI|UX)(\d)(?:MG|MV|F25)\w*$", None), (r"^P(\d)X?\d+F25[02]$", None),
+                      (r"^PT(\d)MX\d\w*$", None), (r"^121272X5$|^F2502X5$", 2),
+                      (r"^121272P?X[357]$|^F250SPX[357]$", 3), (r"^PD[HI]SSX[57]$", 1)):
+        m = re.match(patron, item)
+        if m:
+            return n or int(m.group(1))
+    return 0
+
+
 def _lineas(ficha):
     out = []
     for c in ficha.get("codificaciones") or []:
@@ -171,10 +189,26 @@ def revisar(ficha):
             mal("desmontaje", f"Dice que quita {m.group(1)} magnéticos y codifica {n_desm}.")
 
     # ── ampliaciones de mandos y llaves ──
-    if _dice(obs, r"ampli\w* (\d+ )?mandos?") and not any(l["item"] in MANDOS and l["res"] == "AMPL" for l in lin):
+    # "amplia 8 magneticos, y un mando": el mando puede ir mas adelante en la misma frase (caso 144901603, 10/11)
+    if _dice(obs, r"\bampli(?!ar\b)\w* (?:(?!\bse\b|cambi|sustitu|configur|pilas|fast|in.?situ|central|pendiente)[^.;]){0,40}?\bmandos?") and not any(l["item"] in MANDOS and l["res"] == "AMPL" for l in lin):
         mal("ampliación", "Amplía mando(s) y no está la AMPL del mando (280785 Moonshot, 2409SP/2410SP Fast2, 2411SP 4PRO).")
     if _dice(obs, r"ampli\w* (\d+ )?llaves?") and not any(LLAVES.match(l["item"]) and l["res"] == "AMPL" for l in lin):
         mal("ampliación", "Amplía llave(s) y no va como AMPL con la referencia de la llave (está como MONT/SUST o no está).")
+
+    # ── magneticos ampliados: los que dice frente a los codificados en AMPL (sueltos o en packs) ──
+    m = re.search(r"\bampli(?!ar\b)\w* (\d+|" + "|".join(NUM_PALABRA) + r") ?(?:mg|magneticos?|detectores? de acceso)\b", obs)
+    if m:
+        dice = int(m.group(1)) if m.group(1).isdigit() else NUM_PALABRA[m.group(1)]
+        n_ampl = sum(magneticos_de(l["item"]) * int(l["n"] or 1) for l in lin if l["res"] == "AMPL")
+        if n_ampl and n_ampl < dice:
+            mal("ampliación", f"Dice que amplía {dice} magnéticos y codifica {n_ampl}: faltan {dice - n_ampl}.")
+        elif not n_ampl:
+            n_mont = sum(magneticos_de(l["item"]) * int(l["n"] or 1) for l in lin if l["res"] in ("MONT", "MONU"))
+            if n_mont:
+                mal("ampliación", f"Dice que amplía {dice} magnéticos y los codifica como MONT: van como AMPL "
+                                  "(a coste 0, 121295X0 en Moonshot / F252SPX0 en Fast).")
+            else:
+                mal("ampliación", f"Dice que amplía {dice} magnéticos y no hay ninguna AMPL de magnéticos.")
 
     # ── pilas ──
     # DESM de un dispositivo sin nada que lo explique
@@ -296,6 +330,9 @@ CORTO = [
     (r"quita (\d+) magnéticos y codifica (\d+)", r"Quita \1 MG, codifica \2"),
     (r"DESM que no se explica", "DESM sin explicar"),
     (r"Amplía mando", "Mando ampliado sin AMPL"),
+    (r"amplía (\d+) magnéticos y codifica (\d+)", r"Amplía \1 MG, codifica \2"),
+    (r"amplía (\d+) magnéticos y no hay", r"Amplía \1 MG sin AMPL"),
+    (r"amplía (\d+) magnéticos y los codifica como MONT", r"Amplía \1 MG en MONT → AMPL"),
     (r"Amplía llave", "Llave ampliada: AMPL"),
     (r"Pilas codificadas como AMPL", "Pilas en AMPL → SUST"),
     (r"pilas (\S+)×\S+ para .* duplicadas", r"Pilas \1 duplicadas"),
