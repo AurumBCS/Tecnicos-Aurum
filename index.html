@@ -1089,9 +1089,56 @@ function parseMoney(v){
   const val = parseFloat(s) || 0;
   return neg ? -val : val;
 }
+// ── Resumen de KPIs (hoja "Resumen App Claude" y pestañas de cada mes) ──
+// Se lee SIEMPRE por el nombre del encabezado, nunca por la posicion: las
+// columnas pueden venir en cualquier orden (Noviembre 2026 llego con Técnico
+// en la 2.ª columna). Los nombres se comparan sin tildes, mayusculas ni
+// espacios ("% RM" = "%RM", "Tecnico" = "Técnico"). La fila de encabezados es
+// la que contiene "Técnico", aunque haya filas de titulo encima. Si un
+// encabezado se repite (las dos "Dev": unidades y euros) el segundo pasa a
+// llamarse "Dev.1".
+function normEnc(h){
+  return String(h||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,'');
+}
+function partirLineaCSV(line){
+  const vals=[];let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ if(inQ&&line[i+1]==='"'){cur+='"';i++;} else inQ=!inQ; }
+    else if(c===','&&!inQ){vals.push(cur.trim());cur='';}
+    else cur+=c;
+  }
+  vals.push(cur.trim());
+  return vals;
+}
+const RESUMEN_OBLIGATORIAS=['Técnico','%RM','%Cum'];
+function parseResumenCSV(text, etiqueta){
+  const lines=String(text||'').split(/\r?\n/);
+  const idx=lines.findIndex(l=>partirLineaCSV(l).some(h=>normEnc(h)==='tecnico'));
+  if(idx<0){ console.warn('Resumen '+(etiqueta||'')+': no hay columna "Técnico"'); return []; }
+  const vistos={};
+  const hdrs=partirLineaCSV(lines[idx]).map(h=>{
+    const k=normEnc(h);
+    if(k in vistos){ vistos[k]++; return h+'.'+vistos[k]; }
+    vistos[k]=0; return h;
+  });
+  const faltan=RESUMEN_OBLIGATORIAS.filter(n=>!hdrs.some(h=>normEnc(h)===normEnc(n)));
+  if(faltan.length) console.warn('Resumen '+(etiqueta||'')+': faltan columnas '+faltan.join(', ')+' (salen a 0)');
+  return lines.slice(idx+1).filter(l=>l.replace(/,/g,'').trim()!=='').map(line=>{
+    const vals=partirLineaCSV(line), o={};
+    hdrs.forEach((h,i)=>{ o[h]=vals[i]||''; });
+    return o;
+  });
+}
+// Valor de una columna por su nombre (o el primero de varios nombres posibles)
+function campo(r, ...nombres){
+  if(!r.__enc) Object.defineProperty(r,'__enc',{value:Object.fromEntries(Object.keys(r).map(k=>[normEnc(k),r[k]]))});
+  for(const n of nombres){ const v=r.__enc[normEnc(n)]; if(v!==undefined&&v!=='') return v; }
+  return '';
+}
 function csvRow(r){
-  // Columnas del CSV: Palito,Lab,MPal,ML-V,MA+B,A+B,Nec,Ventas,20%,Conv,Falt,Incum,%Cum,UVen,PPA,Dev,Dev(€),%RM,RM,Técnico
-  const tecRaw = r['Técnico'] || '';
+  // Columnas (en cualquier orden): Fecha,Técnico,Lab,Palito,MPal,ML-V,MA+B,A+B,Nec,UVen,Ventas,20%,Conv,Falt,RM,%RM,%Cum,Incum,PPA,Dev,Dev(€),NPS
+  const tecRaw = campo(r,'Técnico') || '';
   const parts = tecRaw.split('-');
   let id = '', nombre = '', provincia = '';
   for(let i=0; i<parts.length; i++){
@@ -1117,30 +1164,30 @@ function csvRow(r){
 
   return {
     id, nombre, provincia, raw: tecRaw,
-    palito: parseInt(r['Palito'])||0,
-    lab:    parseInt(r['Lab'])||0,
-    mpal:   parseNum(r['MPal']),
-    mlv:    parseNum(r['ML-V']),
-    mab:    parseFloat(String(r['MA+B']||'0').replace(',','.'))||0,
-    ab:     parseFloat(String(r['A+B']||'0').replace(',','.'))||0,
-    nec:    parseInt(r['Nec'])||0,
-    uven:   parseFloat(String(r['Ventas']||'0').replace(',','.'))||0,
-    ventas: parseMoney(r['20%']),
-    conv:   parsePct(r['Conv']),
-    p20:    parsePct(r['Conv']),
-    falt:   parseFloat(String(r['Falt']||'0').replace(',','.'))||0,
-    incum:  parseInt(r['Incum'])||0,
-    pCum:   parsePct(r['%Cum']),
-    ppa:    parsePct(r['PPA']),
-    dev:    parseFloat(String(r['Dev']||'0').replace(',','.'))||0,
-    devE:   parseMoney(r['Dev.1']||r['Dev']||'0'),
-    pRM:    Math.round(parsePct(r['%RM'])*10)/10,
-    rm:     parseFloat(String(r['RM']||'0').replace(',','.'))||0,
-    pRMSinDatos: parsePct(r['%RM'])===100 && !String(r['RM']||'').trim(),
-    nps:    parseNum(r['NPS']),
+    palito: parseInt(campo(r,'Palito'))||0,
+    lab:    parseInt(campo(r,'Lab'))||0,
+    mpal:   parseNum(campo(r,'MPal')),
+    mlv:    parseNum(campo(r,'ML-V')),
+    mab:    parseFloat(String(campo(r,'MA+B')||'0').replace(',','.'))||0,
+    ab:     parseFloat(String(campo(r,'A+B')||'0').replace(',','.'))||0,
+    nec:    parseInt(campo(r,'Nec'))||0,
+    uven:   parseFloat(String(campo(r,'Ventas')||'0').replace(',','.'))||0,
+    ventas: parseMoney(campo(r,'20%')),
+    conv:   parsePct(campo(r,'Conv')),
+    p20:    parsePct(campo(r,'Conv')),
+    falt:   parseFloat(String(campo(r,'Falt')||'0').replace(',','.'))||0,
+    incum:  parseInt(campo(r,'Incum'))||0,
+    pCum:   parsePct(campo(r,'%Cum')),
+    ppa:    parsePct(campo(r,'PPA')),
+    dev:    parseFloat(String(campo(r,'Dev')||'0').replace(',','.'))||0,
+    devE:   parseMoney(campo(r,'Dev(€)','Dev.1')||'0'),
+    pRM:    Math.round(parsePct(campo(r,'%RM'))*10)/10,
+    rm:     parseFloat(String(campo(r,'RM')||'0').replace(',','.'))||0,
+    pRMSinDatos: parsePct(campo(r,'%RM'))===100 && !String(campo(r,'RM')||'').trim(),
+    nps:    parseNum(campo(r,'NPS')),
     cfl:    0,
-    ventas20: parseMoney(r['20%']),
-    fecha:  r['Fecha'] || ''
+    ventas20: parseMoney(campo(r,'20%')),
+    fecha:  campo(r,'Fecha') || ''
   };
 }
 
@@ -1298,8 +1345,8 @@ async function loadSheets(){
       const res = await fetchConReintento(url, {cache: 'no-store'});
       if(!res.ok) continue;
       const text = await res.text();
-      const rows = parseCSV(text);
-      const tecs = rows.filter(r=>r['Técnico']).map(r=>{
+      const rows = parseResumenCSV(text, mes||'actual');
+      const tecs = rows.filter(r=>campo(r,'Técnico')).map(r=>{
         const t=csvRow(r); t.ventas20=t.ventas; return t;
       });
       if(tecs.length > 0){
@@ -1356,8 +1403,8 @@ async function cambiarMes(mes){
     const url = SHEETS_CSV_URL + '&mes=' + encodeURIComponent(mes) + '&t=' + Date.now();
     const res = await fetchConReintento(url, {cache:'no-store'});
     const csv = await res.text();
-    const rows = parseCSV(csv);
-    const tecs = rows.filter(r=>r['Técnico']).map(r=>{
+    const rows = parseResumenCSV(csv, mes);
+    const tecs = rows.filter(r=>campo(r,'Técnico')).map(r=>{
       const t=csvRow(r); t.ventas20=t.ventas; return t;
     });
     if(!tecs.length){
@@ -5657,9 +5704,9 @@ async function loadHistorico(){
         const res = await fetchConReintento(url, {cache:'no-store'});
         if(!res.ok) return [mes, {}];
         const text = await res.text();
-        const rows = parseCSV(text);
+        const rows = parseResumenCSV(text, mes);
         const byTec = {};
-        rows.filter(r=>r['Técnico']).forEach(r=>{
+        rows.filter(r=>campo(r,'Técnico')).forEach(r=>{
           const t = csvRow(r);
           if(t.id) byTec[t.id.toUpperCase()] = t;
         });
