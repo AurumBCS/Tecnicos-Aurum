@@ -127,7 +127,7 @@ def revisar(ficha):
             and not re.search(r"cliente no (quiere|desea|acepta)|no se puede reubicar|se coloca|se instala|se monta", obs):
         mal("texto", "El texto pedía reubicar y no consta (si el cliente no quiere, hay que ponerlo en el parte).")
     if re.search(r"cambiar (la )?sim", pet) and not items & SIMS and not a4 and not re.search(r"\bsim\b|4 ?pro|fast ?4", obs):
-        mal("texto", "El texto pedía cambiar la SIM de operador y no consta: la SIM vieja y la nueva son referencias distintas, van codificadas las dos: DESM de la SIM vieja y MONT de la nueva.")
+        mal("texto", "El texto pedía cambiar la SIM de operador y no consta: la SIM nueva se codifica con MONT (la vieja no se desmonta).")
 
     # ── 3. pilas de toda la instalacion ──
     ult_pilas = None
