@@ -128,6 +128,26 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
   display:flex;align-items:center;gap:8px}
 .section-head::before{content:'';width:14px;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}
 
+/* Cumplimiento de hoy (vista del JE) */
+.cumph-tec{border-top:1px solid var(--border2)}
+.cumph-tec>summary{display:flex;align-items:center;gap:8px;padding:10px 2px;cursor:pointer;list-style:none;font-size:.82rem;min-height:44px;box-sizing:border-box}
+.cumph-tec>summary::-webkit-details-marker,.cumph-act>summary::-webkit-details-marker{display:none}
+.cumph-tec>summary::after{content:'›';color:var(--gold3);font-size:1.1rem;transition:transform .15s}
+.cumph-tec[open]>summary::after{transform:rotate(90deg)}
+.cumph-cuenta{background:var(--gold3);color:#111;font-weight:800;font-size:.7rem;border-radius:999px;min-width:22px;padding:2px 7px;text-align:center}
+.cumph-lista{display:flex;flex-direction:column;gap:6px;padding:0 0 10px}
+.cumph-act{background:var(--s2);border:1px solid var(--border2);border-radius:10px}
+.cumph-act>summary{display:flex;align-items:center;gap:10px;padding:8px 10px;cursor:pointer;list-style:none;min-height:44px;box-sizing:border-box}
+.cumph-act[open]{border-color:var(--gold3)}
+.cumph-ord{width:22px;height:22px;flex:none;border-radius:50%;border:1px solid var(--gold3);color:var(--gold2);font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+.cumph-txt{flex:1;min-width:0;display:flex;flex-direction:column}
+.cumph-num{font-weight:800;font-size:.84rem;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.cumph-tipo{font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cumph-ts{flex:none;border:1px solid;border-radius:8px;padding:3px 8px;font-size:.74rem;font-weight:700;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;align-items:center;line-height:1.1}
+.cumph-ts small{font-size:.55rem;text-transform:uppercase;letter-spacing:.06em}
+.cumph-cont{padding:8px 10px 10px 42px;font-size:.8rem;border-top:1px solid var(--border2)}
+.cumph-tel{color:var(--gold2);font-weight:700;text-decoration:none;border:1px solid var(--gold3);border-radius:8px;padding:5px 10px}
+
 /* HERO cards */
 .hero-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
 .hero-card{background:var(--s1);border-radius:16px;padding:18px 16px 14px;position:relative;
@@ -556,6 +576,9 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
 
       <!-- Uso de Confirmaciones SMS del equipo (hoy en vivo + días anteriores) -->
       <div id="equipoConfirmaciones" style="margin-bottom:14px"></div>
+
+      <!-- Cumplimiento de hoy: lo que sale a las 8:00 y no puede quedar sin hacer -->
+      <div id="equipoCumpHoy" style="margin-bottom:14px"></div>
 
       <!-- Pre-conteo: contar el coche del técnico antes del conteo periódico -->
       <div id="equipoPreconteo" style="margin-bottom:14px"></div>
@@ -1756,6 +1779,7 @@ function renderEquipoPanel(jeId){
   `;
 
   renderConfirmacionesEquipo(jeId);
+  renderCumplimientoHoy(jeId);
   PC_CONT = 'equipoPreconteo';
   renderPreconteo(jeId);
   document.getElementById('equipoKpis').innerHTML = kpiHtml;
@@ -4359,6 +4383,130 @@ async function pcGuardar(jeId){
 
 // ── Apartado en "Mi equipo" del JE ─────────────────────────────────────────
 let CONF_EQUIPO_CACHE = {};
+// ═══════════════════════════════════════════════════════════════
+//  CUMPLIMIENTO DE HOY (vista del JE, "Mi equipo")
+//  Las actividades con las que sale cada técnico a las 8:00 son las que cuentan en el
+//  %Cumplimiento: lo añadido durante el día no cuenta. Las sube agenda_cruce.py a las 8:00
+//  (type=agenda-hoy). El primer contacto no viaja con la lista: se pide al pulsar cada
+//  mantenimiento (type=agenda-contacto) con la matrícula y el DNI del JE, que el servidor
+//  vuelve a comprobar, y solo para mantenimientos de su equipo.
+// ═══════════════════════════════════════════════════════════════
+const CUMPH_CACHE = {};
+let CUMPH_DNI = '';   // el DNI del login, solo en memoria (igual que CF.dni)
+
+function cumphEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// "10-12" -> {ini:10, fin:12}
+function cumphFranja(ts){
+  const m = String(ts||'').match(/(\d{1,2})\D+(\d{1,2})/);
+  return m ? {ini:+m[1], fin:+m[2]} : null;
+}
+// pasada / en curso / pendiente, según la hora de Madrid
+function cumphMomento(ts, ahora){
+  const f = cumphFranja(ts); if(!f) return '';
+  const h = ahora.getHours() + ahora.getMinutes()/60;
+  return h >= f.fin ? 'pasada' : (h >= f.ini ? 'curso' : '');
+}
+
+async function renderCumplimientoHoy(jeId, recargar){
+  const el = document.getElementById('equipoCumpHoy');
+  if(!el || !jeId) return;
+  const cab = '<div class="section-head" style="margin-top:0">🎯 Cumplimiento de hoy · no pueden quedar sin hacer</div>';
+  let d = CUMPH_CACHE[jeId];
+  if(recargar || !d){
+    el.innerHTML = cab+'<div style="color:var(--muted);font-size:.78rem;padding:8px 2px">Cargando…</div>';
+    try{
+      const r = await fetch(SCRIPT_URL_AGENDA_HOY(jeId));
+      d = await r.json();
+      if(!d.ok) throw new Error(d.error||'sin datos');
+      CUMPH_CACHE[jeId] = d;
+    }catch(e){
+      el.innerHTML = cab+'<div style="color:var(--muted);font-size:.78rem;padding:8px 2px">No se pudo cargar la agenda de hoy. <a href="#" onclick="renderCumplimientoHoy(\''+jeId+'\',true);return false" style="color:var(--gold2)">Reintentar</a></div>';
+      return;
+    }
+  }
+  const tecs = (d.tecnicos||[]).filter(t=>(t.acts||[]).length)
+    .sort((a,b)=>String(a.tecnico||a.mat).localeCompare(String(b.tecnico||b.mat)));
+  const total = tecs.reduce((s,t)=>s+t.acts.length,0);
+  const ahora = new Date(new Date().toLocaleString('en-US',{timeZone:'Europe/Madrid'}));
+  const esHoy = d.dia === ahora.toLocaleDateString('sv-SE');
+
+  if(!tecs.length){
+    el.innerHTML = cab+'<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;font-size:.8rem;color:var(--muted)">Hoy no hay mantenimientos agendados a las 8:00 para tu equipo.</div>';
+    return;
+  }
+
+  const filaAct = (t,a) => {
+    const mom = esHoy ? cumphMomento(a.ts, ahora) : '';
+    const pill = mom==='curso'
+      ? 'background:rgba(201,168,76,.18);color:var(--gold2);border-color:var(--gold3)'
+      : mom==='pasada' ? 'background:var(--s2);color:var(--muted);border-color:var(--border2)'
+      : 'background:var(--s2);color:var(--text);border-color:var(--border2)';
+    return `<details class="cumph-act" ontoggle="if(this.open) cumphContacto(this,'${cumphEsc(jeId)}','${cumphEsc(a.n)}')">
+      <summary>
+        <span class="cumph-ord">${cumphEsc(a.orden||'·')}</span>
+        <span class="cumph-txt">
+          <span class="cumph-num">${cumphEsc(a.n)}</span>
+          <span class="cumph-tipo">${cumphEsc(a.tipo)}</span>
+        </span>
+        <span class="cumph-ts" style="${pill}">${cumphEsc(a.ts||'—')}${mom==='curso'?'<small>ahora</small>':''}</span>
+      </summary>
+      <div class="cumph-cont">Pulsa para ver el primer contacto…</div>
+    </details>`;
+  };
+
+  const bloques = tecs.map(t=>{
+    const acts = t.acts.slice().sort((a,b)=>(+a.orden||99)-(+b.orden||99));
+    const ts = acts.map(a=>cumphFranja(a.ts)).filter(Boolean);
+    const rango = ts.length ? `${String(Math.min(...ts.map(f=>f.ini))).padStart(2,'0')}–${Math.max(...ts.map(f=>f.fin))} h` : '';
+    return `<details class="cumph-tec">
+      <summary>
+        <span style="flex:1;min-width:0">
+          <span style="font-weight:700">${cumphEsc(t.tecnico||t.mat)}</span>
+          <span style="color:var(--muted);font-size:.72rem">(${cumphEsc(t.mat)})</span>
+        </span>
+        <span class="cumph-cuenta">${acts.length}</span>
+        <span style="color:var(--muted);font-size:.7rem;white-space:nowrap">${rango}</span>
+      </summary>
+      <div class="cumph-lista">${acts.map(a=>filaAct(t,a)).join('')}</div>
+    </details>`;
+  }).join('');
+
+  const diaTxt = d.dia ? new Date(d.dia+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}) : '';
+  el.innerHTML = cab + `
+    <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
+      <div style="font-size:.7rem;color:var(--gold2);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Agenda de las 8:00 · ${cumphEsc(diaTxt)}${esHoy?'':' <span style="color:#e05a4a">(no es la de hoy)</span>'}</div>
+      <div style="font-size:.8rem;margin-bottom:4px"><b style="color:var(--gold2)">${total}</b> mantenimientos en <b>${tecs.length}</b> técnicos.</div>
+      <div style="font-size:.72rem;color:var(--muted);line-height:1.45;margin-bottom:10px">Son los que cuentan en el %Cumplimiento: los que se dejen sin hacer bajan el KPI. Lo que se añada durante el día no cuenta. Pulsa un mantenimiento para ver el primer contacto.</div>
+      ${bloques}
+      <button onclick="renderCumplimientoHoy('${cumphEsc(jeId)}',true)" style="margin-top:10px;width:100%;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--font);font-size:.78rem;cursor:pointer">↻ Actualizar</button>
+      ${d.actualizado?`<div style="font-size:.62rem;color:var(--muted);text-align:center;margin-top:6px">Actualizado ${cumphEsc(d.actualizado)}</div>`:''}
+    </div>`;
+}
+
+async function cumphContacto(det, jeId, n){
+  const caja = det.querySelector('.cumph-cont');
+  if(caja.dataset.ok) return;
+  caja.textContent = 'Cargando contacto…';
+  try{
+    const r = await fetch(SCRIPT_URL_AGENDA_CONTACTO(), {method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({mat: jeId, dni: CUMPH_DNI, n})});
+    const c = await r.json();
+    if(!c.ok){ caja.textContent = c.error || 'Sin contacto'; return; }
+    const tel = String(c.tel||'').replace(/\s/g,'');
+    caja.innerHTML = `<span style="color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.06em">Primer contacto</span>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:3px">
+        <span style="font-weight:600">${cumphEsc(c.nombre||'—')}</span>
+        ${tel?`<a href="tel:${cumphEsc(tel)}" class="cumph-tel">📞 ${cumphEsc(c.tel)}</a>`:'<span style="color:var(--muted)">sin teléfono</span>'}
+      </div>`;
+    caja.dataset.ok = '1';
+  }catch(e){ caja.textContent = 'No se pudo cargar el contacto.'; }
+}
+
+const CUMPH_EXEC = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec";
+const SCRIPT_URL_AGENDA_HOY = je => CUMPH_EXEC + '?type=agenda-hoy&token=' + APP_TOKEN + '&je=' + encodeURIComponent(je);
+const SCRIPT_URL_AGENDA_CONTACTO = () => CUMPH_EXEC + '?type=agenda-contacto&token=' + APP_TOKEN;
+
 async function renderConfirmacionesEquipo(jeId, recargar){
   const el = document.getElementById('equipoConfirmaciones');
   if(!el || !jeId) return;
@@ -7052,6 +7200,7 @@ async function doLogin(){
   }
 
   recordarAcceso(mat, dni);
+  CUMPH_DNI = dni;
   const found=findUser(mat);
   if(!found){
     document.getElementById('loginError').style.display='block';
@@ -7672,6 +7821,7 @@ function doLogout(){
   document.getElementById('tabsBarJR').style.display='none';
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
   FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={}; FICHAJE_HOY_CARGADO=false;
+  CUMPH_DNI=''; Object.keys(CUMPH_CACHE).forEach(k=>delete CUMPH_CACHE[k]);
   CF={mat:'',dni:'',datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
   CF_EDITAR.clear();
   cfCerrarAsistente();

@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo
 
 from playwright.sync_api import sync_playwright
 
+import agenda_contactos
 import consola_sso
 import ofs_rm_prueba
 import rm_analizar
@@ -78,8 +79,23 @@ def _fichas_ya_leidas(fecha_iso):
 
 def _proxima_ruta(page, fechas_iso, errores, capturas, reutilizar=False):
     filas = []
+    contactos = {}
     for f in fechas_iso:
-        filas += ruta_sugerencias._filas_ruta(consola_sso.descargar_csv_grupos(page, f), f)
+        csvs = consola_sso.descargar_csv_grupos(page, f)
+        filas += ruta_sugerencias._filas_ruta(csvs, f)
+        if reutilizar:
+            # Primer contacto de cada mantenimiento de hoy para "Cumplimiento de hoy" (vista del JE).
+            # Solo en memoria: se sube al Apps Script y se borra a las 18:05.
+            contactos.update(agenda_contactos.contactos_de_csvs(csvs))
+    if reutilizar:
+        try:
+            res = agenda_contactos.subir(fechas_iso[0], contactos)
+            print(f"[mac] contactos de hoy subidos: {res.get('guardados', 0)}")
+        except Exception as e:
+            # No para la ruta: el apartado del JE se queda sin contactos ese día
+            print(f"[mac] no se pudieron subir los contactos de hoy: {e}")
+            registrar_error("mac_tarde", f"contactos de hoy: {e}")
+        contactos.clear()
     ya = {}
     if reutilizar:
         for f in fechas_iso:
@@ -130,6 +146,14 @@ def main(manana=False):
                 errores.append(f"próxima ruta: {e}")
                 registrar_error("mac_tarde", f"proxima ruta: {e}")
             if not manana:
+                # Los contactos de hoy (Cumplimiento de hoy) solo valen durante el día
+                try:
+                    agenda_contactos.borrar()
+                    resumen.append("Contactos de hoy borrados de la app.")
+                except Exception as e:
+                    # Si no se borran, el Apps Script deja de servirlos igual al cambiar de día
+                    resumen.append(f"Contactos de hoy: no se pudieron borrar ({e}).")
+                    registrar_error("mac_tarde", f"borrar contactos: {e}")
                 try:
                     mes = rm_analizar._mes_actual()
                     lista = rm_analizar.pendientes(mes)
