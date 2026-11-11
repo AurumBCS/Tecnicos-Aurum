@@ -31,7 +31,7 @@ VIEJAS = {"121272": "ya no se envía: si pusiste un MC3 va DESM 121272 + MONT 12
 PILAS_POR_ZONA = {
     # la 7014 la llevan muchos dispositivos distintos (y no todos salen en zonas): no se cuenta
     "Moonshot": [("205036", "2", ("MG", "MR", "B3"))],   # B3 = botón de pánico, también 205036 (Gustavo, 11/11)
-    "Fast": [("7002", "1", ("MG", "FG", "B3"))],   # B3 = pulsador SOS (feedback JE 29/10)
+    "Fast": [("7002", "1", ("MG", "FG", "B3", "JS"))],   # B3 = pulsador SOS (feedback JE 29/10); JS = jammer palito (Gustavo, 11/11)
 }
 
 

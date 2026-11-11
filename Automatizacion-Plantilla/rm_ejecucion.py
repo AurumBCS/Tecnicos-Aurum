@@ -21,7 +21,7 @@ from rm_sugerencias import FOTOS, MAGNETICOS, PERIMETRALES, _cuenta, _fecha, _me
 TIPOS_FUERA = re.compile(r"desmontaje|anp remoto|anp/amp|documentacion|nueva instalacion|(?<!des)montaje de alarma|upgrade")
 ZONA = re.compile(r"\b([A-Z]{2}\d{2}|B3\d{2})\b")
 # pila que tiene que aparecer, cuando no hay duda (panel, prefijo de zona)
-PILA_ZONA = {("Fast", "YP"): "7006", ("Fast", "MG"): "7002", ("Fast", "SR"): "7002", ("Fast", "B3"): "7002",
+PILA_ZONA = {("Fast", "YP"): "7006", ("Fast", "MG"): "7002", ("Fast", "SR"): "7002", ("Fast", "B3"): "7002", ("Fast", "JS"): "7002",
              ("Moonshot", "MG"): "205036", ("Moonshot", "SR"): "205036", ("Moonshot", "MR"): "205036",
              ("Moonshot", "B3"): "205036"}   # botón de pánico: 205036 en Moonshot, 7002 en Fast (Gustavo, 11/11)
 # baterias / cable de la central
