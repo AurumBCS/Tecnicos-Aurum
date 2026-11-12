@@ -7167,13 +7167,16 @@ async function cfDescargarExcel(mes){
 //  LOGIN
 // ══════════════════════════════════════════════
 // Administrativas encargadas de revisar fichajes — solo ven la vista de fichajes, no el panel JR completo
-const FICHAJE_ADMIN_IDS=['262876','EQ5303'];
-const FICHAJE_ADMIN_NOMBRES={'262876':'Mercedes Teresa Savarino Sainz','EQ5303':'Estibaliz Balmaseda Russian'};
+const FICHAJE_ADMIN_IDS=['262876'];
+const FICHAJE_ADMIN_NOMBRES={'262876':'Mercedes Teresa Savarino Sainz'};
+// Carga de anexos (Upselling): solo ven el panel Upselling y su botón de fichar (UPS_IDS)
+const ANEXOS_NOMBRES={'EQ5303':'Estibaliz Balmaseda Russian'};
 
 function findUser(q){
   q=q.trim().toUpperCase();
   if(CONTROL_FICHAJES_IDS.includes(q)) return {type:'control-fichajes',id:q};
   if(FICHAJE_ADMIN_IDS.includes(q)) return {type:'fichaje-admin',id:q};
+  if(ANEXOS_NOMBRES[q] && UPS_IDS.includes(q)) return {type:'anexos',id:q};
   // JR nivel — acceso igual que JR9426
   const JR_IDS=['JR9426','CM9651','JN4767','GD5381','BLAS.ALVAREZ','BA8006'];
   if(JR_IDS.includes(q)) return {type:'jr',id:q};
@@ -7319,6 +7322,21 @@ async function doLogin(){
     document.getElementById('tabsBar').style.display='none';
     renderFichajeJR('fichajeAdminContainer');
     showPanel('fichajeAdminPanel');
+
+  } else if(found.type==='anexos'){
+    CURRENT_USER_TYPE='anexos';
+    const nombreAnx=ANEXOS_NOMBRES[found.id]||'Anexos';
+    document.getElementById('topbarName').textContent=nombreAnx;
+    document.getElementById('topbarId').textContent=found.id;
+    FICHAJE_ID=found.id; FICHAJE_NOMBRE=nombreAnx;
+    document.getElementById('scorePill').innerHTML='<span style="color:var(--gold2);font-weight:700">Anexos</span>';
+    document.getElementById('tabsBarJR').style.display='none';
+    document.getElementById('tabsBar').style.display='none';
+    // upsLlamar usa CF.mat y CF.dni; el servidor vuelve a comprobar el DNI en cada llamada
+    CF={mat:found.id,dni,datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
+    document.querySelectorAll('.ups-switch').forEach(e=>e.classList.remove('on'));
+    showPanel('upsellingPanel');
+    upsAbrir('');
 
   } else if(found.type==='jr'){
     CURRENT_USER_TYPE='jr';
@@ -7643,7 +7661,7 @@ setInterval(()=>{
 //  Al aprobarlo, la Lambda (tarea upselling_envio) lo envía fila a fila con la
 //  cuenta de Gustavo y aquí se ve el avance.
 // ══════════════════════════════════════════════
-const UPS_IDS=['314298'];
+const UPS_IDS=['EQ5303'];   // solo Estibaliz (12/11/2026); Anna (314298) ya no lo ve
 const UPS_PANELES=['Moonshot','VERISURE','Otras'];
 // Columnas aceptadas (en mayúsculas, sin acentos ni signos) para cada pregunta del Form
 const UPS_COLS={
@@ -7659,7 +7677,7 @@ const upsClase=s=>String(s||'').replace(/ /g,'-');
 
 function upsPreparar(){
   const puede=UPS_IDS.includes(CF.mat);
-  document.querySelectorAll('#controlFichajesPanel .ups-switch').forEach(e=>e.classList.toggle('on',puede));
+  document.querySelectorAll('.ups-switch').forEach(e=>e.classList.toggle('on',puede));
 }
 
 function upsIr(donde){
