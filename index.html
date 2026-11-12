@@ -79,6 +79,8 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
 #jrPreconteoDet>summary{list-style:none}#jrPreconteoDet>summary::-webkit-details-marker{display:none}
 #jrPreconteoDet>summary::after{content:"▸";margin-left:auto;padding-left:8px}#jrPreconteoDet[open]>summary::after{content:"▾"}
 #jrPreconteo>.section-head:first-child{display:none}
+.plegable>summary{list-style:none;cursor:pointer;display:flex;align-items:center;min-height:44px;box-sizing:border-box}.plegable>summary::-webkit-details-marker{display:none}
+.plegable>summary::after{content:"▸";margin-left:auto;padding-left:8px}.plegable[open]>summary::after{content:"▾"}
 .login-error{margin-top:10px;text-align:center;font-size:.78rem;color:#e05a4a;display:none}
 .login-footer{margin-top:18px;text-align:center;font-size:.67rem;color:var(--muted);
   border-top:1px solid var(--border);padding-top:14px;letter-spacing:.03em;line-height:1.7}
@@ -574,11 +576,11 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
       </select>
       <button onclick="showHistoricoEquipo(CURRENT_JE_ID,'equipoPanel')" style="width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.75rem;font-weight:700;cursor:pointer">📊 Histórico del equipo</button>
 
-      <!-- Uso de Confirmaciones SMS del equipo (hoy en vivo + días anteriores) -->
-      <div id="equipoConfirmaciones" style="margin-bottom:14px"></div>
-
       <!-- Cumplimiento de hoy: lo que sale a las 8:00 y no puede quedar sin hacer -->
       <div id="equipoCumpHoy" style="margin-bottom:14px"></div>
+
+      <!-- Uso de Confirmaciones SMS del equipo (hoy en vivo + días anteriores), plegado -->
+      <div id="equipoConfirmaciones" style="margin-bottom:14px"></div>
 
       <!-- Pre-conteo: contar el coche del técnico antes del conteo periódico -->
       <div id="equipoPreconteo" style="margin-bottom:14px"></div>
@@ -4411,17 +4413,20 @@ function cumphMomento(ts, ahora){
 async function renderCumplimientoHoy(jeId, recargar){
   const el = document.getElementById('equipoCumpHoy');
   if(!el || !jeId) return;
-  const cab = '<div class="section-head" style="margin-top:0">🎯 Cumplimiento de hoy · no pueden quedar sin hacer</div>';
+  // Plegado por defecto: se abre al pulsar la cabecera y sigue abierto al actualizar
+  const abierto = !!(el.querySelector('details.plegable')||{}).open;
+  const plegado = (resumen, cuerpo) => `<details class="plegable"${abierto?' open':''}>
+    <summary class="section-head" style="margin-top:0">🎯 Cumplimiento de hoy${resumen?` <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0">· ${resumen}</span>`:''}</summary>${cuerpo}</details>`;
   let d = CUMPH_CACHE[jeId];
   if(recargar || !d){
-    el.innerHTML = cab+'<div style="color:var(--muted);font-size:.78rem;padding:8px 2px">Cargando…</div>';
+    el.innerHTML = plegado('cargando…', '');
     try{
       const r = await fetch(SCRIPT_URL_AGENDA_HOY(jeId));
       d = await r.json();
       if(!d.ok) throw new Error(d.error||'sin datos');
       CUMPH_CACHE[jeId] = d;
     }catch(e){
-      el.innerHTML = cab+'<div style="color:var(--muted);font-size:.78rem;padding:8px 2px">No se pudo cargar la agenda de hoy. <a href="#" onclick="renderCumplimientoHoy(\''+jeId+'\',true);return false" style="color:var(--gold2)">Reintentar</a></div>';
+      el.innerHTML = plegado('no se pudo cargar', '<div style="color:var(--muted);font-size:.78rem;padding:8px 2px">No se pudo cargar la agenda de hoy. <a href="#" onclick="renderCumplimientoHoy(\''+jeId+'\',true);return false" style="color:var(--gold2)">Reintentar</a></div>');
       return;
     }
   }
@@ -4432,7 +4437,7 @@ async function renderCumplimientoHoy(jeId, recargar){
   const esHoy = d.dia === ahora.toLocaleDateString('sv-SE');
 
   if(!tecs.length){
-    el.innerHTML = cab+'<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;font-size:.8rem;color:var(--muted)">Hoy no hay mantenimientos agendados a las 8:00 para tu equipo.</div>';
+    el.innerHTML = plegado('sin mantenimientos', '<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;font-size:.8rem;color:var(--muted)">Hoy no hay mantenimientos agendados a las 8:00 para tu equipo.</div>');
     return;
   }
 
@@ -4473,7 +4478,7 @@ async function renderCumplimientoHoy(jeId, recargar){
   }).join('');
 
   const diaTxt = d.dia ? new Date(d.dia+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}) : '';
-  el.innerHTML = cab + `
+  el.innerHTML = plegado(`<b style="color:var(--gold2)">${total}</b> mantenimientos · ${tecs.length} técnicos${esHoy?'':' · <span style="color:#e05a4a">no es la de hoy</span>'}`, `
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
       <div style="font-size:.7rem;color:var(--gold2);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Agenda de las 8:00 · ${cumphEsc(diaTxt)}${esHoy?'':' <span style="color:#e05a4a">(no es la de hoy)</span>'}</div>
       <div style="font-size:.8rem;margin-bottom:4px"><b style="color:var(--gold2)">${total}</b> mantenimientos en <b>${tecs.length}</b> técnicos.</div>
@@ -4481,7 +4486,7 @@ async function renderCumplimientoHoy(jeId, recargar){
       ${bloques}
       <button onclick="renderCumplimientoHoy('${cumphEsc(jeId)}',true)" style="margin-top:10px;width:100%;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--font);font-size:.78rem;cursor:pointer">↻ Actualizar</button>
       ${d.actualizado?`<div style="font-size:.62rem;color:var(--muted);text-align:center;margin-top:6px">Actualizado ${cumphEsc(d.actualizado)}</div>`:''}
-    </div>`;
+    </div>`);
 }
 
 async function cumphContacto(det, jeId, n){
@@ -4511,13 +4516,16 @@ async function renderConfirmacionesEquipo(jeId, recargar){
   const el = document.getElementById('equipoConfirmaciones');
   if(!el || !jeId) return;
   const nombre = m => ROSTER_NOMBRES[m] || JE_NAMES[m] || m;
-  const cab = '<div class="section-head" style="margin-top:0">📲 Confirmaciones SMS del equipo</div>';
+  // Plegado por defecto: se abre al pulsar la cabecera y sigue abierto al actualizar
+  const abierto = !!(el.querySelector('details.plegable')||{}).open;
+  const plegado = (resumen, cuerpo) => `<details class="plegable"${abierto?' open':''}>
+    <summary class="section-head" style="margin-top:0">📲 Confirmaciones SMS del equipo${resumen?` <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0">· ${resumen}</span>`:''}</summary>${cuerpo}</details>`;
   let d = CONF_EQUIPO_CACHE[jeId];
   if(recargar || !d){
-    el.innerHTML = cab+'<div style="color:var(--text2);font-size:.78rem;padding:8px 2px">Cargando…</div>';
+    el.innerHTML = plegado('cargando…', '');
     try{ d = await pedirUsoSms(isoDiasAtras(0), isoDiasAtras(14)); CONF_EQUIPO_CACHE[jeId]=d; }
     catch(e){
-      el.innerHTML = cab+'<div style="color:var(--text2);font-size:.78rem;padding:8px 2px">No se pudieron cargar los datos. <a href="#" onclick="renderConfirmacionesEquipo(\''+jeId+'\',true);return false" style="color:var(--gold2)">Reintentar</a></div>';
+      el.innerHTML = plegado('no se pudo cargar', '<div style="color:var(--text2);font-size:.78rem;padding:8px 2px">No se pudieron cargar los datos. <a href="#" onclick="renderConfirmacionesEquipo(\''+jeId+'\',true);return false" style="color:var(--gold2)">Reintentar</a></div>');
       return;
     }
   }
@@ -4544,13 +4552,15 @@ async function renderConfirmacionesEquipo(jeId, recargar){
   jeDeEquipo[jeId] = jeId;
   const histHtml = noEntraronPorEquipo(d, nombre, jeDeEquipo, jeId);
 
-  el.innerHTML = cab + `
+  const resumen = !delEquipo.length ? 'hoy sin citas'
+    : sinUsar.length ? `<span style="color:#e05a4a;font-weight:700">${sinUsar.length} sin usar hoy</span>` : `<span style="color:var(--green)">${usaron}/${delEquipo.length} hoy</span>`;
+  el.innerHTML = plegado(resumen, `
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
       <div style="font-size:.7rem;color:var(--gold2);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Hoy</div>
       ${hoyHtml}
       ${histHtml}
       <button onclick="renderConfirmacionesEquipo('${jeId}',true)" style="margin-top:10px;width:100%;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.78rem;cursor:pointer">↻ Actualizar</button>
-    </div>`;
+    </div>`);
 }
 
 // "Quién no entró, por equipo" para un día guardado (por defecto el último día
