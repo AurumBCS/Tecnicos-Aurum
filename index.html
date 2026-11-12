@@ -4418,12 +4418,13 @@ async function renderCumplimientoHoy(jeId, recargar){
   const plegado = (resumen, cuerpo) => `<details class="plegable"${abierto?' open':''}>
     <summary class="section-head" style="margin-top:0">🎯 Cumplimiento de hoy${resumen?` <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0">· ${resumen}</span>`:''}</summary>${cuerpo}</details>`;
   let d = CUMPH_CACHE[jeId];
-  if(recargar || !d){
+  if(recargar || !d || Date.now()-(d._t||0) > 5*60000){
     el.innerHTML = plegado('cargando…', '');
     try{
       const r = await fetch(SCRIPT_URL_AGENDA_HOY(jeId));
       d = await r.json();
       if(!d.ok) throw new Error(d.error||'sin datos');
+      d._t = Date.now();
       CUMPH_CACHE[jeId] = d;
     }catch(e){
       el.innerHTML = plegado('no se pudo cargar', '<div style="color:var(--muted);font-size:.78rem;padding:8px 2px">No se pudo cargar la agenda de hoy. <a href="#" onclick="renderCumplimientoHoy(\''+jeId+'\',true);return false" style="color:var(--gold2)">Reintentar</a></div>');
@@ -4435,6 +4436,27 @@ async function renderCumplimientoHoy(jeId, recargar){
   const total = tecs.reduce((s,t)=>s+t.acts.length,0);
   const ahora = new Date(new Date().toLocaleString('en-US',{timeZone:'Europe/Madrid'}));
   const esHoy = d.dia === ahora.toLocaleDateString('sv-SE');
+  // Avisos de franja con los estados en vivo de Oracle (Lambda cada 20 min, agenda_vivo.py)
+  const V = esHoy && d.vivo ? d.vivo : null, hMin = ahora.getHours()*60 + ahora.getMinutes();
+  const aMin = h => { const m = String(h||'').match(/^(\d{1,2}):(\d{2})/); return m ? +m[1]*60 + +m[2] : null; };
+  const estado = a => {
+    if(!V) return '';
+    const v = V.est[a.n];
+    if(!v) return V.total >= 300 ? 'quitado' : '';   // solo si la descarga de Oracle vino entera
+    const [e, ini] = v, f = cumphFranja(a.ts);
+    if(e==='C') return 'hecho'; if(e==='I') return 'curso'; if(e==='S') return 'suspendido'; if(e==='X'||e==='N') return 'cancelado';
+    if(e==='P' && f){ if(hMin >= f.fin*60) return 'fuera'; const im = aMin(ini); if(im!=null && im >= f.fin*60) return 'riesgo'; }
+    return '';
+  };
+  const esAlerta = k => k==='riesgo' || k==='fuera';
+  const etiqueta = (a,k) => k==='fuera' ? `<span style="color:#e05a4a;font-weight:800">🔴 Fuera de franja</span> · sin empezar y la franja ${cumphEsc(a.ts)} ya acabó`
+    : k==='riesgo' ? `<span style="color:#e0913a;font-weight:800">🟠 En riesgo</span> · Oracle prevé empezar a las <b>${cumphEsc(V.est[a.n][1])}</b> y la franja es ${cumphEsc(a.ts)}`
+    : k==='quitado' ? `<span style="color:var(--muted);font-weight:800">⚪ Ya no está en la agenda de hoy</span> · se quitó o se movió después de las 8:00`
+    : k==='suspendido' ? `<span style="color:var(--muted);font-weight:800">⏸ Suspendido</span>`
+    : k==='cancelado' ? `<span style="color:var(--muted);font-weight:800">✕ Cancelado</span>` : '';
+  const alertas = [];
+  tecs.forEach(t=>t.acts.forEach(a=>{ const k=estado(a); if(esAlerta(k)) alertas.push({t,a,k}); }));
+  alertas.sort((x,y)=>(x.k==='fuera'?0:1)-(y.k==='fuera'?0:1) || String(x.a.ts).localeCompare(String(y.a.ts)));
 
   if(!tecs.length){
     el.innerHTML = plegado('sin mantenimientos', '<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;font-size:.8rem;color:var(--muted)">Hoy no hay mantenimientos agendados a las 8:00 para tu equipo.</div>');
@@ -4447,13 +4469,17 @@ async function renderCumplimientoHoy(jeId, recargar){
       ? 'background:rgba(201,168,76,.18);color:var(--gold2);border-color:var(--gold3)'
       : mom==='pasada' ? 'background:var(--s2);color:var(--muted);border-color:var(--border2)'
       : 'background:var(--s2);color:var(--text);border-color:var(--border2)';
-    return `<details class="cumph-act" ontoggle="if(this.open) cumphContacto(this,'${cumphEsc(jeId)}','${cumphEsc(a.n)}')">
+    const k = estado(a), col = k==='fuera' ? '#e05a4a' : k==='riesgo' ? '#e0913a' : '';
+    const marca = k==='hecho' ? '<span title="Completado" style="color:var(--green);font-weight:800">✓</span>' : k==='curso' ? '<span title="Iniciado" style="color:var(--gold2)">▶</span>' : '';
+    const apagado = k==='quitado'||k==='suspendido'||k==='cancelado';
+    return `<details class="cumph-act" style="${col?`border-color:${col};border-left:4px solid ${col}`:apagado?'opacity:.6':''}" ontoggle="if(this.open) cumphContacto(this,'${cumphEsc(jeId)}','${cumphEsc(a.n)}')">
       <summary>
         <span class="cumph-ord">${cumphEsc(a.orden||'·')}</span>
         <span class="cumph-txt">
           <span class="cumph-num">${cumphEsc(a.n)}</span>
           <span class="cumph-tipo">${cumphEsc(a.tipo)}</span>
-        </span>
+          ${etiqueta(a,k)?`<span style="font-size:.7rem;line-height:1.35;margin-top:2px">${etiqueta(a,k)}</span>`:''}
+        </span>${marca}
         <span class="cumph-ts" style="${pill}">${cumphEsc(a.ts||'—')}${mom==='curso'?'<small>ahora</small>':''}</span>
       </summary>
       <div class="cumph-cont">Pulsa para ver el primer contacto…</div>
@@ -4470,6 +4496,7 @@ async function renderCumplimientoHoy(jeId, recargar){
           <span style="font-weight:700">${cumphEsc(t.tecnico||t.mat)}</span>
           <span style="color:var(--muted);font-size:.72rem">(${cumphEsc(t.mat)})</span>
         </span>
+        ${(()=>{ const na = acts.filter(a=>esAlerta(estado(a))).length; return na ? `<span style="background:#e0913a;color:#111;font-weight:800;font-size:.68rem;border-radius:999px;padding:2px 7px">⚠ ${na}</span>` : ''; })()}
         <span class="cumph-cuenta">${acts.length}</span>
         <span style="color:var(--muted);font-size:.7rem;white-space:nowrap">${rango}</span>
       </summary>
@@ -4478,11 +4505,20 @@ async function renderCumplimientoHoy(jeId, recargar){
   }).join('');
 
   const diaTxt = d.dia ? new Date(d.dia+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}) : '';
-  el.innerHTML = plegado(`<b style="color:var(--gold2)">${total}</b> mantenimientos · ${tecs.length} técnicos${esHoy?'':' · <span style="color:#e05a4a">no es la de hoy</span>'}`, `
+  const nFuera = alertas.filter(x=>x.k==='fuera').length, nRiesgo = alertas.length - nFuera;
+  const avisosHtml = !V ? '' : alertas.length ? `<div style="border:1px solid #e0913a;border-radius:10px;padding:10px 12px;margin:0 0 12px;background:rgba(224,145,58,.08)">
+      <div style="font-size:.7rem;color:#e0913a;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">⚠ Necesitan atención · Oracle ${cumphEsc(V.hora)} · se revisa cada 20 min</div>
+      ${alertas.map(({t,a,k})=>`<div style="font-size:.76rem;padding:6px 0;border-top:1px solid var(--border2)">
+        <b>${cumphEsc(t.tecnico||t.mat)}</b> · ${cumphEsc(a.n)} · ${cumphEsc(a.tipo)}<br>${etiqueta(a,k)}</div>`).join('')}
+      <div style="font-size:.7rem;color:var(--muted);margin-top:6px">Si no llega, reubícalo en Oracle con otro técnico de tu equipo.</div>
+    </div>` : `<div style="font-size:.74rem;color:var(--green);margin-bottom:10px">✓ Ninguno en riesgo ahora (Oracle ${cumphEsc(V.hora)}, se revisa cada 20 min).</div>`;
+  const resAvisos = (nFuera?` · <span style="color:#e05a4a;font-weight:800">🔴 ${nFuera} fuera de franja</span>`:'') + (nRiesgo?` · <span style="color:#e0913a;font-weight:800">⚠ ${nRiesgo} en riesgo</span>`:'');
+  el.innerHTML = plegado(`<b style="color:var(--gold2)">${total}</b> mantenimientos · ${tecs.length} técnicos${resAvisos}${esHoy?'':' · <span style="color:#e05a4a">no es la de hoy</span>'}`, `
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
       <div style="font-size:.7rem;color:var(--gold2);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Agenda de las 8:00 · ${cumphEsc(diaTxt)}${esHoy?'':' <span style="color:#e05a4a">(no es la de hoy)</span>'}</div>
       <div style="font-size:.8rem;margin-bottom:4px"><b style="color:var(--gold2)">${total}</b> mantenimientos en <b>${tecs.length}</b> técnicos.</div>
       <div style="font-size:.72rem;color:var(--muted);line-height:1.45;margin-bottom:10px">Son los que cuentan en el %Cumplimiento: los que se dejen sin hacer bajan el KPI. Lo que se añada durante el día no cuenta. Pulsa un mantenimiento para ver el primer contacto.</div>
+      ${avisosHtml}
       ${bloques}
       <button onclick="renderCumplimientoHoy('${cumphEsc(jeId)}',true)" style="margin-top:10px;width:100%;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--font);font-size:.78rem;cursor:pointer">↻ Actualizar</button>
       ${d.actualizado?`<div style="font-size:.62rem;color:var(--muted);text-align:center;margin-top:6px">Actualizado ${cumphEsc(d.actualizado)}</div>`:''}

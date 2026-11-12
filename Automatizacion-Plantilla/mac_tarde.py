@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo
 from playwright.sync_api import sync_playwright
 
 import agenda_contactos
+import agenda_vivo
 import consola_sso
 import ofs_rm_prueba
 import rm_analizar
@@ -83,6 +84,17 @@ def _proxima_ruta(page, fechas_iso, errores, capturas, reutilizar=False):
     for f in fechas_iso:
         csvs = consola_sso.descargar_csv_grupos(page, f)
         filas += ruta_sugerencias._filas_ruta(csvs, f)
+        if reutilizar and f == fechas_iso[0]:
+            # Lista de las 8:00 para "Cumplimiento de hoy" (vista del JE), desde Oracle: ya no depende
+            # del correo de Verisure. agenda_cruce.py la compara después con el Excel de Verisure.
+            try:
+                lista = agenda_vivo.lista_8(csvs, agenda_vivo.cuadrante())
+                agenda_vivo.subir_lista(f, lista)
+                agenda_vivo.guardar_foto(f, lista)
+                print(f"[mac] lista de las 8:00 subida desde Oracle: {len(lista)} mantenimientos")
+            except Exception as e:
+                print(f"[mac] no se pudo subir la lista de las 8:00: {e}")
+                registrar_error("mac_tarde", f"lista de las 8:00: {e}")
         if reutilizar:
             # Primer contacto de cada mantenimiento de hoy para "Cumplimiento de hoy" (vista del JE).
             # Solo en memoria: se sube al Apps Script y se borra a las 18:05.

@@ -20,6 +20,8 @@ Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "ofs_rm_prueba"} -> prueba (manual): buscar mantenimientos repetidos en Oracle (ver ofs_rm_prueba.py)
   {"tarea": "rm_analizar", "mes": "Septiembre"} -> analiza las RM del mes para el dashboard de la app y se
                                   relanza sola hasta acabar (ver rm_analizar.py)
+  {"tarea": "agenda_vivo"} -> L-V cada 20 min de 8:10 a 18:50: estados de los mantenimientos de hoy en la
+                                  consola de Oracle para los avisos del "Cumplimiento de hoy" del JE (ver agenda_vivo.py)
   {"tarea": "upselling_envio"} -> SIN horario: envia al Microsoft Form los lotes de Upselling aprobados en
                                   la app (ver forms_upselling.py). Lo arranca la URL de funcion (ver _desde_url).
 (El correo de la mañana con capturas a Mercedes se retiro el 2026-10-16.)
@@ -83,9 +85,9 @@ def handler(event, context):
     if isinstance(event, dict) and "requestContext" in event:
         return _desde_url(event, context)
     tarea = (event or {}).get("tarea")
-    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "preconteo", "preconteo_lista", "ofs_rm_prueba", "rm_analizar", "upselling_envio"):
+    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "preconteo", "preconteo_lista", "ofs_rm_prueba", "rm_analizar", "upselling_envio", "agenda_vivo"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/preconteo/preconteo_lista/ofs_rm_prueba/rm_analizar/upselling_envio): {event}"
+            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/preconteo/preconteo_lista/ofs_rm_prueba/rm_analizar/upselling_envio/agenda_vivo): {event}"
         )
 
     if (event or {}).get("respaldo"):
@@ -151,6 +153,11 @@ def handler(event, context):
         import rm_analizar
 
         return rm_analizar.main(event, context)
+    elif tarea == "agenda_vivo":
+        # Estados en vivo de los mantenimientos de hoy (avisos de franja en la vista del JE).
+        import agenda_vivo
+
+        _correr(agenda_vivo.main, "agenda_vivo")
     elif tarea == "upselling_envio":
         # Envia al Microsoft Form UPSELLING el lote aprobado en la app, fila a fila.
         import forms_upselling
