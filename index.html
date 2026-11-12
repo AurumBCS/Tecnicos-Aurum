@@ -1498,36 +1498,40 @@ function showPanel(id){
 // ══════════════════════════════════════════════
 //  TABS
 // ══════════════════════════════════════════════
+// Confirmaciones por WhatsApp: la app "Aurum WhatsApp" corre en el ordenador del JE
+// (http://localhost:3131). Desde aquí se abre o, si no la tiene, se descarga con los pasos.
+// (Antes apuntaba al servidor antiguo de localhost:3000 con INICIAR.bat / INICIAR.sh.)
 function abrirConfirmaciones(){
-  const matricula = CURRENT_JE_ID || '';
-  const url = 'http://localhost:3000?je=' + encodeURIComponent(matricula);
-
-  // Comprobar si el servidor está corriendo antes de abrir
-  fetch('http://localhost:3000/status', { signal: AbortSignal.timeout(2000), mode: 'no-cors' })
-    .then(() => window.open(url, '_blank'))
-    .catch(() => {
-      // Servidor no disponible — mostrar aviso
-      const overlay = document.createElement('div');
-      overlay.id = 'wa-server-modal';
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center';
-      overlay.innerHTML = `
-        <div style="background:#111;border:1px solid #3d3300;border-radius:16px;padding:32px;max-width:360px;width:90%;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,.8)">
-          <div style="font-size:2.5rem;margin-bottom:12px">📲</div>
-          <h3 style="color:#e8c96a;font-family:'Outfit',sans-serif;margin-bottom:10px;font-size:1rem">Servidor no iniciado</h3>
-          <p style="color:#7a6840;font-size:.82rem;line-height:1.6;margin-bottom:20px">
-            Para usar las Confirmaciones WhatsApp primero tienes que arrancar el servidor.<br><br>
-            <strong style="color:#f0e6c8">Haz doble clic en <code style="background:#1c1800;padding:2px 6px;border-radius:4px;color:#c9a84c">INICIAR.bat</code></strong><br>
-            (o <code style="background:#1c1800;padding:2px 6px;border-radius:4px;color:#c9a84c">INICIAR.sh</code> en Mac)<br><br>
-            Cuando la ventana negra esté abierta, vuelve a pulsar esta pestaña.
-          </p>
-          <button onclick="document.getElementById('wa-server-modal').remove()"
-            style="background:linear-gradient(135deg,#7a5c10,#c9a84c,#e8c96a,#c9a84c,#7a5c10);background-size:200% 100%;color:#0a0a0a;border:none;border-radius:8px;padding:10px 24px;font-family:'Outfit',sans-serif;font-weight:700;font-size:.82rem;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">
-            Entendido
-          </button>
-        </div>`;
-      document.body.appendChild(overlay);
-      overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
-    });
+  const ant = document.getElementById('wa-server-modal'); if(ant) ant.remove();
+  const sis = /Windows/i.test(navigator.userAgent) ? 'win' : 'mac';
+  const nom = {mac:'Mac', win:'Windows'};
+  const dondeAbrir = sis === 'mac' ? '<b>Aplicaciones → Aurum WhatsApp</b>' : 'el acceso directo <b>Aurum WhatsApp</b> del Escritorio';
+  const overlay = document.createElement('div');
+  overlay.id = 'wa-server-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const pasos = s => '<ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;text-align:left">' + WA_PASOS[s].map(x => `<li>${x}</li>`).join('') + '</ol>';
+  overlay.innerHTML = `
+    <div style="background:#111;border:1px solid #3d3300;border-radius:16px;padding:24px;max-width:460px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 40px 80px rgba(0,0,0,.8);color:#f0e6c8;font-size:.82rem;line-height:1.5">
+      <div style="text-align:center;font-size:2.2rem;margin-bottom:6px">💬</div>
+      <h3 style="color:#e8c96a;font-family:'Outfit',sans-serif;margin:0 0 12px;font-size:1rem;text-align:center">Confirmaciones por WhatsApp</h3>
+      <div style="background:#1a1600;border:1px solid #3d3300;border-radius:10px;padding:12px;margin-bottom:14px">
+        <b style="color:#e8c96a">¿Ya la tienes instalada?</b><br>
+        Ábrela desde ${dondeAbrir}: se abre sola en el navegador. O pulsa aquí:
+        <a href="http://localhost:3131" target="_blank" rel="noopener" style="display:block;text-align:center;margin-top:8px;padding:10px;background:#2a2300;border:1px solid #c9a84c;border-radius:8px;color:#e8c96a;font-weight:700;text-decoration:none">Abrir Aurum WhatsApp</a>
+        <div style="font-size:.7rem;color:#7a6840;margin-top:6px">Si sale "no se puede conectar", la app está cerrada: ábrela primero como se indica arriba.</div>
+      </div>
+      <b style="color:#e8c96a">¿Aún no la tienes? Instálala (solo la primera vez)</b>
+      <a href="${WA_DESCARGAS[sis]}" style="display:block;text-align:center;margin:8px 0 4px;padding:11px;background:linear-gradient(135deg,#7a5c10,#c9a84c,#e8c96a,#c9a84c,#7a5c10);color:#0a0a0a;border-radius:8px;font-weight:800;text-decoration:none">⬇️ Descargar para ${nom[sis]}</a>
+      <div style="text-align:center;font-size:.7rem;color:#7a6840;margin-bottom:10px">¿Usas ${nom[sis==='mac'?'win':'mac']}? <a href="${WA_DESCARGAS[sis==='mac'?'win':'mac']}" style="color:#c9a84c">Descargar para ${nom[sis==='mac'?'win':'mac']}</a></div>
+      ${pasos(sis)}
+      <div style="font-size:.7rem;color:#7a6840;margin-top:10px">Necesitas Google Chrome instalado. Si tenías la versión antigua (INICIAR.bat / INICIAR.sh), ya no hace falta: puedes borrarla.</div>
+      <div style="text-align:center;margin-top:16px">
+        <button onclick="document.getElementById('wa-server-modal').remove()"
+          style="background:#2a2300;color:#e8c96a;border:1px solid #3d3300;border-radius:8px;padding:9px 22px;font-family:'Outfit',sans-serif;font-weight:700;font-size:.8rem;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">Cerrar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
 }
 
 // Confirmaciones por SMS — página web en la nube, sin instalar nada.
