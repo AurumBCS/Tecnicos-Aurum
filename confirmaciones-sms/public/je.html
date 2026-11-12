@@ -91,6 +91,8 @@
     .badge-confirmado    { background: rgba(46,125,82,.18);  color: var(--green2); }
     .badge-no_confirmado { background: rgba(192,57,43,.18);  color: var(--red2); }
     .badge-sin_telefono  { background: rgba(26,24,0,.5);     color: #3a3520; }
+    .badge-otra_respuesta { background: rgba(212,131,26,.15); color: #d4831a; }
+    .badge-sin_whatsapp  { background: rgba(26,24,0,.5);     color: #7a6840; }
     .card-actions { display:flex; gap:6px; align-items:center; }
     .chk-envio { width:18px; height:18px; accent-color: var(--gold); flex-shrink:0; cursor:pointer; }
 
@@ -352,7 +354,8 @@
   function cardHTML(c) {
     const labels = {
       pendiente: '⏳ Pendiente', enviado: '📨 Enviado', confirmado: '✅ Confirmado',
-      no_confirmado: '❌ No confirma', sin_telefono: '📵 Sin teléfono'
+      no_confirmado: '❌ No confirma', sin_telefono: '📵 Sin teléfono',
+        otra_respuesta: '💬 Otra respuesta', sin_whatsapp: '📵 Sin WhatsApp'
     };
     const badge = `<span class="badge badge-${c.status}">${labels[c.status] || c.status}</span>`;
     const puedeEnviar = c.status !== 'sin_telefono';

@@ -630,6 +630,7 @@ app.post('/upload', upload.single('excel'), (req, res) => {
     let nextId = appointments.length > 0 ? Math.max(...appointments.map(a => a.id)) + 1 : 0;
     let added  = 0;
     let updated = 0;
+    let reasignadas = 0;
 
     newAppointments.forEach(na => {
       const actual = existentes.get(claveCita(na));
@@ -640,7 +641,17 @@ app.post('/upload', upload.single('excel'), (req, res) => {
         added++;
         return;
       }
-      if (actual.fecha === na.fecha && actual.timeslot === na.timeslot) return; // misma cita
+      if (actual.fecha === na.fecha && actual.timeslot === na.timeslot) {
+        // misma cita: se conserva su estado. Si en Oracle se ha pasado a otro
+        // técnico (p. ej. una ruta de Mallorca reasignada el 10/11), se
+        // cambia el técnico para que le salga al nuevo.
+        const matNueva = String(na.matricula || '').trim().toUpperCase();
+        if (matNueva && matNueva !== String(actual.matricula || '').trim().toUpperCase()) {
+          Object.assign(actual, { tecnico: na.tecnico, matricula: na.matricula });
+          reasignadas++;
+        }
+        return;
+      }
       Object.assign(actual, {
         tecnico: na.tecnico, matricula: na.matricula, cliente: na.cliente, telefono: na.telefono,
         timeslot: na.timeslot, tipo: na.tipo, fecha: na.fecha,
@@ -653,7 +664,7 @@ app.post('/upload', upload.single('excel'), (req, res) => {
     guardarSesion();
     broadcast({ type: 'update', appointments });
     broadcast({ type: 'je', je: currentJE });
-    res.json({ ok: true, count: appointments.length, added, updated, je: currentJE });
+    res.json({ ok: true, count: appointments.length, added, updated, reasignadas, je: currentJE });
   } catch (e) {
     console.error('Error al leer Excel:', e);
     res.json({ ok: false, error: e.message });
@@ -1101,6 +1112,40 @@ app.post('/marcar-respuesta', (req, res) => {
   if (quien && status !== 'pendiente') {
     registrarUso(quien, rol === 'je' ? 'je' : 'tecnico', status === 'enviado' ? 'sms' : status, apt);
   }
+
+  guardarSesion();
+  broadcast({ type: 'update', appointments });
+  res.json({ ok: true });
+});
+
+// ── Estado desde el WhatsApp del Mac de un JE (confirmaciones-wa-je) ────────
+// El Mac del JE envía por su WhatsApp, lee la respuesta del cliente y avisa
+// aquí. Cada petición lleva matrícula + DNI del JE y solo puede tocar citas de
+// técnicos de su equipo (misma jerarquía que /mis-citas-equipo).
+app.post('/equipo-estado', async (req, res) => {
+  const { matricula, dni, numMantenimiento, status, respuesta } = req.body || {};
+  const mat = String(matricula || '').trim().toUpperCase();
+  if (!(await verificarDNIConRecarga(mat, dni))) {
+    return res.status(403).json({ ok: false, error: 'Matrícula o DNI incorrectos' });
+  }
+  const tecnicos = JERARQUIA[mat] ? JERARQUIA[mat].map(id => id.toUpperCase()) : null;
+  if (!tecnicos) return res.status(403).json({ ok: false, error: 'No es un jefe de equipo reconocido' });
+
+  const validos = ['enviado', 'confirmado', 'no_confirmado', 'otra_respuesta', 'sin_whatsapp', 'pendiente'];
+  if (!validos.includes(status)) return res.json({ ok: false, error: 'Estado inválido' });
+
+  const num = String(numMantenimiento || '').trim();
+  const apt = num && appointments.find(a => String(a.numMantenimiento || '').trim() === num);
+  if (!apt) return res.json({ ok: false, error: 'Cita no encontrada' });
+  if (!tecnicos.includes(String(apt.matricula || '').trim().toUpperCase())) {
+    return res.status(403).json({ ok: false, error: 'La cita no es de tu equipo' });
+  }
+
+  apt.status = status;
+  apt.respuesta = status === 'enviado' ? 'Enviado por WhatsApp' : String(respuesta || '').slice(0, 300);
+  if (status === 'enviado') apt.sentAt = Date.now();
+  apt.horaRespuesta = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' });
+  registrarUso(mat, 'je', status === 'enviado' ? 'whatsapp' : status, apt);
 
   guardarSesion();
   broadcast({ type: 'update', appointments });
