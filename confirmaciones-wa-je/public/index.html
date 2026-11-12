@@ -177,6 +177,7 @@ async function refrescarEstado() {
   $('pHoy').textContent = `Hoy: ${estado.hoy}/${estado.limite} mensajes`;
   $('vQr').classList.toggle('oculto', w.estado !== 'qr');
   $('vErr').classList.toggle('oculto', w.estado !== 'error'); $('vErr').textContent = w.detalle || 'WhatsApp no ha arrancado. Cierra la app y vuelve a abrirla.';
+  if (/Reintentar/.test(w.detalle || '')) { const b = document.createElement('button'); b.textContent = '↻ Reintentar'; b.style.marginLeft = '10px'; b.onclick = () => { b.disabled = true; fetch('/api/reintentar', { method: 'POST' }); }; $('vErr').appendChild(b); }
   if (w.estado === 'qr' && w.qr) $('qr').innerHTML = `<img src="${w.qr}" alt="Código QR">`;
   const s = estado.sesion;
   $('vLogin').classList.toggle('oculto', !!s); $('vApp').classList.toggle('oculto', !s);

@@ -187,6 +187,8 @@ const CHROMES = ES_WIN ? [
 const executablePath = process.env.CHROME_PATH || CHROMES.find(c => { try { return fs.existsSync(c); } catch { return false; } });
 const client = new Client({
   authStrategy: new LocalAuth({ clientId: 'aurum-je', dataPath: path.join(DATA_DIR, 'wa') }),
+  // WhatsApp Web puede tardar más de 30 s en cargar con una conexión o un equipo lentos
+  authTimeoutMs: 180000,
   puppeteer: { headless: true, executablePath, args: ['--no-sandbox', '--disable-dev-shm-usage'] }
 });
 client.on('qr', async qr => { wa = { estado: 'qr', qr: await QRCode.toDataURL(qr), numero: '' }; log('Escanea el QR desde la app'); });
@@ -199,8 +201,27 @@ client.on('auth_failure', m => { wa.estado = 'error'; log('Fallo de autenticaci�
 client.on('disconnected', r => {
   wa = { estado: 'desconectado', qr: '', numero: '' };
   log('WhatsApp desconectado:', r);
-  setTimeout(() => client.initialize().catch(e => log('Reinicio WA:', e.message)), 5e3);
+  setTimeout(() => arrancarWA(), 5e3);
 });
+
+// Arranca WhatsApp y, si falla (red lenta, Chrome ocupado), lo reintenta solo hasta 4 veces
+let arrancando = false;
+async function arrancarWA(intento = 1) {
+  if (arrancando) return; arrancando = true;
+  try {
+    if (intento > 1) { wa.estado = 'iniciando'; wa.detalle = ''; }
+    await client.initialize();
+  } catch (e) {
+    const m = String((e && e.message) || e).split('\n')[0];
+    log(`No arrancó WhatsApp (intento ${intento}):`, m);
+    try { await client.destroy(); } catch {}
+    if (!executablePath) { wa.estado = 'error'; wa.detalle = 'Falta Google Chrome: instálalo desde google.com/chrome y vuelve a abrir la app.'; }
+    else if (intento < 4) {
+      wa.estado = 'error'; wa.detalle = `WhatsApp está tardando en cargar. Reintentando solo (${intento + 1} de 4)…`;
+      arrancando = false; setTimeout(() => arrancarWA(intento + 1), 15e3); return;
+    } else { wa.estado = 'error'; wa.detalle = 'No arrancó WhatsApp (' + m + '). Comprueba la conexión a internet y pulsa Reintentar.'; }
+  } finally { arrancando = false; }
+}
 
 // Sí / No (mismo criterio que el sistema anterior)
 const SI = [/\bsi\b/, /\byes\b/, /\bok\b/, /\bokey\b/, /\bclaro\b/, /\bvale\b/, /\bconfirm(o|a|ado|amos)\b/, /\bperfecto\b/,
@@ -431,10 +452,12 @@ app.post('/api/vista-previa', (req, res) => {
   res.json({ texto: mensajePara(c) });
 });
 
+app.post('/api/reintentar', (req, res) => { if (wa.estado === 'error') arrancarWA(); res.json({ ok: true }); });
+
 app.post('/api/desvincular', async (req, res) => {
   try { await client.logout(); } catch {}
   wa = { estado: 'desconectado', qr: '', numero: '' };
-  setTimeout(() => client.initialize().catch(() => {}), 2e3);
+  setTimeout(() => arrancarWA(), 2e3);
   res.json({ ok: true });
 });
 
@@ -455,11 +478,7 @@ function abrirNavegador(url) {
 const servidor = app.listen(PORT, '127.0.0.1', () => {
   abrirNavegador(`http://localhost:${PORT}`);
   log(`App lista en http://localhost:${PORT}  (datos en ${DATA_DIR})`);
-  client.initialize().catch(e => {
-    wa.estado = 'error';
-    wa.detalle = executablePath ? 'No arrancó WhatsApp: ' + e.message.split('\n')[0] : 'Falta Google Chrome: instálalo desde google.com/chrome y vuelve a abrir la app.';
-    log('No arrancó WhatsApp:', e.message);
-  });
+  arrancarWA();
   if (config.mat) cargarCitas(config.mat, config.dni).catch(e => log('Carga inicial:', e.message));
 });
 // Si ya hay una abierta (doble clic otra vez), solo se abre el navegador
