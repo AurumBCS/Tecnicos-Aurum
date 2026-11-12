@@ -582,6 +582,24 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
       <!-- Uso de Confirmaciones SMS del equipo (hoy en vivo + días anteriores), plegado -->
       <div id="equipoConfirmaciones" style="margin-bottom:14px"></div>
 
+      <!-- Confirmaciones por WhatsApp: descarga de la app del JE (Mac / Windows) y pasos -->
+      <div id="equipoWhatsapp" style="margin-bottom:14px">
+        <details class="plegable">
+          <summary class="section-head" style="margin-top:0">💬 Confirmaciones por WhatsApp <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0">· descargar la app</span></summary>
+          <div style="font-size:.8rem;line-height:1.5;padding:4px 2px">
+            <div style="color:var(--text2);margin-bottom:10px">Envía las confirmaciones de las citas de tu equipo desde <b>tu WhatsApp</b>: eliges las citas, salen solas con pausas como si las escribieras tú, la app lee si el cliente dice <b>SÍ</b> o <b>NO</b>, le contesta y marca la cita. Los que dicen que no van a la lista <b>📞 Llamar</b>.</div>
+            <a id="waDescarga" href="#" style="display:block;text-align:center;padding:11px;background:var(--gold);color:#1a1405;border-radius:10px;font-weight:800;text-decoration:none;margin-bottom:6px">⬇️ Descargar Aurum WhatsApp</a>
+            <div id="waOtro" style="text-align:center;font-size:.7rem;color:var(--text2);margin-bottom:12px"></div>
+            <div id="waPasos"></div>
+            <div style="font-size:.72rem;color:var(--text2);margin-top:10px;border-top:1px solid var(--border2);padding-top:8px">
+              Necesitas <b>Google Chrome</b> instalado (<a href="https://www.google.com/chrome/" target="_blank" rel="noopener" style="color:var(--gold2)">descargar</a>). No hace falta nada más.<br>
+              La app tiene que estar abierta y el ordenador encendido (tapa abierta) mientras envía y mientras esperas respuestas: si un cliente contesta con el ordenador apagado, se lee al volver a abrirla.<br>
+              Mejor con un WhatsApp de empresa que con el personal: los clientes verán ese número.
+            </div>
+          </div>
+        </details>
+      </div>
+
       <!-- Pre-conteo: contar el coche del técnico antes del conteo periódico -->
       <div id="equipoPreconteo" style="margin-bottom:14px"></div>
 
@@ -1781,6 +1799,7 @@ function renderEquipoPanel(jeId){
   `;
 
   renderConfirmacionesEquipo(jeId);
+  renderDescargaWhatsapp();
   renderCumplimientoHoy(jeId);
   PC_CONT = 'equipoPreconteo';
   renderPreconteo(jeId);
@@ -4570,6 +4589,37 @@ async function cumphContacto(det, jeId, n){
 const CUMPH_EXEC = "https://script.google.com/macros/s/AKfycbxotyAfeX08YR-Sx4QuYCt41SOwmfVX5ltxq4n0L2-XVJoahUkdlo4_EY8-SCDfVgR7/exec";
 const SCRIPT_URL_AGENDA_HOY = je => CUMPH_EXEC + '?type=agenda-hoy&token=' + APP_TOKEN + '&je=' + encodeURIComponent(je);
 const SCRIPT_URL_AGENDA_CONTACTO = () => CUMPH_EXEC + '?type=agenda-contacto&token=' + APP_TOKEN;
+
+// ── Descarga de Aurum WhatsApp (app del JE) con los pasos según su sistema ──
+const WA_DESCARGAS = {
+  mac: 'https://github.com/AurumBCS/Tecnicos-Aurum/releases/latest/download/Aurum-WhatsApp-Mac.zip',
+  win: 'https://github.com/AurumBCS/Tecnicos-Aurum/releases/latest/download/Aurum-WhatsApp-Windows.zip'
+};
+const WA_PASOS = {
+  mac: ['Pulsa <b>Descargar</b>. Se descarga <b>Aurum-WhatsApp-Mac.zip</b> (unos 100 MB) y se abre solo; si no, haz doble clic en él en <b>Descargas</b>.',
+        'Arrastra <b>Aurum WhatsApp</b> a la carpeta <b>Aplicaciones</b>.',
+        'Ábrela desde Aplicaciones. La primera vez el Mac dice que no puede comprobar el desarrollador: pulsa <b>Aceptar</b>, ve a <b>Ajustes del Sistema → Privacidad y seguridad</b>, baja hasta el final y pulsa <b>Abrir igualmente</b>. Solo esta vez.',
+        'Se abre una página en tu navegador. En el móvil: <b>WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo</b> y escanea el código.',
+        'Entra con tu <b>matrícula y DNI</b> (los de esta app). Te salen las citas de tus técnicos: márcalas y pulsa <b>Enviar por WhatsApp</b>.',
+        'Para que se abra sola al encender el Mac: <b>Ajustes del Sistema → General → Ítems de inicio</b> → <b>+</b> → Aurum WhatsApp.'],
+  win: ['Pulsa <b>Descargar</b>. Se descarga <b>Aurum-WhatsApp-Windows.zip</b> (unos 50 MB).',
+        'En <b>Descargas</b>, clic derecho sobre el zip → <b>Extraer todo…</b> → elige <b>Documentos</b> → <b>Extraer</b>.',
+        'Entra en la carpeta <b>Aurum WhatsApp</b> y haz doble clic en <b>Crear accesos directos</b>: pone Aurum WhatsApp en el Escritorio y hace que se abra al encender el PC.',
+        'Abre <b>Aurum WhatsApp</b> desde el Escritorio. Si sale <b>"Windows protegió su PC"</b>, pulsa <b>Más información → Ejecutar de todas formas</b> (solo la primera vez). Queda una ventana negra minimizada: es la app, no la cierres.',
+        'Se abre una página en tu navegador. En el móvil: <b>WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo</b> y escanea el código.',
+        'Entra con tu <b>matrícula y DNI</b> (los de esta app). Te salen las citas de tus técnicos: márcalas y pulsa <b>Enviar por WhatsApp</b>.']
+};
+function renderDescargaWhatsapp(sis){
+  const el = document.getElementById('waPasos'); if(!el) return;
+  if(!sis){ const ua = navigator.userAgent; sis = /Windows/i.test(ua) ? 'win' : 'mac'; }
+  const otro = sis === 'mac' ? 'win' : 'mac', nom = {mac:'Mac', win:'Windows'};
+  document.getElementById('waDescarga').href = WA_DESCARGAS[sis];
+  document.getElementById('waDescarga').textContent = '⬇️ Descargar Aurum WhatsApp para ' + nom[sis];
+  document.getElementById('waOtro').innerHTML = `¿Usas ${nom[otro]}? <a href="#" onclick="renderDescargaWhatsapp('${otro}');return false" style="color:var(--gold2)">Ver la versión para ${nom[otro]}</a>`;
+  el.innerHTML = `<div style="font-weight:700;color:var(--gold2);margin-bottom:6px">Pasos en ${nom[sis]} (solo la primera vez)</div>` +
+    '<ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">' + WA_PASOS[sis].map(p => `<li>${p}</li>`).join('') + '</ol>';
+}
+document.addEventListener('DOMContentLoaded', () => renderDescargaWhatsapp());
 
 async function renderConfirmacionesEquipo(jeId, recargar){
   const el = document.getElementById('equipoConfirmaciones');

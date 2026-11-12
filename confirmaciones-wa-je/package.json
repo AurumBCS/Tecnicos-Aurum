@@ -1,0 +1,13 @@
+{
+  "name": "confirmaciones-wa-je",
+  "version": "1.0.0",
+  "description": "Confirmaciones de citas por el WhatsApp del jefe de equipo, desde su Mac - Aurum BC Security",
+  "main": "server.js",
+  "private": true,
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "whatsapp-web.js": "^1.34.8"
+  }
+}

@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confirmaciones WhatsApp · Aurum</title>
+<style>
+  :root { --bg:#0f0e0a; --card:#1a1810; --line:#2c281a; --gold:#c9a84c; --gold2:#e3c878; --txt:#efe6cc; --muted:#8f8466;
+          --green:#3fae6e; --red:#d9534f; --blue:#4aa3df; --orange:#d4831a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header { display:flex; align-items:center; gap:14px; padding:12px 18px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:1.05rem; margin:0; color:var(--gold2); font-weight:700; }
+  .pill { padding:4px 10px; border-radius:20px; font-size:.78rem; font-weight:600; background:var(--card); border:1px solid var(--line); }
+  .pill.ok { color:var(--green); border-color:rgba(63,174,110,.4); } .pill.mal { color:var(--red); border-color:rgba(217,83,79,.4); }
+  .esp { flex:1; }
+  main { max-width:1100px; margin:0 auto; padding:16px; }
+  .tabs { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .tab { background:var(--card); border:1px solid var(--line); color:var(--muted); padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
+  .tab.on { color:var(--bg); background:var(--gold); border-color:var(--gold); }
+  .caja { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:14px; }
+  input, select, textarea { background:#0b0a07; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:8px 10px; font:inherit; }
+  textarea { width:100%; min-height:140px; font-size:.86rem; }
+  button { background:var(--gold); color:#1a1405; border:0; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; font:inherit; font-weight:700; }
+  button.sec { background:transparent; color:var(--gold2); border:1px solid var(--line); }
+  button.rojo { background:var(--red); color:#fff; }
+  button:disabled { opacity:.45; cursor:default; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:14px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .kpi b { display:block; font-size:1.5rem; } .kpi span { color:var(--muted); font-size:.78rem; }
+  .tec { border:1px solid var(--line); border-radius:10px; margin-bottom:10px; overflow:hidden; }
+  .tec-h { display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--card); cursor:pointer; }
+  .tec-h .n { font-weight:700; flex:1; } .tec-h small { color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:.88rem; }
+  td, th { padding:7px 10px; border-top:1px solid var(--line); text-align:left; vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:.78rem; }
+  .b { padding:2px 8px; border-radius:10px; font-size:.75rem; font-weight:700; white-space:nowrap; }
+  .b-pendiente { color:var(--muted); background:rgba(143,132,102,.15); } .b-enviado { color:var(--blue); background:rgba(74,163,223,.15); }
+  .b-confirmado { color:var(--green); background:rgba(63,174,110,.15); } .b-no_confirmado { color:var(--red); background:rgba(217,83,79,.15); }
+  .b-otra_respuesta { color:var(--orange); background:rgba(212,131,26,.15); } .b-sin_whatsapp, .b-sin_telefono { color:#7a6840; background:rgba(26,24,0,.5); }
+  .resp { color:var(--muted); font-size:.8rem; font-style:italic; }
+  .barra { position:sticky; bottom:0; background:#14120c; border-top:1px solid var(--gold); padding:10px 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .aviso { padding:10px 12px; border-radius:8px; background:rgba(212,131,26,.12); color:var(--orange); margin-bottom:12px; }
+  .ok-msg { background:rgba(63,174,110,.12); color:var(--green); }
+  .qr img { width:260px; height:260px; background:#fff; padding:10px; border-radius:10px; }
+  .fila { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  .oculto { display:none !important; }
+  pre.prev { white-space:pre-wrap; background:#0b0a07; border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; font-size:.86rem; }
+  a { color:var(--gold2); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Confirmaciones WhatsApp · Aurum</h1>
+  <span id="pWa" class="pill">WhatsApp…</span>
+  <span id="pHoy" class="pill"></span>
+  <span class="esp"></span>
+  <span id="pJe" class="pill oculto"></span>
+  <button id="bSalir" class="sec oculto" onclick="salir()">Cambiar de usuario</button>
+  <button class="sec" onclick="apagar()" title="Cierra la app. Mientras esté cerrada no se envían mensajes ni se leen respuestas.">⏻ Cerrar app</button>
+</header>
+
+<main>
+  <div id="vErr" class="aviso oculto"></div>
+  <!-- Vincular WhatsApp -->
+  <div id="vQr" class="caja oculto">
+    <h3 style="margin-top:0">1 · Vincula tu WhatsApp</h3>
+    <p>En el móvil: <b>WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo</b> y escanea este código. Solo hace falta la primera vez.</p>
+    <div class="qr" id="qr">Generando código…</div>
+  </div>
+
+  <!-- Entrar -->
+  <div id="vLogin" class="caja oculto">
+    <h3 style="margin-top:0">Entra como jefe de equipo</h3>
+    <p style="color:var(--muted)">Con tu matrícula y tu DNI, igual que en la app de SMS. Verás solo las citas de tus técnicos.</p>
+    <div class="fila">
+      <input id="lMat" placeholder="Matrícula (p. ej. GD5381)" autocomplete="username">
+      <input id="lDni" placeholder="DNI" type="password" autocomplete="current-password">
+      <button onclick="entrar()">Entrar</button>
+    </div>
+    <div id="lErr" class="aviso oculto"></div>
+  </div>
+
+  <div id="vApp" class="oculto">
+    <div class="tabs">
+      <div class="tab on" data-t="citas">Citas</div>
+      <div class="tab" data-t="llamar">📞 Llamar <span id="nLlamar"></span></div>
+      <div class="tab" data-t="plantillas">Mensajes por tipo</div>
+      <div class="tab" data-t="prueba">Prueba</div>
+    </div>
+
+    <div id="avisoEnvio" class="aviso oculto"></div>
+
+    <section id="t-citas">
+      <div class="kpis" id="kpis"></div>
+      <div class="fila">
+        <select id="fFecha" onchange="pintar()"></select>
+        <select id="fEstado" onchange="pintar()">
+          <option value="">Todos los estados</option><option value="pendiente">Pendientes</option><option value="enviado">Enviadas sin respuesta</option>
+          <option value="confirmado">Confirmadas</option><option value="no_confirmado">No confirma</option><option value="otra_respuesta">Otra respuesta</option>
+          <option value="sin_whatsapp">Sin WhatsApp</option>
+        </select>
+        <button class="sec" onclick="selPendientes()">Marcar todas las pendientes</button>
+        <button class="sec" onclick="sel.clear(); pintar()">Quitar selección</button>
+        <span class="esp"></span>
+        <button class="sec" onclick="cargar(true)">↻ Recargar</button>
+      </div>
+      <div id="lista"></div>
+    </section>
+
+    <section id="t-llamar" class="oculto">
+      <p style="color:var(--muted)">Clientes que han dicho que <b>no</b> o han contestado otra cosa. Llama, reagenda y pulsa <b>Quitar</b> cuando esté gestionada.</p>
+      <div id="llamar"></div>
+      <details style="margin-top:12px"><summary style="cursor:pointer;color:var(--muted)">Ya gestionadas</summary><div id="gestionadas"></div></details>
+    </section>
+
+    <section id="t-plantillas" class="oculto">
+      <div class="caja">
+        <p style="margin-top:0">Escribe <b>{nombre}</b>, <b>{tipo}</b>, <b>{fecha}</b> y <b>{tramo}</b> donde quieras que salgan. Puedes poner varias versiones separadas por una línea con <b>---</b>: cada cliente recibe una al azar, para que no salgan todos iguales.</p>
+        <label><b>Mensaje general</b> (para los tipos que no tengan uno propio)</label>
+        <textarea id="pGeneral"></textarea>
+      </div>
+      <div id="pTipos"></div>
+      <div class="caja">
+        <label><b>Respuesta automática al SÍ</b></label><textarea id="pSi" style="min-height:80px"></textarea>
+        <label><b>Respuesta automática al NO</b></label><textarea id="pNo" style="min-height:80px"></textarea>
+      </div>
+      <div class="fila"><button onclick="guardarPlantillas()">Guardar mensajes</button><span id="pOk" class="pill ok oculto">Guardado</span></div>
+    </section>
+
+    <section id="t-prueba" class="oculto">
+      <div class="caja">
+        <p style="margin-top:0">Envía el mensaje a <b>otro móvil tuyo</b> (no al mismo WhatsApp vinculado) y contesta desde allí con SÍ o NO para ver la respuesta automática. Las pruebas no cambian nada en Render.</p>
+        <div class="fila">
+          <input id="tTel" placeholder="Teléfono (9 cifras)">
+          <input id="tNom" placeholder="Nombre" value="Prueba">
+          <select id="tTipo"></select>
+          <button onclick="probar()">Enviar prueba</button>
+        </div>
+        <div id="tRes"></div>
+        <table id="tLista"></table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="barra" class="barra oculto">
+  <b><span id="nSel">0</span> seleccionadas</b>
+  <span style="color:var(--muted);font-size:.85rem">Se envían de una en una con pausas de 30–75 s, como una persona.</span>
+  <span class="esp"></span>
+  <button onclick="enviar()">💬 Enviar por WhatsApp</button>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ETQ = { pendiente:'⏳ Pendiente', enviado:'📨 Enviado', confirmado:'✅ Confirmada', no_confirmado:'❌ No confirma',
+  otra_respuesta:'💬 Otra respuesta', sin_whatsapp:'📵 Sin WhatsApp', sin_telefono:'📵 Sin teléfono', error:'⚠️ Error' };
+let citas = [], sel = new Set(), abiertos = new Set(), estado = {}, plant = null, tab = 'citas';
+const api = (u, body) => fetch(u, body ? { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) } : {}).then(r => r.json());
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  tab = t.dataset.t;
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
+  ['citas','llamar','plantillas','prueba'].forEach(n => $('t-' + n).classList.toggle('oculto', n !== tab));
+  if (tab === 'plantillas' || tab === 'prueba') cargarPlantillas();
+  if (tab === 'prueba') pruebas();
+  barra();
+});
+
+async function refrescarEstado() {
+  try { estado = await api('/api/estado'); } catch { $('pWa').textContent = 'App parada'; $('pWa').className = 'pill mal'; return; }
+  const w = estado.wa || {};
+  const txt = { conectado:'WhatsApp conectado' + (w.numero ? ' (…' + w.numero + ')' : ''), qr:'Falta vincular WhatsApp',
+    conectando:'Conectando WhatsApp…', iniciando:'Arrancando WhatsApp…', desconectado:'WhatsApp desconectado', error:'Error de WhatsApp' }[w.estado] || w.estado;
+  $('pWa').textContent = txt; $('pWa').className = 'pill ' + (w.estado === 'conectado' ? 'ok' : (w.estado === 'qr' || w.estado === 'error' || w.estado === 'desconectado') ? 'mal' : '');
+  $('pHoy').textContent = `Hoy: ${estado.hoy}/${estado.limite} mensajes`;
+  $('vQr').classList.toggle('oculto', w.estado !== 'qr');
+  $('vErr').classList.toggle('oculto', w.estado !== 'error'); $('vErr').textContent = w.detalle || 'WhatsApp no ha arrancado. Cierra la app y vuelve a abrirla.';
+  if (w.estado === 'qr' && w.qr) $('qr').innerHTML = `<img src="${w.qr}" alt="Código QR">`;
+  const s = estado.sesion;
+  $('vLogin').classList.toggle('oculto', !!s); $('vApp').classList.toggle('oculto', !s);
+  $('pJe').classList.toggle('oculto', !s); $('bSalir').classList.toggle('oculto', !s);
+  if (s) $('pJe').textContent = s.nombre + ' · ' + s.mat;
+  const e = estado.envio || {};
+  const av = $('avisoEnvio');
+  if (e.activo) {
+    av.className = 'aviso';
+    av.innerHTML = `💬 Enviando ${e.hechos}/${e.total}` + (e.segundosPausa ? ` · siguiente en ${fmt(e.segundosPausa)}` : '') +
+      ` <button class="rojo" style="margin-left:10px;padding:4px 10px" onclick="parar()">Parar</button>`;
+  } else if (e.total) {
+    av.className = 'aviso ok-msg'; av.textContent = `Envío terminado: ${e.hechos - e.fallos} enviados` + (e.fallos ? `, ${e.fallos} con error` : '') + (e.aviso ? ' · ' + e.aviso : '');
+  } else av.className = 'aviso oculto';
+  barra();
+}
+const fmt = s => s >= 60 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : s + ' s';
+
+async function entrar() {
+  $('lErr').classList.add('oculto');
+  const r = await api('/api/login', { mat: $('lMat').value, dni: $('lDni').value });
+  if (!r.ok) { $('lErr').textContent = r.error + (/Render/.test(r.error) ? '' : ''); $('lErr').classList.remove('oculto'); return; }
+  $('lDni').value = ''; await refrescarEstado(); cargar(true);
+}
+async function apagar() {
+  if (!confirm('¿Cerrar la app?\n\nMientras esté cerrada no se envían mensajes ni se leen las respuestas de los clientes. Para volver a abrirla: Aurum WhatsApp en Aplicaciones (o en el escritorio en Windows).')) return;
+  await api('/api/apagar', {}).catch(() => {});
+  document.body.innerHTML = '<main><div class="caja" style="margin-top:40px"><h3>App cerrada</h3><p>Puedes cerrar esta pestaña. Para volver a usarla, abre <b>Aurum WhatsApp</b>.</p></div></main>';
+}
+async function salir() { if (!confirm('¿Salir? Tendrás que volver a poner matrícula y DNI.')) return; await api('/api/salir', {}); citas = []; refrescarEstado(); }
+
+async function cargar(forzar) {
+  const r = await api('/api/citas' + (forzar ? '?recargar=1' : ''));
+  if (r.citas) citas = r.citas;
+  if (!r.ok && r.error) console.warn(r.error);
+  pintar();
+}
+
+function filtroFechas() {
+  const fs = [...new Set(citas.map(c => c.fecha).filter(Boolean))].sort((a, b) => a.split('/').reverse().join('').localeCompare(b.split('/').reverse().join('')));
+  const v = $('fFecha').value;
+  $('fFecha').innerHTML = '<option value="">Todas las fechas</option>' + fs.map(f => `<option ${f === v ? 'selected' : ''}>${esc(f)}</option>`).join('');
+}
+function visibles() {
+  const f = $('fFecha').value, e = $('fEstado').value;
+  return citas.filter(c => (!f || c.fecha === f) && (!e || c.status === e));
+}
+const enviable = c => ['pendiente', 'enviado', 'otra_respuesta', 'error'].includes(c.status) && c.telefono;
+
+function pintar() {
+  filtroFechas();
+  const v = visibles();
+  const n = s => v.filter(c => c.status === s).length;
+  $('kpis').innerHTML = [['Citas', v.length], ['Pendientes', n('pendiente')], ['Enviadas', n('enviado')], ['Confirmadas', n('confirmado')],
+    ['No confirma', n('no_confirmado')], ['Otra respuesta', n('otra_respuesta')], ['Sin WhatsApp', n('sin_whatsapp') + n('sin_telefono')]]
+    .map(([t, x]) => `<div class="kpi"><b>${x}</b><span>${t}</span></div>`).join('');
+
+  const grupos = {};
+  v.forEach(c => (grupos[c.tecnico] = grupos[c.tecnico] || []).push(c));
+  $('lista').innerHTML = Object.keys(grupos).sort().map(t => {
+    const l = grupos[t].sort((a, b) => String(a.tramo).localeCompare(String(b.tramo)));
+    const env = l.filter(enviable), todos = env.length && env.every(c => sel.has(c.num));
+    const abierto = abiertos.has(t);
+    return `<div class="tec">
+      <div class="tec-h" onclick="abrir('${esc(t).replace(/'/g, "\\'")}')">
+        <input type="checkbox" ${todos ? 'checked' : ''} ${env.length ? '' : 'disabled'} onclick="event.stopPropagation(); selTec('${esc(t).replace(/'/g, "\\'")}', this.checked)" title="Seleccionar las de este técnico">
+        <span class="n">${esc(t)}</span>
+        <small>${l.length} citas · ${l.filter(c => c.status === 'pendiente').length} pend. · ${l.filter(c => c.status === 'confirmado').length} ✅ · ${l.filter(c => c.status === 'no_confirmado').length} ❌</small>
+        <span>${abierto ? '▴' : '▾'}</span>
+      </div>
+      ${abierto ? `<table><tr><th></th><th>Cliente</th><th>Tipo</th><th>Fecha · tramo</th><th>Estado</th><th></th></tr>
+        ${l.map(c => `<tr>
+          <td><input type="checkbox" ${sel.has(c.num) ? 'checked' : ''} ${enviable(c) ? '' : 'disabled'} onchange="selUna('${esc(c.num)}', this.checked)"></td>
+          <td>${esc(c.cliente)}<br><span class="resp">${esc(c.telefono || 'sin teléfono')}</span></td>
+          <td>${esc(c.tipo)}</td><td>${esc(c.fecha)} · ${esc(c.tramo)}h</td>
+          <td><span class="b b-${esc(c.status)}">${ETQ[c.status] || esc(c.status)}</span>${c.hora ? ` <small class="resp">${esc(c.hora)}</small>` : ''}
+            ${c.respuesta && !/^(Enviado por WhatsApp|Marcado)/.test(c.respuesta) ? `<div class="resp">“${esc(c.respuesta)}”</div>` : ''}</td>
+          <td style="white-space:nowrap">${['enviado','otra_respuesta'].includes(c.status) ? `<button class="sec" style="padding:3px 8px" onclick="marcar('${esc(c.num)}','confirmado')">✅</button> <button class="sec" style="padding:3px 8px" onclick="marcar('${esc(c.num)}','no_confirmado')">❌</button>` : ''}</td>
+        </tr>`).join('')}</table>` : ''}
+    </div>`;
+  }).join('') || '<p style="color:var(--muted)">No hay citas cargadas para tu equipo.</p>';
+
+  const aLlamar = citas.filter(c => ['no_confirmado', 'otra_respuesta'].includes(c.status));
+  const pend = aLlamar.filter(c => !c.gestionada), hechas = aLlamar.filter(c => c.gestionada);
+  $('nLlamar').textContent = pend.length ? `(${pend.length})` : '';
+  const filaLl = (c, quitar) => `<tr><td><b>${esc(c.cliente)}</b><br><a href="tel:+34${esc(String(c.telefono).replace(/\D/g, '').slice(-9))}">📞 ${esc(c.telefono)}</a></td>
+    <td>${esc(c.tecnico)}<br><span class="resp">${esc(c.tipo)} · ${esc(c.fecha)} · ${esc(c.tramo)}h · nº ${esc(c.num)}</span></td>
+    <td><span class="b b-${esc(c.status)}">${ETQ[c.status]}</span>${c.respuesta && !/^Marcado/.test(c.respuesta) ? `<div class="resp">“${esc(c.respuesta)}”</div>` : ''}</td>
+    <td><button class="${quitar ? '' : 'sec'}" onclick="gestionada('${esc(c.num)}', ${quitar})">${quitar ? 'Quitar' : 'Devolver'}</button></td></tr>`;
+  $('llamar').innerHTML = pend.length ? `<table>${pend.map(c => filaLl(c, true)).join('')}</table>` : '<p class="aviso ok-msg">Nada pendiente de llamar 🎉</p>';
+  $('gestionadas').innerHTML = hechas.length ? `<table>${hechas.map(c => filaLl(c, false)).join('')}</table>` : '<p class="resp">Ninguna.</p>';
+  barra();
+}
+function abrir(t) { abiertos.has(t) ? abiertos.delete(t) : abiertos.add(t); pintar(); }
+function selUna(n, v) { v ? sel.add(n) : sel.delete(n); pintar(); }
+function selTec(t, v) { visibles().filter(c => c.tecnico === t && enviable(c)).forEach(c => v ? sel.add(c.num) : sel.delete(c.num)); abiertos.add(t); pintar(); }
+function selPendientes() { visibles().filter(c => c.status === 'pendiente' && c.telefono).forEach(c => sel.add(c.num)); pintar(); }
+function barra() {
+  const n = sel.size, ocup = estado.envio && estado.envio.activo;
+  $('nSel').textContent = n;
+  $('barra').classList.toggle('oculto', !(n && tab === 'citas' && !ocup && estado.sesion));
+}
+async function enviar() {
+  if (estado.wa?.estado !== 'conectado') return alert('Primero vincula el WhatsApp.');
+  if (!confirm(`¿Enviar ${sel.size} mensajes por tu WhatsApp?\n\nSalen de uno en uno con pausas de persona: tardará aprox. ${Math.round(sel.size * 0.9)} min o más. Puedes pararlo cuando quieras.`)) return;
+  const r = await api('/api/enviar', { nums: [...sel] });
+  if (!r.ok) return alert(r.error);
+  sel.clear(); refrescarEstado(); pintar();
+}
+async function parar() { await api('/api/parar', {}); refrescarEstado(); }
+async function marcar(num, status) { await api('/api/marcar', { num, status }); const c = citas.find(x => x.num === num); if (c) c.status = status; pintar(); }
+async function gestionada(num, valor) { await api('/api/gestionada', { num, valor }); const c = citas.find(x => x.num === num); if (c) c.gestionada = valor; pintar(); }
+
+async function cargarPlantillas() {
+  plant = await api('/api/plantillas');
+  $('pGeneral').value = plant.general; $('pSi').value = plant.respuestaSi; $('pNo').value = plant.respuestaNo;
+  const rep = plant.reparto || {};
+  const lista = obj => Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${esc(t)} (${n})`).join(' · ');
+  const caja = (f, txt) => `<div class="caja"><label><b>${esc(f.split('|').join(' / '))}</b></label>
+    <div class="resp" style="margin:4px 0 8px">${rep[f] ? 'Citas cargadas: ' + lista(rep[f]) : 'Ninguna cita cargada de este tipo ahora'}</div>
+    <textarea data-tipo="${esc(f)}" placeholder="Vacío: se usa el mensaje general">${esc(txt || '')}</textarea>
+    <button class="sec" onclick="verPrevia('${esc(f.split('|')[0]).replace(/'/g, "\\'")}', this)">Vista previa</button><pre class="prev oculto"></pre></div>`;
+  $('pTipos').innerHTML = Object.entries(plant.porTipo || {}).map(([f, t]) => caja(f, t)).join('') +
+    (rep[''] ? `<div class="caja"><b>Usan el mensaje general</b><div class="resp">${lista(rep[''])}</div></div>` : '') +
+    `<div class="caja fila"><input id="nuevaFam" placeholder="Nueva familia: palabras del tipo, separadas por |  (p. ej. ANP)" style="flex:1"><button class="sec" onclick="nuevaFamilia()">Añadir</button></div>`;
+  const tipos = [...new Set(citas.map(c => c.tipo).filter(Boolean))].sort();
+  $('tTipo').innerHTML = tipos.length ? tipos.map(t => `<option>${esc(t)}</option>`).join('') : Object.keys(plant.porTipo || {}).map(f => `<option>${esc(f.split('|')[0])}</option>`).join('');
+}
+async function nuevaFamilia() {
+  const f = $('nuevaFam').value.trim(); if (!f) return;
+  const p = leerPlantillas(); p.porTipo[f] = p.general; await api('/api/plantillas', p); cargarPlantillas();
+}
+function leerPlantillas() {
+  const porTipo = {};
+  document.querySelectorAll('#pTipos textarea').forEach(t => { if (t.value.trim()) porTipo[t.dataset.tipo] = t.value; });
+  return { general: $('pGeneral').value, porTipo, respuestaSi: $('pSi').value, respuestaNo: $('pNo').value };
+}
+async function guardarPlantillas() { await api('/api/plantillas', leerPlantillas()); $('pOk').classList.remove('oculto'); setTimeout(() => $('pOk').classList.add('oculto'), 2000); }
+async function verPrevia(tipo, b) { await api('/api/plantillas', leerPlantillas()); const r = await api('/api/vista-previa', { tipo }); const p = b.nextElementSibling; p.textContent = r.texto; p.classList.remove('oculto'); }
+
+async function probar() {
+  $('tRes').innerHTML = 'Enviando…';
+  const r = await api('/api/prueba', { telefono: $('tTel').value, nombre: $('tNom').value, tipo: $('tTipo').value });
+  $('tRes').innerHTML = r.ok ? `<p class="aviso ok-msg">Enviado (${esc(r.ref)}). Contesta SÍ o NO desde ese móvil.</p>` : `<p class="aviso">${esc(r.error)}</p>`;
+  pruebas();
+}
+async function pruebas() {
+  const l = await api('/api/pruebas');
+  $('tLista').innerHTML = l.length ? '<tr><th>Prueba</th><th>Estado</th><th>Hora respuesta</th></tr>' + l.reverse().map(p => `<tr><td>${esc(p.ref)}</td><td><span class="b b-${esc(p.status)}">${ETQ[p.status] || esc(p.status)}</span></td><td>${esc(p.hora)}</td></tr>`).join('') : '';
+}
+
+refrescarEstado().then(() => { if (estado.sesion) cargar(); });
+setInterval(refrescarEstado, 3000);
+setInterval(() => { if (estado.sesion && tab !== 'plantillas') cargar(false).then(() => { if (tab === 'prueba') pruebas(); }); }, 20000);
+setInterval(() => { if (tab === 'prueba') pruebas(); }, 4000);
+</script>
+</body>
+</html>
