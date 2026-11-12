@@ -17,7 +17,7 @@ const { spawn, execSync } = require('child_process');
 const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
-const VERSION = '2026.11.12d';
+const VERSION = '2026.11.12e';
 const RENDER = (process.env.RENDER_URL || 'https://tecnicos-aurum.onrender.com').replace(/\/$/, '');
 const PORT = Number(process.env.PORT || 3131);
 const ES_WIN = process.platform === 'win32';
@@ -189,7 +189,7 @@ const executablePath = process.env.CHROME_PATH || CHROMES.find(c => { try { retu
 const client = new Client({
   authStrategy: new LocalAuth({ clientId: 'aurum-je', dataPath: path.join(DATA_DIR, 'wa') }),
   // WhatsApp Web puede tardar más de 30 s en cargar con una conexión o un equipo lentos
-  authTimeoutMs: 180000,
+  authTimeoutMs: 90000,
   puppeteer: { headless: true, executablePath, args: ['--no-sandbox', '--disable-dev-shm-usage'] }
 });
 // Aviso a Render de cómo va el arranque (para ver fallos sin pedir capturas).
@@ -215,7 +215,7 @@ function diagnostico(evento, detalle = '', unaVez = false) {
 }
 
 client.on('qr', async qr => { diagnostico('qr', '', true); wa = { estado: 'qr', qr: await QRCode.toDataURL(qr), numero: '' }; log('Escanea el QR desde la app'); });
-client.on('authenticated', () => { wa.estado = 'conectando'; wa.qr = ''; });
+client.on('authenticated', () => { wa.estado = 'conectando'; wa.qr = ''; desdeConectando = Date.now(); diagnostico('autenticado', '', true); });
 client.on('ready', () => {
   wa = { estado: 'conectado', qr: '', numero: client.info && client.info.wid ? client.info.wid.user.slice(-4) : '' };
   log('WhatsApp conectado'); diagnostico('conectado', '', true);
@@ -253,7 +253,10 @@ async function arrancarWA(intento = 1) {
     if (intento > 1) { wa.estado = 'iniciando'; wa.detalle = ''; }
     limpiarChromeColgados();
     // Al tercer intento se descarta la vinculación a medias (obliga a escanear el QR de nuevo)
-    if (intento === 3 && wa.estado !== 'conectado') { try { fs.rmSync(WA_DIR, { recursive: true, force: true }); log('Sesión de WhatsApp reiniciada'); } catch {} }
+    if (intento === 2) { try { fs.rmSync(WA_DIR, { recursive: true, force: true }); log('Sesión de WhatsApp reiniciada'); } catch {} }
+    // whatsapp-web.js solo engancha la recarga de la página la primera vez: al
+    // reutilizar el cliente hay que volver a engancharla en la página nueva
+    client._framenavigatedRegistered = false;
     await client.initialize();
   } catch (e) {
     const m = String((e && e.message) || e).split('\n')[0];
@@ -521,7 +524,45 @@ function abrirNavegador(url) {
 }
 
 process.on('uncaughtException', e => { log('Error inesperado:', e && e.stack || e); diagnostico('excepcion', String(e && e.message || e)); });
-process.on('unhandledRejection', e => { log('Error sin tratar:', e && e.message || e); diagnostico('rechazo', String(e && e.message || e)); });
+process.on('unhandledRejection', e => {
+  const m = String(e && e.message || e);
+  log('Error sin tratar:', m); diagnostico('rechazo', m);
+  // WhatsApp Web recargó la página y no se pudo volver a enganchar: se reconecta
+  if (/auth timeout|ready timeout|Execution context|Target closed|Session closed/i.test(m)) reiniciarWA('tras recarga: ' + m);
+});
+
+// ── Vigilante: si WhatsApp se cuelga después de vincular, se reconecta solo ──
+// (con la sesión guardada, sin pedir otro QR)
+let desdeConectando = 0, fallosVigilancia = 0, reiniciando = false, reconexiones = [];
+async function reiniciarWA(motivo) {
+  if (reiniciando || arrancando) return;
+  // Como mucho 5 reconexiones por hora (si no, se para y se muestra Reintentar)
+  reconexiones = reconexiones.filter(t => Date.now() - t < 36e5);
+  if (reconexiones.length >= 5) {
+    wa = { estado: 'error', qr: '', numero: '', detalle: 'WhatsApp se desconecta una y otra vez. Comprueba la conexión a internet y pulsa Reintentar.' };
+    return diagnostico('demasiadas-reconexiones', motivo);
+  }
+  reconexiones.push(Date.now());
+  reiniciando = true;
+  log('Reconectando WhatsApp:', motivo); diagnostico('reconexion', motivo);
+  wa = { estado: 'iniciando', qr: '', numero: '', detalle: '' };
+  try { await client.destroy(); } catch {}
+  setTimeout(() => { reiniciando = false; fallosVigilancia = 0; arrancarWA(); }, 5e3);
+}
+setInterval(async () => {
+  if (reiniciando || arrancando) return;
+  if (wa.estado === 'conectando' && desdeConectando && Date.now() - desdeConectando > 4 * 60e3) {
+    desdeConectando = 0; return reiniciarWA('vinculado pero sin terminar de cargar en 4 min');
+  }
+  if (wa.estado !== 'conectado') { fallosVigilancia = 0; return; }
+  try {
+    const st = await Promise.race([client.getState(), new Promise((_, r) => setTimeout(() => r(new Error('sin respuesta')), 20e3))]);
+    if (!st) throw new Error('estado vacío');
+    fallosVigilancia = 0;
+  } catch (e) {
+    if (++fallosVigilancia >= 2) reiniciarWA('WhatsApp no responde (' + e.message + ')');
+  }
+}, 60e3);
 
 const servidor = app.listen(PORT, '127.0.0.1', () => {
   abrirNavegador(`http://localhost:${PORT}`);
