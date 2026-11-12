@@ -701,6 +701,13 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
   <div id="upsellingPanel">
     <div style="padding:14px 13px 48px;max-width:680px;margin:0 auto">
       <div class="ups-switch on"><button class="cf-chip" onclick="upsIr('fichajes')">🕒 Fichajes</button><button class="cf-chip on">📤 Upselling</button></div>
+      <!-- Altas NNII (solo usuarias "anexos"): ficha de alta de cada "7 NI" del Cuadrante a la carpeta Altas NNII -->
+      <div id="nniiCaja" style="display:none;margin-bottom:16px;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px">
+        <div style="font-size:.8rem;font-weight:700;color:var(--gold2);margin-bottom:4px">📄 Altas NNII</div>
+        <div style="font-size:.68rem;color:var(--muted);margin-bottom:10px">Crea la ficha de alta de cada nuevo ingreso (7 NI) del Cuadrante que aún no la tenga y la guarda en la carpeta Altas NNII del Drive. Sexo: Hombre por defecto, revísalo.</div>
+        <button class="cf-btn prim" id="nniiBtn" onclick="nniiGenerar()" style="width:100%;padding:11px">Generar altas NNII</button>
+        <div id="nniiRes" style="margin-top:10px"></div>
+      </div>
       <div class="data-banner" style="margin-bottom:14px">
         <div class="sync-dot"></div>
         Upselling · Excel del día al Form
@@ -7389,6 +7396,8 @@ async function doLogin(){
     // upsLlamar usa CF.mat y CF.dni; el servidor vuelve a comprobar el DNI en cada llamada
     CF={mat:found.id,dni,datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
     document.querySelectorAll('.ups-switch').forEach(e=>e.classList.remove('on'));
+    document.getElementById('nniiCaja').style.display='';
+    document.getElementById('nniiRes').innerHTML='';
     showPanel('upsellingPanel');
     upsAbrir('');
 
@@ -7746,7 +7755,32 @@ function upsIr(donde){
   }
 }
 
-function upsSalir(){ upsParar(); UPS={datos:null,previa:null,lote:'',timer:null,ocupado:false}; }
+function upsSalir(){ upsParar(); UPS={datos:null,previa:null,lote:'',timer:null,ocupado:false};
+  const n=document.getElementById('nniiCaja'); if(n) n.style.display='none';
+  const r=document.getElementById('nniiRes'); if(r) r.innerHTML=''; }
+
+// Altas NNII: el servidor (AltasNNII.js) genera las fichas que falten y devuelve los enlaces
+async function nniiGenerar(){
+  const btn=document.getElementById('nniiBtn'), out=document.getElementById('nniiRes');
+  btn.disabled=true; btn.textContent='⏳ Generando… (unos segundos por ficha)';
+  out.innerHTML='';
+  try{
+    const d=await upsLlamar('nnii-generar',{},1);
+    const fila=(x,extra)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border2);font-size:.7rem"><span>${cfEsc(x.nombre)}${extra||''}</span>${x.url?`<a href="${cfEsc(x.url)}" target="_blank" style="color:var(--gold2);white-space:nowrap">Abrir</a>`:''}</div>`;
+    let h='';
+    h+=`<div style="font-size:.72rem;font-weight:700;margin:4px 0">${d.nuevas.length?'✅ '+d.nuevas.length+' ficha(s) nueva(s)':'No hay nuevos ingresos pendientes'}</div>`;
+    h+=d.nuevas.map(x=>fila(x,` <span style="color:var(--muted)">· ${cfEsc(x.zona)}</span>`)).join('');
+    if(d.errores.length) h+=`<div style="font-size:.72rem;font-weight:700;margin:10px 0 4px;color:#e67e22">⚠️ Sin generar (${d.errores.length})</div>`+d.errores.map(x=>fila(x,` <span style="color:#e67e22">· ${cfEsc(x.error)}</span>`)).join('');
+    if(d.pendientes) h+=`<div style="font-size:.68rem;color:var(--muted);margin-top:8px">Quedan ${d.pendientes} por generar: vuelve a pulsar el botón.</div>`;
+    if(d.yaHechas.length) h+=`<details style="margin-top:10px"><summary style="font-size:.68rem;color:var(--muted);cursor:pointer">Ya generadas antes (${d.yaHechas.length})</summary>${d.yaHechas.map(x=>fila(x,` <span style="color:var(--muted)">· ${cfEsc(x.fecha||'')}</span>`)).join('')}</details>`;
+    h+=`<a href="${cfEsc(d.carpeta)}" target="_blank" style="display:block;text-align:center;margin-top:12px;font-size:.7rem;color:var(--gold2)">📁 Abrir carpeta Altas NNII</a>`;
+    out.innerHTML=h;
+  }catch(e){
+    out.innerHTML=`<div class="cf-vacio">❌ ${cfEsc(e.message)}</div>`;
+  }finally{
+    btn.disabled=false; btn.textContent='Generar altas NNII';
+  }
+}
 function upsParar(){ if(UPS.timer){ clearTimeout(UPS.timer); UPS.timer=null; } }
 
 async function upsLlamar(accion,extra,intentos){
