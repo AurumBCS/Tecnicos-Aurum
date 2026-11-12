@@ -173,10 +173,10 @@ async function refrescarEstado() {
   const w = estado.wa || {};
   const txt = { conectado:'WhatsApp conectado' + (w.numero ? ' (…' + w.numero + ')' : ''), qr:'Falta vincular WhatsApp',
     conectando:'Conectando WhatsApp…', iniciando:'Arrancando WhatsApp…', desconectado:'WhatsApp desconectado', error:'Error de WhatsApp' }[w.estado] || w.estado;
-  $('pWa').textContent = txt; $('pWa').className = 'pill ' + (w.estado === 'conectado' ? 'ok' : (w.estado === 'qr' || w.estado === 'error' || w.estado === 'desconectado') ? 'mal' : '');
+  $('pWa').textContent = txt; $('pWa').title = 'Versión ' + (estado.version || 'antigua'); $('pWa').className = 'pill ' + (w.estado === 'conectado' ? 'ok' : (w.estado === 'qr' || w.estado === 'error' || w.estado === 'desconectado') ? 'mal' : '');
   $('pHoy').textContent = `Hoy: ${estado.hoy}/${estado.limite} mensajes`;
   $('vQr').classList.toggle('oculto', w.estado !== 'qr');
-  $('vErr').classList.toggle('oculto', w.estado !== 'error'); $('vErr').textContent = w.detalle || 'WhatsApp no ha arrancado. Cierra la app y vuelve a abrirla.';
+  $('vErr').classList.toggle('oculto', w.estado !== 'error'); $('vErr').textContent = (w.detalle || 'WhatsApp no ha arrancado. Cierra la app y vuelve a abrirla.') + '  · v' + (estado.version || '?');
   if (/Reintentar/.test(w.detalle || '')) { const b = document.createElement('button'); b.textContent = '↻ Reintentar'; b.style.marginLeft = '10px'; b.onclick = () => { b.disabled = true; fetch('/api/reintentar', { method: 'POST' }); }; $('vErr').appendChild(b); }
   if (w.estado === 'qr' && w.qr) $('qr').innerHTML = `<img src="${w.qr}" alt="Código QR">`;
   const s = estado.sesion;

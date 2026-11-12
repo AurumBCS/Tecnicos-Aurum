@@ -13,10 +13,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
+const VERSION = '2026.11.12c';
 const RENDER = (process.env.RENDER_URL || 'https://tecnicos-aurum.onrender.com').replace(/\/$/, '');
 const PORT = Number(process.env.PORT || 3131);
 const ES_WIN = process.platform === 'win32';
@@ -204,12 +205,33 @@ client.on('disconnected', r => {
   setTimeout(() => arrancarWA(), 5e3);
 });
 
+// Limpia restos de intentos anteriores: Chrome ocultos que se quedaron abiertos
+// con la carpeta de WhatsApp y los ficheros de bloqueo que dejan (si no, el
+// Chrome nuevo no puede abrir la sesión y WhatsApp no llega a cargar).
+const WA_DIR = path.join(DATA_DIR, 'wa');
+function limpiarChromeColgados() {
+  try {
+    if (ES_WIN) {
+      execSync(`powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*AurumWhatsApp*wa*' -and $_.Name -match 'chrome|msedge' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"`, { stdio: 'ignore', windowsHide: true, timeout: 20e3 });
+    } else {
+      execSync(`pkill -9 -f -- ${JSON.stringify('user-data-dir=' + WA_DIR)}`, { stdio: 'ignore', timeout: 10e3 });
+    }
+  } catch {}
+  try {
+    for (const d of fs.readdirSync(WA_DIR)) for (const f of ['SingletonLock', 'SingletonSocket', 'SingletonCookie'])
+      try { fs.rmSync(path.join(WA_DIR, d, f), { force: true }); } catch {}
+  } catch {}
+}
+
 // Arranca WhatsApp y, si falla (red lenta, Chrome ocupado), lo reintenta solo hasta 4 veces
 let arrancando = false;
 async function arrancarWA(intento = 1) {
   if (arrancando) return; arrancando = true;
   try {
     if (intento > 1) { wa.estado = 'iniciando'; wa.detalle = ''; }
+    limpiarChromeColgados();
+    // Al tercer intento se descarta la vinculación a medias (obliga a escanear el QR de nuevo)
+    if (intento === 3 && wa.estado !== 'conectado') { try { fs.rmSync(WA_DIR, { recursive: true, force: true }); log('Sesión de WhatsApp reiniciada'); } catch {} }
     await client.initialize();
   } catch (e) {
     const m = String((e && e.message) || e).split('\n')[0];
@@ -356,7 +378,7 @@ function vista() {
 app.get('/api/estado', (req, res) => {
   contarHoy();
   res.json({
-    wa, sesion: config.mat ? { mat: config.mat, nombre: config.nombre || config.mat } : null,
+    version: VERSION, wa, sesion: config.mat ? { mat: config.mat, nombre: config.nombre || config.mat } : null,
     envio: { ...envio, segundosPausa: envio.pausaHasta ? Math.max(0, Math.round((envio.pausaHasta - Date.now()) / 1e3)) : 0 },
     hoy: hoy.enviados, limite: DAILY_LIMIT, ultimaCarga
   });
@@ -482,7 +504,17 @@ const servidor = app.listen(PORT, '127.0.0.1', () => {
   if (config.mat) cargarCitas(config.mat, config.dni).catch(e => log('Carga inicial:', e.message));
 });
 // Si ya hay una abierta (doble clic otra vez), solo se abre el navegador
-servidor.on('error', e => {
-  if (e.code === 'EADDRINUSE') { abrirNavegador(`http://localhost:${PORT}`); setTimeout(() => process.exit(0), 1000); }
+// Si la que está abierta es otra versión (p. ej. la anterior), se cierra y arranca esta.
+let reintentosPuerto = 0;
+servidor.on('error', async e => {
+  if (e.code === 'EADDRINUSE') {
+    let otra = null;
+    try { otra = await (await fetch(`http://127.0.0.1:${PORT}/api/estado`)).json(); } catch {}
+    if (otra && otra.version === VERSION) { abrirNavegador(`http://localhost:${PORT}`); setTimeout(() => process.exit(0), 1000); return; }
+    if (reintentosPuerto++ >= 5) { log('El puerto sigue ocupado'); abrirNavegador(`http://localhost:${PORT}`); setTimeout(() => process.exit(0), 1000); return; }
+    log('Cerrando la versión anterior que estaba abierta');
+    try { await fetch(`http://127.0.0.1:${PORT}/api/apagar`, { method: 'POST' }); } catch {}
+    setTimeout(() => servidor.listen(PORT, '127.0.0.1'), 4e3);
+  }
   else { log('Error del servidor:', e.message); process.exit(1); }
 });
