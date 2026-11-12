@@ -11,7 +11,8 @@ TMP="$OUT/.tmp"; rm -rf "$OUT"; mkdir -p "$TMP"
 
 # 1) Código de la app con sus librerías de producción (sin descargar Chromium: usa el Chrome del equipo)
 mkdir -p "$TMP/app"
-cp "$APP_SRC/server.js" "$APP_SRC/package.json" "$APP_SRC/package-lock.json" "$TMP/app/"
+cp "$APP_SRC/server.js" "$APP_SRC/package.json" "$APP_SRC/package-lock.json" "$APP_SRC/aviso-arranque.sh" "$APP_SRC/aviso-arranque.ps1" "$TMP/app/"
+VAPP=$(sed -n "s/^const VERSION = '\([^']*\)';/\1/p" "$APP_SRC/server.js")
 cp -R "$APP_SRC/public" "$TMP/app/"
 ( cd "$TMP/app" && PUPPETEER_SKIP_DOWNLOAD=1 npm ci --omit=dev --no-audit --no-fund --ignore-scripts >/dev/null )
 
@@ -34,8 +35,10 @@ R="$(cd "$(dirname "$0")/../Resources" && pwd)"
 mkdir -p "$HOME/Library/Logs"
 cd "$R/app"
 nohup "$N" server.js >> "$HOME/Library/Logs/AurumWhatsApp.log" 2>&1 &
+nohup /bin/bash "$R/app/aviso-arranque.sh" "__VAPP__" >/dev/null 2>&1 &
 exit 0
 EOF
+sed -i '' "s/__VAPP__/$VAPP/" "$MAC/MacOS/AurumWhatsApp"
 chmod +x "$MAC/MacOS/AurumWhatsApp"
 cat > "$MAC/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -67,7 +70,7 @@ codesign --force --deep -s - "$TMP/mac/Aurum WhatsApp.app" 2>/dev/null || true
 WIN="$TMP/win/Aurum WhatsApp"
 mkdir -p "$WIN/node"
 cp -R "$TMP/app" "$WIN/app"; cp "$TMP/node.exe" "$WIN/node/node.exe"
-printf '@echo off\r\nrem Abre Aurum WhatsApp. La ventana minimizada es la app: no la cierres mientras haya envios.\r\ncd /d "%%~dp0app"\r\nstart "Aurum WhatsApp (no cerrar)" /min "%%~dp0node\\node.exe" server.js\r\n' > "$WIN/Aurum WhatsApp.cmd"
+printf '@echo off\r\nrem Abre Aurum WhatsApp. La ventana minimizada es la app: no la cierres mientras haya envios.\r\ncd /d "%%~dp0app"\r\nstart "Aurum WhatsApp (no cerrar)" /min "%%~dp0node\\node.exe" server.js\r\nstart "" /min powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%%~dp0app\\aviso-arranque.ps1" -Version %s\r\n' "$VAPP" > "$WIN/Aurum WhatsApp.cmd"
 printf '@echo off\r\nrem Crea un acceso directo en el Escritorio y en Inicio (para que se abra al encender el PC).\r\nset "D=%%~dp0"\r\npowershell -NoProfile -Command "$s=New-Object -ComObject WScript.Shell; foreach($p in @([Environment]::GetFolderPath(\x27Desktop\x27),[Environment]::GetFolderPath(\x27Startup\x27))){ $l=$s.CreateShortcut($p+\x27\\Aurum WhatsApp.lnk\x27); $l.TargetPath=$env:D+\x27Aurum WhatsApp.cmd\x27; $l.WorkingDirectory=$env:D; $l.WindowStyle=7; $l.Save() }"\r\necho Accesos directos creados en el Escritorio y en Inicio.\r\npause\r\n' > "$WIN/Crear accesos directos.cmd"
 ( cd "$TMP/win" && zip -qr "$OUT/Aurum-WhatsApp-Windows.zip" "Aurum WhatsApp" )
 

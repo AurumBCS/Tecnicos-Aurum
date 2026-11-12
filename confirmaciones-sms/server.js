@@ -1158,6 +1158,36 @@ app.get('/status', (req, res) => {
   res.json({ waStatus, count: appointments.length, sendingActive });
 });
 
+// ── Diagnóstico de la app "Aurum WhatsApp" de los JE ──────────────────────────
+// La app (y su lanzador, si ni siquiera arranca) manda aquí sus fallos y si llegó
+// al QR. Sin datos de clientes: matrícula del JE, versión, sistema, Chrome y el
+// mensaje de error. Se guarda en la pestaña "Uso" (rol "wa-diag") y en memoria;
+// se lee con GET /wa-diagnostico?token=APP_TOKEN.
+const waDiag = [];
+const waDiagIp = {};
+const corta = (v, n) => String(v == null ? '' : v).replace(/[\r\n\t]+/g, ' ').trim().slice(0, n);
+app.post('/wa-diagnostico', (req, res) => {
+  const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
+  const h = Math.floor(Date.now() / 36e5);
+  const k = ip + '|' + h;
+  waDiagIp[k] = (waDiagIp[k] || 0) + 1;
+  if (waDiagIp[k] > 60) return res.status(429).json({ ok: false });
+  const b = req.body || {};
+  const d = {
+    ts: new Date().toISOString(), mat: corta(b.mat, 12).toUpperCase(), evento: corta(b.evento, 30),
+    version: corta(b.version, 20), so: corta(b.so, 40), arch: corta(b.arch, 10),
+    chrome: corta(b.chrome, 60), node: corta(b.node, 20), detalle: corta(b.detalle, 400)
+  };
+  waDiag.push(d); if (waDiag.length > 300) waDiag.shift();
+  console.log('[WA-diag]', JSON.stringify(d));
+  registrarUso(d.mat, 'wa-diag', corta(`wa-${d.evento} | v${d.version} | ${d.so} ${d.arch} | ${d.chrome} | ${d.detalle}`, 480), null);
+  res.json({ ok: true });
+});
+app.get('/wa-diagnostico', (req, res) => {
+  if (String(req.query.token || '') !== APP_TOKEN) return res.status(403).json({ ok: false, error: 'No autorizado' });
+  res.json({ ok: true, eventos: waDiag.slice(-Number(req.query.n || 100)) });
+});
+
 // ── Diagnóstico ───────────────────────────────────────────────────────────────
 app.get('/diagnostico', (req, res) => {
   const chromePath = findChrome();

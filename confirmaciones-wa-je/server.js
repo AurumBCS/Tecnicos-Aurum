@@ -17,7 +17,7 @@ const { spawn, execSync } = require('child_process');
 const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
-const VERSION = '2026.11.12c';
+const VERSION = '2026.11.12d';
 const RENDER = (process.env.RENDER_URL || 'https://tecnicos-aurum.onrender.com').replace(/\/$/, '');
 const PORT = Number(process.env.PORT || 3131);
 const ES_WIN = process.platform === 'win32';
@@ -192,13 +192,35 @@ const client = new Client({
   authTimeoutMs: 180000,
   puppeteer: { headless: true, executablePath, args: ['--no-sandbox', '--disable-dev-shm-usage'] }
 });
-client.on('qr', async qr => { wa = { estado: 'qr', qr: await QRCode.toDataURL(qr), numero: '' }; log('Escanea el QR desde la app'); });
+// Aviso a Render de cómo va el arranque (para ver fallos sin pedir capturas).
+// Sin datos de clientes: matrícula del JE, versión, sistema, Chrome y el error.
+let infoEquipo = null;
+function datosEquipo() {
+  if (infoEquipo) return infoEquipo;
+  let so = ES_WIN ? 'Windows ' + os.release() : 'macOS', chrome = executablePath ? '' : 'sin Chrome';
+  try { if (!ES_WIN) so = 'macOS ' + execSync('sw_vers -productVersion', { timeout: 5e3 }).toString().trim(); } catch {}
+  try {
+    if (executablePath) chrome = ES_WIN
+      ? 'Chrome ' + execSync(`powershell -NoProfile -Command "(Get-Item '${executablePath}').VersionInfo.ProductVersion"`, { timeout: 15e3, windowsHide: true }).toString().trim()
+      : execSync(`${JSON.stringify(executablePath)} --version`, { timeout: 15e3 }).toString().trim();
+  } catch (e) { chrome = (chrome || 'Chrome') + ' (no responde)'; }
+  return (infoEquipo = { so, arch: process.arch, chrome, node: process.version });
+}
+const avisados = new Set();
+function diagnostico(evento, detalle = '', unaVez = false) {
+  if (unaVez) { if (avisados.has(evento)) return; avisados.add(evento); }
+  const cuerpo = JSON.stringify({ mat: (config && config.mat) || '', evento, version: VERSION, detalle, ...datosEquipo() });
+  fetch(RENDER + '/wa-diagnostico', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: cuerpo, signal: AbortSignal.timeout(90e3) })
+    .catch(() => {});
+}
+
+client.on('qr', async qr => { diagnostico('qr', '', true); wa = { estado: 'qr', qr: await QRCode.toDataURL(qr), numero: '' }; log('Escanea el QR desde la app'); });
 client.on('authenticated', () => { wa.estado = 'conectando'; wa.qr = ''; });
 client.on('ready', () => {
   wa = { estado: 'conectado', qr: '', numero: client.info && client.info.wid ? client.info.wid.user.slice(-4) : '' };
-  log('WhatsApp conectado');
+  log('WhatsApp conectado'); diagnostico('conectado', '', true);
 });
-client.on('auth_failure', m => { wa.estado = 'error'; log('Fallo de autenticación:', m); });
+client.on('auth_failure', m => { wa.estado = 'error'; diagnostico('fallo-auth', String(m)); log('Fallo de autenticación:', m); });
 client.on('disconnected', r => {
   wa = { estado: 'desconectado', qr: '', numero: '' };
   log('WhatsApp desconectado:', r);
@@ -236,6 +258,7 @@ async function arrancarWA(intento = 1) {
   } catch (e) {
     const m = String((e && e.message) || e).split('\n')[0];
     log(`No arrancó WhatsApp (intento ${intento}):`, m);
+    diagnostico('error', `intento ${intento}: ${m}`);
     try { await client.destroy(); } catch {}
     if (!executablePath) { wa.estado = 'error'; wa.detalle = 'Falta Google Chrome: instálalo desde google.com/chrome y vuelve a abrir la app.'; }
     else if (intento < 4) {
@@ -497,10 +520,14 @@ function abrirNavegador(url) {
   try { spawn(cmd[0], cmd[1], { stdio: 'ignore', detached: true, windowsHide: true }).unref(); } catch {}
 }
 
+process.on('uncaughtException', e => { log('Error inesperado:', e && e.stack || e); diagnostico('excepcion', String(e && e.message || e)); });
+process.on('unhandledRejection', e => { log('Error sin tratar:', e && e.message || e); diagnostico('rechazo', String(e && e.message || e)); });
+
 const servidor = app.listen(PORT, '127.0.0.1', () => {
   abrirNavegador(`http://localhost:${PORT}`);
   log(`App lista en http://localhost:${PORT}  (datos en ${DATA_DIR})`);
   arrancarWA();
+  setTimeout(() => diagnostico('arranque', executablePath || 'sin Chrome', true), 3e3);
   if (config.mat) cargarCitas(config.mat, config.dni).catch(e => log('Carga inicial:', e.message));
 });
 // Si ya hay una abierta (doble clic otra vez), solo se abre el navegador
