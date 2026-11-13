@@ -172,7 +172,7 @@ async function refrescarEstado() {
   try { estado = await api('/api/estado'); } catch { $('pWa').textContent = 'App parada'; $('pWa').className = 'pill mal'; return; }
   const w = estado.wa || {};
   const txt = { conectado:'WhatsApp conectado' + (w.numero ? ' (…' + w.numero + ')' : ''), qr:'Falta vincular WhatsApp',
-    conectando:'Conectando WhatsApp…', iniciando:'Arrancando WhatsApp…', desconectado:'WhatsApp desconectado', error:'Error de WhatsApp' }[w.estado] || w.estado;
+    conectando:'Cargando tus chats…' + (w.progreso ? ' ' + w.progreso + '%' : ''), iniciando:'Abriendo WhatsApp…' + (w.desde ? ' ' + Math.floor((Date.now() - w.desde) / 60e3) + ':' + String(Math.floor((Date.now() - w.desde) / 1e3) % 60).padStart(2, '0') + ' (puede tardar unos minutos)' : ''), desconectado:'WhatsApp desconectado', error:'Error de WhatsApp' }[w.estado] || w.estado;
   $('pWa').textContent = txt; $('pWa').title = 'Versión ' + (estado.version || 'antigua'); $('pWa').className = 'pill ' + (w.estado === 'conectado' ? 'ok' : (w.estado === 'qr' || w.estado === 'error' || w.estado === 'desconectado') ? 'mal' : '');
   $('pHoy').textContent = `Hoy: ${estado.hoy}/${estado.limite} mensajes`;
   $('vQr').classList.toggle('oculto', w.estado !== 'qr');

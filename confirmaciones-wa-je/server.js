@@ -17,7 +17,7 @@ const { spawn, execSync } = require('child_process');
 const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
-const VERSION = '2026.11.13a';
+const VERSION = '2026.11.13b';
 const RENDER = (process.env.RENDER_URL || 'https://tecnicos-aurum.onrender.com').replace(/\/$/, '');
 const PORT = Number(process.env.PORT || 3131);
 const ES_WIN = process.platform === 'win32';
@@ -189,7 +189,7 @@ const executablePath = process.env.CHROME_PATH || CHROMES.find(c => { try { retu
 const client = new Client({
   authStrategy: new LocalAuth({ clientId: 'aurum-je', dataPath: path.join(DATA_DIR, 'wa') }),
   // WhatsApp Web puede tardar más de 30 s en cargar con una conexión o un equipo lentos
-  authTimeoutMs: 90000,
+  authTimeoutMs: 10 * 60e3,   // en algunos equipos WhatsApp Web tarda 2-3 min en cargar: se espera sin cortar
   puppeteer: { headless: true, executablePath, args: ['--no-sandbox', '--disable-dev-shm-usage'] }
 });
 // Aviso a Render de cómo va el arranque (para ver fallos sin pedir capturas).
@@ -216,7 +216,8 @@ function diagnostico(evento, detalle = '', unaVez = false) {
     .catch(() => {});
 }
 
-client.on('qr', async qr => { diagnostico('qr', '', true); wa = { estado: 'qr', qr: await QRCode.toDataURL(qr), numero: '' }; log('Escanea el QR desde la app'); });
+client.on('loading_screen', p => { wa.progreso = Number(p) || 0; });
+client.on('qr', async qr => { diagnostico('qr', 'tardó ' + Math.round((Date.now() - (wa.desde || Date.now())) / 1e3) + ' s', true); wa = { estado: 'qr', qr: await QRCode.toDataURL(qr), numero: '' }; log('Escanea el QR desde la app'); });
 client.on('authenticated', () => { wa.estado = 'conectando'; wa.qr = ''; desdeConectando = Date.now(); diagnostico('autenticado', '', true); });
 client.on('ready', () => {
   wa = { estado: 'conectado', qr: '', numero: client.info && client.info.wid ? client.info.wid.user.slice(-4) : '' };
@@ -253,6 +254,7 @@ async function arrancarWA(intento = 1) {
   if (arrancando) return; arrancando = true;
   try {
     if (intento > 1) { wa.estado = 'iniciando'; wa.detalle = ''; }
+    wa.desde = Date.now(); wa.progreso = 0;
     limpiarChromeColgados();
     // Al tercer intento se descarta la vinculación a medias (obliga a escanear el QR de nuevo)
     if (intento === 2) { try { fs.rmSync(WA_DIR, { recursive: true, force: true }); log('Sesión de WhatsApp reiniciada'); } catch {} }
@@ -554,8 +556,8 @@ async function reiniciarWA(motivo) {
 }
 setInterval(async () => {
   if (reiniciando || arrancando) return;
-  if (wa.estado === 'conectando' && desdeConectando && Date.now() - desdeConectando > 4 * 60e3) {
-    desdeConectando = 0; return reiniciarWA('vinculado pero sin terminar de cargar en 4 min');
+  if (wa.estado === 'conectando' && desdeConectando && Date.now() - desdeConectando > 15 * 60e3) {
+    desdeConectando = 0; return reiniciarWA('vinculado pero sin terminar de cargar en 15 min');
   }
   if (wa.estado !== 'conectado') { fallosVigilancia = 0; return; }
   try {
