@@ -531,6 +531,7 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
     <button class="tab-btn" id="tabUso" onclick="switchTab(&#39;uso&#39;)">Uso de la app</button>
     <button class="tab-btn" id="tabUsoSms" style="display:none" onclick="switchTab(&#39;usoSms&#39;)">📲 Uso confirmaciones</button>
     <button class="tab-btn" id="tabAgenda" style="display:none" onclick="switchTab(&#39;agenda&#39;)">🕗 Agenda 8:00</button>
+    <button class="tab-btn" id="tabAnexos" style="display:none" onclick="switchTab(&#39;anexos&#39;)">📤 Anexos y Altas NNII</button>
   </div>
 
   <!-- Panel técnico normal -->
@@ -923,6 +924,17 @@ let AUTH_DATA = {
   '239831':       '48650727T'
 };
 Object.assign(AUTH_DATA, AUTH_FIJAS);
+// Contraseñas fijas guardadas solo como huella SHA-256 (el repo es público): se compara la huella de lo tecleado
+// (en mayúsculas). Para estas matrículas el DNI del Cuadrante ya no sirve. (13/11/2026)
+const AUTH_HASH = {
+  'CM9651':       'a227b845c10f59d316351bfe6362d66be6bf58700566344ead0fe07d2f6ccb20',
+  'BLAS.ALVAREZ': 'a227b845c10f59d316351bfe6362d66be6bf58700566344ead0fe07d2f6ccb20',
+  'BA8006':       'a227b845c10f59d316351bfe6362d66be6bf58700566344ead0fe07d2f6ccb20'
+};
+async function authHash(txt){
+  const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(txt).trim().toUpperCase()));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
 let AUTH_CUADRANTE_LOADED = false;
 let ZONA_DATA = {};
 let CUENTA_DATA = {}; // mat -> {je: bool, empresa: bool}
@@ -1562,7 +1574,10 @@ function switchTab(tab){
     document.getElementById('tabUso').classList.toggle('active', tab==='uso');
     document.getElementById('tabUsoSms').classList.toggle('active', tab==='usoSms');
     document.getElementById('tabAgenda').classList.toggle('active', tab==='agenda');
-    if(tab==='uso'){ showPanel('usagePanel'); renderUsagePanel(); renderUsoSecciones(); }
+    document.getElementById('tabAnexos').classList.toggle('active', tab==='anexos');
+    if(tab!=='anexos') upsParar();
+    if(tab==='anexos'){ showPanel('upsellingPanel'); upsAbrir(UPS.lote); }
+    else if(tab==='uso'){ showPanel('usagePanel'); renderUsagePanel(); renderUsoSecciones(); }
     else if(tab==='usoSms'){ showPanel('usoSmsPanel'); renderUsoSmsPanel(); }
     else if(tab==='agenda'){ showPanel('agendaPanel'); renderAgendaPanel(); }
     else { showPanel('jrPanel'); }
@@ -7310,7 +7325,7 @@ async function doLogin(){
   document.getElementById('loginBtn').style.opacity='1';
 
   // ✅ VALIDACIÓN: todos los usuarios validan matrícula + DNI contra el cuadrante
-  const dniEsperado = AUTH_DATA[mat];
+  const dniEsperado = AUTH_HASH[mat] ? ((await authHash(dni))===AUTH_HASH[mat] ? dni : '\u0000') : AUTH_DATA[mat];
   if(!dniEsperado){
     if(!AUTH_CUADRANTE_LOADED){
       // El cuadrante no llegó a tiempo — puede ser un técnico válido, pedir reintento
@@ -7421,6 +7436,15 @@ async function doLogin(){
     document.getElementById('btnEquipoTF').style.display = found.id==='GD5381' ? 'block' : 'none';
     document.getElementById('tabUsoSms').style.display = USO_SMS_VISIBLE_PARA.includes(found.id) ? '' : 'none';
     document.getElementById('tabAgenda').style.display = AGENDA_VISIBLE_PARA.includes(found.id) ? '' : 'none';
+    // Anexos (Upselling) y Altas NNII también para estos JR, en su propia pestaña (13/11/2026)
+    const verAnexos = ANEXOS_JR.includes(found.id);
+    document.getElementById('tabAnexos').style.display = verAnexos ? '' : 'none';
+    if(verAnexos){
+      CF={mat:found.id,dni,datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
+      document.querySelectorAll('.ups-switch').forEach(e=>e.classList.remove('on'));
+      document.getElementById('nniiCaja').style.display='';
+      document.getElementById('nniiRes').innerHTML='';
+    }
     renderJRPanel();
     const pcDet = document.getElementById('jrPreconteoDet');
     if(PC_COORD_VEN.includes(found.id)){ pcDet.style.display = ''; pcDet.open = false; PC_CONT = 'jrPreconteo'; renderPreconteo(found.id); }
@@ -7725,7 +7749,8 @@ setInterval(()=>{
 //  Al aprobarlo, la Lambda (tarea upselling_envio) lo envía fila a fila con la
 //  cuenta de Gustavo y aquí se ve el avance.
 // ══════════════════════════════════════════════
-const UPS_IDS=['EQ5303'];   // solo Estibaliz (12/11/2026); Anna (314298) ya no lo ve
+const ANEXOS_JR=['CM9651'];   // JR que ven la pestaña "Anexos y Altas NNII"
+const UPS_IDS=['EQ5303','CM9651'];   // Estibaliz (12/11) y César (13/11); Anna (314298) ya no lo ve
 const UPS_PANELES=['Moonshot','VERISURE','Otras'];
 // Columnas aceptadas (en mayúsculas, sin acentos ni signos) para cada pregunta del Form
 const UPS_COLS={
