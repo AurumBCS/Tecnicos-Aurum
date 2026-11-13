@@ -31,7 +31,9 @@ cat > "$MAC/MacOS/AurumWhatsApp" <<'EOF'
 #!/bin/bash
 # Arranca el servidor de la app en segundo plano y abre el navegador (lo hace el propio servidor).
 R="$(cd "$(dirname "$0")/../Resources" && pwd)"
-[ "$(uname -m)" = "arm64" ] && N="$R/node-arm64" || N="$R/node-x64"
+# El lanzador es un script y macOS puede abrirlo con Rosetta (uname -m dice x86_64
+# aunque el Mac sea Apple Silicon): se mira el procesador real.
+if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ]; then N="$R/node-arm64"; else N="$R/node-x64"; fi
 mkdir -p "$HOME/Library/Logs"
 cd "$R/app"
 nohup "$N" server.js >> "$HOME/Library/Logs/AurumWhatsApp.log" 2>&1 &
@@ -54,6 +56,8 @@ cat > "$MAC/Info.plist" <<EOF
   <key>CFBundleVersion</key><string>$(date +%Y%m%d%H%M)</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>LSUIElement</key><true/>
+  <key>LSArchitecturePriority</key><array><string>arm64</string><string>x86_64</string></array>
+  <key>LSRequiresNativeExecution</key><true/>
 </dict></plist>
 EOF
 LOGO="$APP_SRC/../confirmaciones-sms/public/logo.png"

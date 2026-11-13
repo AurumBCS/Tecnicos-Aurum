@@ -17,7 +17,7 @@ const { spawn, execSync } = require('child_process');
 const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
-const VERSION = '2026.11.12e';
+const VERSION = '2026.11.13a';
 const RENDER = (process.env.RENDER_URL || 'https://tecnicos-aurum.onrender.com').replace(/\/$/, '');
 const PORT = Number(process.env.PORT || 3131);
 const ES_WIN = process.platform === 'win32';
@@ -204,7 +204,9 @@ function datosEquipo() {
       ? 'Chrome ' + execSync(`powershell -NoProfile -Command "(Get-Item '${executablePath}').VersionInfo.ProductVersion"`, { timeout: 15e3, windowsHide: true }).toString().trim()
       : execSync(`${JSON.stringify(executablePath)} --version`, { timeout: 15e3 }).toString().trim();
   } catch (e) { chrome = (chrome || 'Chrome') + ' (no responde)'; }
-  return (infoEquipo = { so, arch: process.arch, chrome, node: process.version });
+  let arch = process.arch;
+  try { if (!ES_WIN && arch === 'x64' && execSync('sysctl -n hw.optional.arm64', { timeout: 5e3 }).toString().trim() === '1') arch = 'x64 con Rosetta en Apple Silicon'; } catch {}
+  return (infoEquipo = { so, arch, chrome, node: process.version });
 }
 const avisados = new Set();
 function diagnostico(evento, detalle = '', unaVez = false) {
@@ -528,7 +530,8 @@ process.on('unhandledRejection', e => {
   const m = String(e && e.message || e);
   log('Error sin tratar:', m); diagnostico('rechazo', m);
   // WhatsApp Web recargó la página y no se pudo volver a enganchar: se reconecta
-  if (/auth timeout|ready timeout|Execution context|Target closed|Session closed/i.test(m)) reiniciarWA('tras recarga: ' + m);
+  // Solo si ya estaba vinculado: con el QR en pantalla, reiniciar cambiaría el QR que el JE está escaneando
+  if ((wa.estado === 'conectado' || wa.estado === 'conectando') && /auth timeout|ready timeout|Execution context|Target closed|Session closed/i.test(m)) reiniciarWA('tras recarga: ' + m);
 });
 
 // ── Vigilante: si WhatsApp se cuelga después de vincular, se reconecta solo ──
