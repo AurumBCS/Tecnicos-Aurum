@@ -464,7 +464,8 @@
       return;
     }
     seleccionados.delete(id);
-    const texto = encodeURIComponent(mensajeWhatsApp(c, { tecnico: nombreDePila(c.tecnico) }));
+    // En primera persona, como si escribiera el técnico de la cita (Gustavo, 16/11/2026)
+    const texto = encodeURIComponent(mensajeWhatsApp(c, { yo: nombreDePila(c.tecnico) }));
     if (esDeCola) {
       // En lote se abre la app directamente (como hacía el enlace sms:): la página no cambia y,
       // al volver de WhatsApp, se abre el siguiente
