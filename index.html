@@ -523,7 +523,7 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
     <button class="tab-btn" id="tabMisDatos" onclick="switchTab(&#39;misDatos&#39;)">Mis datos</button>
     <button class="tab-btn" id="tabEquipo" onclick="switchTab(&#39;equipo&#39;)">Mi equipo</button>
     <button class="tab-btn" id="tabConfirmaciones" onclick="abrirConfirmaciones()" style="color:var(--gold3);">📲 Confirmaciones (WhatsApp)</button>
-    <button class="tab-btn" id="tabConfirmacionesSMS" onclick="abrirConfirmacionesSMS('je')" style="color:var(--gold3);">💬 Confirmaciones (SMS)</button>
+    <button class="tab-btn" id="tabConfirmacionesSMS" onclick="abrirConfirmacionesSMS('je')" style="color:var(--gold3);">💬 Confirmaciones WhatsApp</button>
   </div>
   <!-- Tabs para JR -->
   <div class="tabs-bar" id="tabsBarJR" style="display:none">
@@ -545,8 +545,8 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
          padding:12px 14px;margin:10px 0;align-items:center;gap:10px;">
       <div style="font-size:1.4rem">💬</div>
       <div>
-        <div style="color:var(--gold2);font-weight:700;font-size:.82rem">Confirmaciones de citas por SMS</div>
-        <div style="color:var(--muted);font-size:.7rem;margin-top:2px">Ábrelo desde tu móvil de trabajo para mandar los SMS de mañana</div>
+        <div style="color:var(--gold2);font-weight:700;font-size:.82rem">Confirmaciones de citas por WhatsApp</div>
+        <div style="color:var(--muted);font-size:.7rem;margin-top:2px">Ábrelo desde tu móvil de trabajo para mandar los WhatsApp de mañana</div>
       </div>
     </div>
     <div id="mananaMain"></div>
@@ -743,7 +743,7 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
   <div id="usoSmsPanel" style="display:none;padding:14px 13px 48px;max-width:680px;margin:0 auto">
     <div class="data-banner" style="margin-bottom:14px">
       <div class="sync-dot"></div>
-      Quién entra en Confirmaciones SMS, envía los SMS y marca las respuestas
+      Quién entra en Confirmaciones WhatsApp, envía los mensajes y marca las respuestas
     </div>
     <select id="periodoUsoSms" aria-label="Periodo" onchange="renderUsoSmsPanel(true)" style="display:none;width:100%;margin-bottom:14px;padding:10px 12px;background:var(--s1);border:1px solid var(--border2);border-radius:10px;color:var(--gold2);font-family:var(--font);font-size:.78rem;font-weight:700;cursor:pointer">
       <option value="hoy">Hoy</option>
@@ -4655,7 +4655,7 @@ async function renderConfirmacionesEquipo(jeId, recargar){
   // Plegado por defecto: se abre al pulsar la cabecera y sigue abierto al actualizar
   const abierto = !!(el.querySelector('details.plegable')||{}).open;
   const plegado = (resumen, cuerpo) => `<details class="plegable"${abierto?' open':''}>
-    <summary class="section-head" style="margin-top:0">📲 Confirmaciones SMS del equipo${resumen?` <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0">· ${resumen}</span>`:''}</summary>${cuerpo}</details>`;
+    <summary class="section-head" style="margin-top:0">📲 Confirmaciones WhatsApp del equipo${resumen?` <span style="color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0">· ${resumen}</span>`:''}</summary>${cuerpo}</details>`;
   let d = CONF_EQUIPO_CACHE[jeId];
   if(recargar || !d){
     el.innerHTML = plegado('cargando…', '');
@@ -5130,7 +5130,7 @@ async function renderUsoSmsPanel(recargar){
     </tr>`;
   };
   const cab = `<tr style="background:var(--s2);color:var(--text2);font-size:.66rem;text-transform:uppercase;letter-spacing:.04em">
-      <th style="padding:6px 8px;text-align:left">Persona</th><th style="padding:6px 4px">Entr.</th><th style="padding:6px 4px">SMS</th><th style="padding:6px 4px">✅</th><th style="padding:6px 4px">❌</th><th style="padding:6px 4px">Pend.</th></tr>`;
+      <th style="padding:6px 8px;text-align:left">Persona</th><th style="padding:6px 4px">Entr.</th><th style="padding:6px 4px">Env.</th><th style="padding:6px 4px">✅</th><th style="padding:6px 4px">❌</th><th style="padding:6px 4px">Pend.</th></tr>`;
   const equipos = Object.keys(jer).sort((a,b)=>nombre(a).localeCompare(nombre(b)));
   const tablas = equipos.map(je=>{
     const tecs = (jer[je]||[]).filter(m=>m!==je).sort((a,b)=>nombre(a).localeCompare(nombre(b)));
@@ -5147,18 +5147,18 @@ async function renderUsoSmsPanel(recargar){
     ${bloqueSin}
     <details ${USO_SMS_DETALLE_ABIERTO?'open':''} ontoggle="USO_SMS_DETALLE_ABIERTO=this.open"
              style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:10px 12px;margin-bottom:12px">
-    <summary style="cursor:pointer;font-weight:800;color:var(--gold2);font-size:.9rem">📈 Ver detalle de actividad (entradas, SMS y respuestas)</summary>
+    <summary style="cursor:pointer;font-weight:800;color:var(--gold2);font-size:.9rem">📈 Ver detalle de actividad (entradas, mensajes y respuestas)</summary>
     <div id="huecoPeriodoUsoSms" style="margin-top:10px"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
       ${tarjeta(tecnicosQueEntraron.size,'Técnicos que entraron','var(--gold2)')}
       ${tarjeta(jesQueEntraron.size,'JEs que entraron','var(--gold2)')}
-      ${tarjeta(total('sms'),'SMS enviados','#3498db')}
+      ${tarjeta(total('sms'),'Mensajes enviados','#3498db')}
       ${tarjeta(total('confirmado'),'Confirmadas','var(--green)')}
       ${tarjeta(total('no_confirmado'),'No confirman','#e05a4a')}
     </div>
     ${tablas || '<div style="text-align:center;color:var(--text2);padding:20px 0">Sin actividad en este periodo.</div>'}
     ${historicoDiarioUsoSms(d, nombre, jeDe)}
-    <div style="font-size:.7rem;color:var(--text2);margin:6px 0 10px">Entr. (entradas), SMS, ✅ y ❌: lo que hizo cada persona en el periodo elegido. Pend.: citas pendientes / citas cargadas ahora mismo. ⭐ = jefe de equipo.</div>
+    <div style="font-size:.7rem;color:var(--text2);margin:6px 0 10px">Entr. (entradas), Env. (mensajes enviados), ✅ y ❌: lo que hizo cada persona en el periodo elegido. Pend.: citas pendientes / citas cargadas ahora mismo. ⭐ = jefe de equipo.</div>
     </details>
     <button onclick="renderUsoSmsPanel(true)" style="width:100%;padding:10px;background:var(--s2);border:1px solid var(--border2);border-radius:10px;color:var(--text1);font-size:.85rem;cursor:pointer">↻ Actualizar datos</button>`;
   // El selector de periodo solo afecta al detalle: se mueve dentro de él
