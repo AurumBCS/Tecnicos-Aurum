@@ -94,6 +94,11 @@
     .badge-otra_respuesta { background: rgba(212,131,26,.15); color: #d4831a; }
     .badge-sin_whatsapp  { background: rgba(26,24,0,.5);     color: #7a6840; }
     .card-actions { display:flex; gap:6px; align-items:center; }
+    .card-actions + .card-actions { margin-top:6px; }
+    .btn-wa { background: rgba(37,211,102,.14); color: #3fd67c; border: 1px solid rgba(37,211,102,.4); flex: 1.4; padding: 10px; font-size: .76rem; }
+    .btn-sec { background: var(--dim); color: var(--muted); border: 1px solid var(--border2); flex: 1; padding: 9px; font-size: .72rem; text-decoration: none; }
+    .btn-call { background: rgba(201,168,76,.14); color: var(--gold2); border: 1px solid rgba(201,168,76,.4); flex: 1; padding: 9px; font-size: .74rem; text-decoration: none; }
+    .aviso-llamar { background: rgba(212,131,26,.1); border: 1px solid rgba(212,131,26,.35); color: #e0a050; border-radius: 9px; padding: 8px 10px; font-size: .76rem; line-height: 1.4; margin-bottom: 8px; }
     .chk-envio { width:18px; height:18px; accent-color: var(--gold); flex-shrink:0; cursor:pointer; }
 
     .filtro-fechas { display:none; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
@@ -142,7 +147,7 @@
 
 <header>
   <h1>📲 Confirmaciones del Equipo</h1>
-  <div class="sub">Verisure · Envío por SMS</div>
+  <div class="sub">Verisure · Confirmación por WhatsApp</div>
 </header>
 
 <main>
@@ -192,6 +197,7 @@
 
 <div id="toast"></div>
 
+<script src="mensaje-wa.js?v=20261116"></script>
 <script>
   let citas = [];
   let openTecnicos = new Set();
@@ -259,7 +265,7 @@
   }
   function cambiarFiltroFecha(f) {
     filtroFecha = f;
-    seleccionados.clear(); // no enviar SMS a citas de otro día que no se ven
+    seleccionados.clear(); // no enviar mensajes a citas de otro día que no se ven
     render();
   }
 
@@ -293,7 +299,7 @@
 
   function cambiarFiltroTecnico(tec) {
     filtroTecnico = tec;
-    // Al cambiar de técnico se limpia la selección, para no enviar SMS a citas que no se ven
+    // Al cambiar de técnico se limpia la selección, para no enviar mensajes a citas que no se ven
     seleccionados.clear();
     if (tec) openTecnicos.add(tec);
     render();
@@ -359,22 +365,33 @@
     };
     const badge = `<span class="badge badge-${c.status}">${labels[c.status] || c.status}</span>`;
     const puedeEnviar = c.status !== 'sin_telefono';
+    const tel = telefonoDe(c);
+    const movil = /^[67]/.test(tel);
+    const sinWa = c.status === 'sin_whatsapp' || !movil;
+    const aviso = !puedeEnviar ? ''
+      : c.status === 'sin_whatsapp' ? '<div class="aviso-llamar">📵 Este cliente no tiene WhatsApp: mejor llamarle para confirmar la cita.</div>'
+      : !movil ? '<div class="aviso-llamar">☎️ Solo tiene teléfono fijo: hay que llamarle para confirmar la cita.</div>' : '';
     return `<div class="card ${c.status}">
       <div class="card-top">
         <div class="card-name">${esc(c.cliente)}</div>
         ${badge}
       </div>
       <div class="card-detail">
-        <b>${esc(c.tipo)}</b> · ${esc(c.fecha)} · tramo ${esc(c.timeslot)}h<br>
+        <b>${esc(c.tipo)}</b> · ${esc(c.fecha)} · tramo ${esc(c.timeslot)}h${/^N-/i.test(c.tipoCliente || '') ? ' · 🏪 Negocio' : ''}<br>
         📞 ${esc(c.telefono) || '—'}
       </div>
-      ${puedeEnviar ? `<div class="card-actions">
-        <input type="checkbox" class="chk-envio" ${seleccionados.has(c.id) ? 'checked' : ''}
+      ${puedeEnviar ? `${aviso}<div class="card-actions">
+        ${sinWa ? `<a class="btn btn-call" href="tel:+34${tel}">📞 Llamar</a>`
+                : `<input type="checkbox" class="chk-envio" ${seleccionados.has(c.id) ? 'checked' : ''}
           onchange="toggleSeleccion(${c.id}, this.checked)" title="Seleccionar para envio en lote">
-        <button class="btn btn-send" onclick="enviarSMS(${c.id})">📱 Enviar SMS</button>
+        <button class="btn btn-wa" onclick="enviarWhatsApp(${c.id})">💬 Enviar WhatsApp</button>`}
         <button class="btn btn-yes" onclick="marcar(${c.id},'confirmado')">✅ Sí</button>
         <button class="btn btn-no" onclick="marcar(${c.id},'no_confirmado')">❌ No</button>
-      </div>` : ''}
+      </div>
+      ${sinWa ? '' : `<div class="card-actions">
+        <button class="btn btn-sec" onclick="sinWhatsApp(${c.id})">📵 No tiene WhatsApp</button>
+        <a class="btn btn-sec" href="tel:+34${tel}">📞 Llamar</a>
+      </div>`}` : ''}
     </div>`;
   }
 
@@ -412,45 +429,58 @@
     if (seleccionados.size === 0) return;
     colaEnvio = Array.from(seleccionados);
     enviandoEnCola = true;
-    showToast(`Enviando ${colaEnvio.length} SMS, uno por uno...`, 'success');
+    showToast(`Abriendo ${colaEnvio.length} WhatsApp, uno por uno...`, 'success');
     procesarSiguienteEnCola();
   }
 
   function procesarSiguienteEnCola() {
     if (colaEnvio.length === 0) {
       enviandoEnCola = false;
-      showToast('Listo, se abrieron todos los SMS de la seleccion', 'success');
+      showToast('Listo, se abrieron todos los WhatsApp de la selección', 'success');
       return;
     }
     const id = colaEnvio.shift();
-    enviarSMS(id, true);
+    enviarWhatsApp(id, true);
   }
 
-  // Cuando el usuario manda el SMS y vuelve a la pestaña (el navegador se
+  // Cuando el usuario manda el WhatsApp y vuelve a la pestaña (el navegador se
   // "esconde" al abrir la app de mensajes y "reaparece" al volver), se abre
-  // automaticamente el siguiente SMS de la cola.
+  // automaticamente el siguiente de la cola.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && enviandoEnCola) {
       setTimeout(procesarSiguienteEnCola, 800);
     }
   });
 
-  function enviarSMS(id, esDeCola) {
+  function enviarWhatsApp(id, esDeCola) {
     const c = citas.find(x => x.id === id);
     if (!c) { if (esDeCola) procesarSiguienteEnCola(); return; }
-    const nombre = c.cliente.split(' ')[0];
-    // Mensaje sin acentos (para que cuente como SMS simple, mas caracteres permitidos)
-    const msg = `Hola ${nombre}! Le recordamos su cita de ${c.tipo} el ${c.fecha}, tramo ${c.timeslot}h. `
-      + `Nos confirma si le viene bien? Responda SI o NO. Gracias, Verisure`;
-    const tel = String(c.telefono || '').replace(/\D/g, '');
-    if (tel.length < 9) {
-      showToast('Este cliente no tiene telefono valido', 'error');
+    const tel = telefonoDe(c);
+    // En lote se saltan los que no pueden recibir WhatsApp (fijo o ya marcados sin WhatsApp)
+    if (tel.length < 9 || !/^[67]/.test(tel) || c.status === 'sin_whatsapp') {
+      if (!esDeCola) showToast('Este cliente no tiene WhatsApp: mejor llamarle', 'error');
+      seleccionados.delete(id);
       if (esDeCola) procesarSiguienteEnCola();
       return;
     }
     seleccionados.delete(id);
-    window.location.href = `sms:+34${tel}?body=${encodeURIComponent(msg)}`;
+    const texto = encodeURIComponent(mensajeWhatsApp(c, { tecnico: nombreDePila(c.tecnico) }));
+    if (esDeCola) {
+      // En lote se abre la app directamente (como hacía el enlace sms:): la página no cambia y,
+      // al volver de WhatsApp, se abre el siguiente
+      window.location.href = `whatsapp://send?phone=34${tel}&text=${texto}`;
+    } else {
+      const url = `https://wa.me/34${tel}?text=${texto}`;
+      const w = window.open(url, '_blank');
+      if (!w) window.location.href = url;
+    }
     marcar(id, 'enviado', true);
+  }
+
+  function sinWhatsApp(id) {
+    seleccionados.delete(id);
+    marcar(id, 'sin_whatsapp', true);
+    showToast('Sin WhatsApp: mejor llamar al cliente', 'error');
   }
 
   function marcar(id, status, silencioso) {
@@ -487,6 +517,22 @@
   }
 
   if (savedMat && savedDni) cargarCitas();
+
+  // Si la página se abre desde la app de técnicos con la sesión iniciada, la app pasa la matrícula
+  // y el DNI (postMessage, solo desde aurumbcs.github.io) y se cargan las citas sin escribirlos.
+  const ORIGEN_APP = 'https://aurumbcs.github.io';
+  if (window.opener) {
+    window.addEventListener('message', e => {
+      if (e.origin !== ORIGEN_APP || !e.data || e.data.tipo !== 'aurum-acceso') return;
+      const mat = String(e.data.mat || '').trim().toUpperCase(), dni = String(e.data.dni || '').trim().toUpperCase();
+      if (!mat || !dni) return;
+      const cm = document.getElementById('matricula'), cd = document.getElementById('dni');
+      if (cm.value.trim().toUpperCase() === mat && cd.value.trim().toUpperCase() === dni && refreshTimer) return;
+      cm.value = mat; cd.value = dni;
+      cargarCitas();
+    });
+    try { window.opener.postMessage('aurum-listo', ORIGEN_APP); } catch (e) {}
+  }
 </script>
 </body>
 </html>

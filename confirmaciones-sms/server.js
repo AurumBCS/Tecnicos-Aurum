@@ -606,6 +606,8 @@ app.post('/upload', upload.single('excel'), (req, res) => {
           numMantenimiento: String(r['Número de Mantenimiento'] || '').trim(),
           timeslot: String(r['Timeslot'] || r['Ventana de Servicio'] || '').trim(),
           tipo: String(r['Tipo de Actividad'] || '').trim(),
+          // "P-…" domicilio particular, "N-…" negocio: el mensaje del técnico cambia (16/11/2026)
+          tipoCliente: String(r['Tipo de Cliente'] || '').trim(),
           fecha: formatFecha(r['Fecha de la Actividad']),
           status: telefono.length >= 9 ? 'pendiente' : 'sin_telefono',
           respuesta: '',
@@ -642,6 +644,7 @@ app.post('/upload', upload.single('excel'), (req, res) => {
         return;
       }
       if (actual.fecha === na.fecha && actual.timeslot === na.timeslot) {
+        if (na.tipoCliente) actual.tipoCliente = na.tipoCliente;
         // misma cita: se conserva su estado. Si en Oracle se ha pasado a otro
         // técnico (p. ej. una ruta de Mallorca reasignada el 10/11), se
         // cambia el técnico para que le salga al nuevo.
@@ -654,7 +657,7 @@ app.post('/upload', upload.single('excel'), (req, res) => {
       }
       Object.assign(actual, {
         tecnico: na.tecnico, matricula: na.matricula, cliente: na.cliente, telefono: na.telefono,
-        timeslot: na.timeslot, tipo: na.tipo, fecha: na.fecha,
+        timeslot: na.timeslot, tipo: na.tipo, tipoCliente: na.tipoCliente, fecha: na.fecha,
         status: na.status, respuesta: '', horaRespuesta: '', sentAt: ''
       });
       updated++;
@@ -1004,6 +1007,8 @@ app.post('/reset', (req, res) => {
 // ── Vista móvil para técnicos (envío por SMS desde su propio teléfono) ────────
 // El técnico abre /tecnico.html, ve solo sus citas y manda el SMS con el
 // enlace nativo sms: — el servidor nunca envía el SMS, solo guarda el estado.
+// Desde el 16/11/2026 el técnico envía por WhatsApp (enlace wa.me) en vez de SMS; si el
+// cliente no tiene WhatsApp lo marca (sin_whatsapp) y la página le dice que mejor le llame.
 app.get('/mis-citas', async (req, res) => {
   purgarYGuardar();
   const matricula = String(req.query.matricula || '').trim().toUpperCase();
@@ -1020,7 +1025,8 @@ app.get('/mis-citas', async (req, res) => {
     String(a.matricula || '').trim().toUpperCase() === matricula
   );
   const fechas = [...new Set(mias.map(a => a.fecha).filter(Boolean))];
-  res.json({ ok: true, citas: mias, fecha: fechas.join(' y ') });
+  // nombre: para que el técnico se presente en el WhatsApp ("soy Carlos, el técnico de Verisure")
+  res.json({ ok: true, citas: mias, fecha: fechas.join(' y '), nombre: TEC_NAMES[matricula] || '' });
 });
 
 // ── Vista móvil para JE: todo el equipo, agrupado por técnico ────────────────
@@ -1096,7 +1102,7 @@ app.get('/uso', async (req, res) => {
 
 app.post('/marcar-respuesta', (req, res) => {
   const { id, status, quien, rol } = req.body;
-  const estadosValidos = ['enviado', 'confirmado', 'no_confirmado', 'pendiente'];
+  const estadosValidos = ['enviado', 'confirmado', 'no_confirmado', 'pendiente', 'sin_whatsapp'];
   if (!estadosValidos.includes(status)) {
     return res.json({ ok: false, error: 'Estado inválido' });
   }
@@ -1104,7 +1110,8 @@ app.post('/marcar-respuesta', (req, res) => {
   if (!apt) return res.json({ ok: false, error: 'Cita no encontrada' });
 
   apt.status = status;
-  if (status === 'confirmado')    apt.respuesta = 'Confirmado por SMS (marcado por el técnico)';
+  if (status === 'confirmado')    apt.respuesta = 'Confirmado (marcado por el técnico)';
+  else if (status === 'sin_whatsapp') apt.respuesta = 'Sin WhatsApp: llamar al cliente (marcado por el técnico)';
   else if (status === 'no_confirmado') apt.respuesta = 'No confirma (marcado por el técnico)';
   else if (status === 'enviado')  { apt.respuesta = ''; apt.sentAt = Date.now(); }
   else apt.respuesta = '';

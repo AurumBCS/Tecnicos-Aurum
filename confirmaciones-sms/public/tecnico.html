@@ -129,6 +129,25 @@
     .badge-sin_whatsapp  { background: rgba(26,24,0,.5);     color: #7a6840; }
 
     .card-actions { display:flex; gap:6px; }
+    .card-actions + .card-actions { margin-top:6px; }
+    .btn-wa {
+      background: rgba(37,211,102,.14); color: #3fd67c; border: 1px solid rgba(37,211,102,.4);
+      flex: 1.4; padding: 10px; font-size: .78rem;
+    }
+    .btn-sec {
+      background: var(--dim); color: var(--muted); border: 1px solid var(--border2);
+      flex: 1; padding: 9px; font-size: .72rem; text-decoration: none;
+    }
+    .btn-call {
+      background: rgba(201,168,76,.14); color: var(--gold2); border: 1px solid rgba(201,168,76,.4);
+      flex: 1; padding: 9px; font-size: .74rem; text-decoration: none;
+    }
+    .aviso-llamar {
+      background: rgba(212,131,26,.1); border: 1px solid rgba(212,131,26,.35); color: #e0a050;
+      border-radius: 9px; padding: 8px 10px; font-size: .76rem; line-height: 1.4; margin-bottom: 8px;
+    }
+    .mi-nombre { display:flex; align-items:center; gap:8px; margin-bottom:12px; font-size:.74rem; color:var(--muted); }
+    .mi-nombre input { flex:1; padding:8px 10px; font-size:.86rem; text-transform:none; letter-spacing:0; }
 
     #empty, #login-hint {
       text-align:center; padding: 40px 20px; color: var(--muted); font-size: .82rem; line-height:1.6;
@@ -150,7 +169,7 @@
 
 <header>
   <h1>📲 Mis Confirmaciones</h1>
-  <div class="sub">Verisure · Envío por SMS</div>
+  <div class="sub">Verisure · Confirmación por WhatsApp</div>
 </header>
 
 <main>
@@ -170,6 +189,10 @@
 
   <div id="content" style="display:none">
     <div class="sub" id="fecha-titulo" style="text-align:center; margin-bottom:10px; color:var(--gold3); font-size:.78rem; font-weight:700;"></div>
+    <div class="mi-nombre">
+      <span>Tu nombre en el mensaje:</span>
+      <input type="text" id="mi-nombre" maxlength="25" placeholder="Ej: Carlos" oninput="guardarMiNombre()">
+    </div>
     <div id="filtro-fechas" class="filtro-fechas"></div>
     <div class="stats">
       <div class="stat"><b id="st-total">0</b><span>Total</span></div>
@@ -188,6 +211,7 @@
 
 <div id="toast"></div>
 
+<script src="mensaje-wa.js?v=20261116"></script>
 <script>
   let citas = [];
   let refreshTimer = null;
@@ -216,6 +240,7 @@
       .then(d => {
         if (!d.ok) { showToast(d.error || 'Error', 'error'); return; }
         citas = d.citas;
+        ponerMiNombre(d.nombre);
         document.getElementById('fecha-titulo').textContent = d.fecha ? `Citas del ${d.fecha}` : '';
         document.getElementById('login-hint').style.display = 'none';
         document.getElementById('content').style.display = '';
@@ -284,35 +309,60 @@
       };
       const badge = `<span class="badge badge-${c.status}">${labels[c.status] || c.status}</span>`;
       const puedeEnviar = c.status !== 'sin_telefono';
+      const tel = telefonoDe(c);
+      const movil = /^[67]/.test(tel);
+      const sinWa = c.status === 'sin_whatsapp' || !movil;
+      const aviso = !puedeEnviar ? ''
+        : c.status === 'sin_whatsapp' ? '<div class="aviso-llamar">📵 Este cliente no tiene WhatsApp: mejor llámale para confirmar la cita.</div>'
+        : !movil ? '<div class="aviso-llamar">☎️ Solo tiene teléfono fijo: llámale para confirmar la cita.</div>' : '';
       return `<div class="card ${c.status}">
         <div class="card-top">
           <div class="card-name">${esc(c.cliente)}</div>
           ${badge}
         </div>
         <div class="card-detail">
-          <b>${esc(c.tipo)}</b> · ${esc(c.fecha)} · tramo ${esc(c.timeslot)}h<br>
+          <b>${esc(c.tipo)}</b> · ${esc(c.fecha)} · tramo ${esc(c.timeslot)}h${/^N-/i.test(c.tipoCliente || '') ? ' · 🏪 Negocio' : ''}<br>
           📞 ${esc(c.telefono) || '—'}
         </div>
-        ${puedeEnviar ? `<div class="card-actions">
-          <button class="btn btn-send" onclick="enviarSMS(${c.id})">📱 Enviar SMS</button>
+        ${puedeEnviar ? `${aviso}<div class="card-actions">
+          ${sinWa ? `<a class="btn btn-call" href="tel:+34${tel}">📞 Llamar</a>`
+                  : `<button class="btn btn-wa" onclick="enviarWhatsApp(${c.id})">💬 Enviar WhatsApp</button>`}
           <button class="btn btn-yes" onclick="marcar(${c.id},'confirmado')">✅ Sí</button>
           <button class="btn btn-no" onclick="marcar(${c.id},'no_confirmado')">❌ No</button>
-        </div>` : ''}
+        </div>
+        ${sinWa ? '' : `<div class="card-actions">
+          <button class="btn btn-sec" onclick="sinWhatsApp(${c.id})">📵 No tiene WhatsApp</button>
+          <a class="btn btn-sec" href="tel:+34${tel}">📞 Llamar</a>
+        </div>`}` : ''}
       </div>`;
     }).join('');
   }
 
-  function enviarSMS(id) {
+  // ── WhatsApp (16/11/2026: sustituye al SMS). El mensaje está en mensaje-wa.js ──
+  function ponerMiNombre(delCuadrante) {
+    const campo = document.getElementById('mi-nombre');
+    if (campo.value.trim()) return;
+    let n = localStorage.getItem('mi_nombre_msg');
+    if (n === null) n = nombreDePila(delCuadrante);
+    campo.value = n;
+  }
+  function guardarMiNombre() { localStorage.setItem('mi_nombre_msg', document.getElementById('mi-nombre').value.trim()); }
+
+  function enviarWhatsApp(id) {
     const c = citas.find(x => x.id === id);
     if (!c) return;
-    const nombre = c.cliente.split(' ')[0];
-    // Mensaje sin acentos para que cuente como SMS simple (mas caracteres permitidos)
-    const msg = `Hola ${nombre}! Le recordamos su cita de ${c.tipo} el ${c.fecha}, tramo ${c.timeslot}h. `
-      + `Nos confirma si le viene bien? Responda SI o NO. Gracias, Verisure`;
-    const tel = String(c.telefono || '').replace(/\D/g, '');
+    const tel = telefonoDe(c);
     if (tel.length < 9) { showToast('Este cliente no tiene teléfono válido', 'error'); return; }
-    window.location.href = `sms:+34${tel}?body=${encodeURIComponent(msg)}`;
+    // Abre el WhatsApp del técnico en el chat del cliente con el mensaje escrito; él pulsa enviar
+    const url = `https://wa.me/34${tel}?text=${encodeURIComponent(mensajeWhatsApp(c, { yo: document.getElementById('mi-nombre').value }))}`;
+    const w = window.open(url, '_blank');
+    if (!w) window.location.href = url;
     marcar(id, 'enviado', true);
+  }
+
+  function sinWhatsApp(id) {
+    marcar(id, 'sin_whatsapp', true);
+    showToast('Sin WhatsApp: mejor llama al cliente', 'error');
   }
 
   function marcar(id, status, silencioso) {
@@ -350,6 +400,22 @@
 
   // Cargar automáticamente si ya hay matrícula guardada
   if (savedMat && savedDni) cargarCitas();
+
+  // Si la página se abre desde la app de técnicos con la sesión iniciada, la app pasa la matrícula
+  // y el DNI (postMessage, solo desde aurumbcs.github.io) y se cargan las citas sin escribirlos.
+  const ORIGEN_APP = 'https://aurumbcs.github.io';
+  if (window.opener) {
+    window.addEventListener('message', e => {
+      if (e.origin !== ORIGEN_APP || !e.data || e.data.tipo !== 'aurum-acceso') return;
+      const mat = String(e.data.mat || '').trim().toUpperCase(), dni = String(e.data.dni || '').trim().toUpperCase();
+      if (!mat || !dni) return;
+      const cm = document.getElementById('matricula'), cd = document.getElementById('dni');
+      if (cm.value.trim().toUpperCase() === mat && cd.value.trim().toUpperCase() === dni && refreshTimer) return;
+      cm.value = mat; cd.value = dni;
+      cargarCitas();
+    });
+    try { window.opener.postMessage('aurum-listo', ORIGEN_APP); } catch (e) {}
+  }
 </script>
 </body>
 </html>
