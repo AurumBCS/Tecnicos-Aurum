@@ -65,9 +65,12 @@ def revisar(ficha):
     obs_original = _observaciones(ficha)
     if not obs_original and cods and not any((c.get("ID ITEM") or "").strip() for c in cods):
         return []      # cerrado con soporte
-    obs = _n(obs_original)
+    obs = re.sub(r"\brehubic", "reubic", _n(obs_original))   # "se rehubica" (JE 247472, 14/11)
     pet_original = (ficha.get("texto_actividad") or "").split("****")[0]
     pet = _n(pet_original)
+    # desmontaje de la alarma a peticion del cliente (baja, baja temporal...): no hay RM posible (JE 247472, 14/11)
+    if re.search(r"desmont\w* (de )?(la |el )?(alarma|instalacion|sistema|equipo completo|kit)|se desmonta todo", obs):
+        return []
     panel = _panel(ficha)
     lin = _lineas(ficha)
     items = {l["item"] for l in lin}
@@ -134,7 +137,9 @@ def revisar(ficha):
     ult_pilas = None
     for v in visitas:
         t = _n(v.get("texto"))
-        if re.search(r"\bpilas?\b|bateri", t + " " + _n(v.get("razon"))) and re.search(r"camb|sustitu|sust\b", t):
+        # un upgrade reciente cuenta como cambio de pilas (JE 247472, 14/11: upgrade del 09/06 y visita del 12/11)
+        if (re.search(r"\bpilas?\b|bateri", t + " " + _n(v.get("razon"))) and re.search(r"camb|sustitu|sust\b", t)) \
+                or re.search(r"upgrad", _n(v.get("razon")) + " " + t):
             fv = _fecha(v.get("cierre")) or _fecha(v.get("apertura"))
             if fv and (not ult_pilas or fv > ult_pilas):
                 ult_pilas = fv
@@ -174,7 +179,8 @@ def revisar(ficha):
         # (el bloqueo GSM sin internet ya lo avisa el correo de codificacion)
         mal("comunicaciones", "Aviso de comunicaciones (missing test / no transmite) y no consta revisión de SIM, cobertura ni conexión a internet.")
     if panel == "Fast" and "vf2" in _n(ficha.get("version_panel")) and ("bloqueos gsm" in tipo or re.search(r"fallo (de )?(la )?central", pet)) \
-            and not a4 and not items & SIMS and not re.search(r"\bsim\b|4 ?pro|fast ?4", obs):
+            and not a4 and not items & SIMS and not hay_reub and not re.search(r"\bsim\b|4 ?pro|fast ?4", obs):
+        # reubicar la central por cobertura también resuelve el bloqueo (JE 247472, 14/11)
         mal("comunicaciones", "Fast 2 con bloqueo GSM o fallo de central: no cambió la SIM ni la pasó a 4PRO.")
 
     # ── 5. cambio a 4PRO: batería nueva del panel (comunicado 05/11) ──
