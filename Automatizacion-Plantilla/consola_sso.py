@@ -59,6 +59,53 @@ def leer_credenciales_sso():
     return correo, clave
 
 
+# Oracle abre en la ultima pantalla que se vio (p. ej. "Detalles de actividad" tras leer fichas), y ahi el
+# boton del menu se llama "Menú de navegador" en vez de "Menú" (visto 2026-11-16).
+BOTON_MENU = "button[aria-label^='Menú']:visible, button[aria-label^='Menu']:visible"
+ENLACE_ACTIVIDADES = "a.global-navigation-item--activities"
+
+
+def volver_a_actividades(page, espera_ms=20000):
+    """Deja la consola en Actividades (la pantalla de los tecnicos). True si se ve el arbol de grupos.
+    Se usa al terminar una tarea en el Chrome compartido, para que Gustavo no se encuentre la ultima ficha."""
+    try:
+        if page.locator(SELECTOR_GRUPOS + ":visible").count() > 0:
+            return True
+        if page.locator(ENLACE_ACTIVIDADES + ":visible").count() == 0:
+            try:
+                page.locator(BOTON_MENU).first.click(timeout=5000)
+            except Exception:
+                pass
+            page.wait_for_timeout(1200)
+        page.evaluate(
+            """sel => {
+                const a = [...document.querySelectorAll(sel)].find(e => e.getBoundingClientRect().width > 0)
+                          || document.querySelector(sel);
+                if (a) a.click();
+            }""", ENLACE_ACTIVIDADES)
+        page.wait_for_selector(SELECTOR_GRUPOS + ":visible", timeout=espera_ms)
+        return True
+    except Exception:
+        return False
+
+
+def cerrar_sesion(page):
+    """Cierra la sesion de Oracle (menu de usuario -> "Cerrar sesión") para no dejarla ocupando una de las 3
+    que permite Oracle por usuario. True si se llego a la pantalla de entrada. Nunca lanza excepcion.
+    No usar en el Chrome compartido del Mac: ahi la sesion es tambien la de Gustavo."""
+    try:
+        page.locator("button.user-menu:visible").first.click(timeout=8000)
+        page.locator(".item-caption--logout:visible").first.click(timeout=8000)
+        for _ in range(20):
+            page.wait_for_timeout(1000)
+            if page.locator("button.user-menu:visible").count() == 0:
+                print("[consola] sesion de Oracle cerrada", flush=True)
+                return True
+    except Exception as e:
+        print(f"[consola] no se pudo cerrar la sesion: {e.__class__.__name__}", flush=True)
+    return False
+
+
 def entrar_a_consola(page, correo, clave):
     """Login por SSO y abre Actividades (Consola de despacho)."""
     # El navegador del servidor no puede usar llave de acceso / huella, pero
@@ -66,7 +113,8 @@ def entrar_a_consola(page, correo, clave):
     # cancelarla vuelve a pedir el correo (bucle visto en vivo). Se le oculta
     # la API de llaves de acceso (WebAuthn) para que ofrezca la contraseña,
     # igual que haria cualquier navegador sin soporte.
-    page.context.add_init_script(
+    # (en la pagina y no en el contexto: en el Chrome compartido el contexto es tambien el de Gustavo)
+    page.add_init_script(
         "try { delete window.PublicKeyCredential; } catch (e) {}"
         "try { Object.defineProperty(navigator, 'credentials', { get: () => undefined }); } catch (e) {}"
     )
@@ -102,7 +150,7 @@ def entrar_a_consola(page, correo, clave):
     # primero esta escondido, y el enlace es a.global-navigation-item--activities
     # (no depende del idioma).
     enlace = "a.global-navigation-item--activities"
-    page.wait_for_selector("button[aria-label='Menú']:visible, button[aria-label='Menu']:visible, "
+    page.wait_for_selector(BOTON_MENU + ", "
                            + enlace + ":visible, " + SELECTOR_GRUPOS + ":visible", timeout=90000)
     # Dejar que "Mi ruta" termine de cargar: un clic demasiado pronto se ignora
     # (visto en vivo 2026-10-16: se quedo en "Lista de actividades").
@@ -118,7 +166,7 @@ def entrar_a_consola(page, correo, clave):
             break
         print(f"[consola] abriendo Actividades (intento {intento})")
         if page.locator(enlace + ":visible").count() == 0:
-            boton_menu = page.locator("button[aria-label='Menú']:visible, button[aria-label='Menu']:visible").first
+            boton_menu = page.locator(BOTON_MENU).first
             try:
                 boton_menu.click(timeout=5000)
             except Exception:

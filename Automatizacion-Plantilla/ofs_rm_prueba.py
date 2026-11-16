@@ -163,7 +163,7 @@ def _reanudar_si_corte(page):
 # Sesion de Oracle caida a mitad de lectura (visto 2026-11-13: 288 fallos seguidos durante 1 h 20 min
 # porque la consola dejo de mostrar el buscador): se vuelve a entrar en la misma pagina y se sigue.
 FALLOS_PARA_REENTRAR = 3
-MAX_REENTRADAS = 2
+MAX_REENTRADAS = 4
 _fallos_seguidos = 0
 _reentradas = 0
 
@@ -196,6 +196,12 @@ def _reentrar(page, motivo):
         print("[rm] de nuevo dentro de la consola", flush=True)
         return True
     except Exception as e:
+        try:
+            if page.locator(BOTON_BUSCADOR + ":visible, " + CAMPO_BUSCADOR + ":visible").count() > 0:
+                print("[rm] dentro de Oracle (con el buscador, sin abrir Actividades): se sigue", flush=True)
+                return True
+        except Exception:
+            pass
         print(f"[rm] no se pudo volver a entrar: {e.__class__.__name__}: {e}", flush=True)
         registrar_error("ofs_rm_prueba", f"no se pudo volver a entrar en la consola: {e}")
         return False
@@ -303,6 +309,8 @@ def _abrir_pestanas(page, cuantas):
         pg = None
         try:
             pg = page.context.new_page()
+            if page.viewport_size:
+                pg.set_viewport_size(page.viewport_size)
             pg.goto(consola_sso.URL_CONSOLA, wait_until="domcontentloaded")
             pg.wait_for_selector(BOTON_BUSCADOR + ":visible, " + CAMPO_BUSCADOR + ":visible", timeout=60000)
             pg.wait_for_timeout(3000)

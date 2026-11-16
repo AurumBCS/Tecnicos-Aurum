@@ -27,6 +27,7 @@ import urllib.request
 from datetime import date, timedelta
 from pathlib import Path
 
+import chrome_compartido
 import consola_sso
 import ofs_rm_prueba
 import ruta_sugerencias
@@ -53,7 +54,7 @@ def leer(fecha_iso, grupo=""):
     parcial = CARPETA / f"parcial_{fecha_iso}_{grupo or 'todos'}.json"
     hechas = {d["numero"]: d for d in json.loads(parcial.read_text(encoding="utf-8")) if d.get("ficha")} if parcial.exists() else {}
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
+        browser = chrome_compartido.lanzar(p)
         ctx, page, _ = _entrar(browser, correo, clave)
         try:
             csvs = [c for c in consola_sso.descargar_csv_grupos(page, fecha_iso) if grupo.lower() in c[0].lower()]
@@ -76,6 +77,8 @@ def leer(fecha_iso, grupo=""):
             parcial.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
             ctx.storage_state(path=str(SESION_MAC))
         finally:
+            if not getattr(browser, "compartido", False):
+                consola_sso.cerrar_sesion(page)   # con navegador propio no se deja la sesion abierta
             browser.close()
     salida = CARPETA / f"fichas_{fecha_iso}_{grupo or 'todos'}.json"
     salida.write_text(json.dumps(datos, ensure_ascii=False, indent=1), encoding="utf-8")

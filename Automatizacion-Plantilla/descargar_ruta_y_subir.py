@@ -139,6 +139,8 @@ def main(despues=None):
             if despues:
                 despues(page, context, correo, clave)
         finally:
+            # No dejar la sesion abierta: Oracle solo permite 3 por usuario (16/11/2026)
+            consola_sso.cerrar_sesion(page)
             browser.close()
 
 

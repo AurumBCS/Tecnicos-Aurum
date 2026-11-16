@@ -27,6 +27,7 @@ from playwright.sync_api import sync_playwright
 
 import agenda_contactos
 import agenda_vivo
+import chrome_compartido
 import consola_sso
 import ofs_rm_prueba
 import rm_analizar
@@ -47,7 +48,10 @@ def _entrar(browser, correo, clave):
 
     consola_sso.iniciar_sesion_microsoft = con_aviso
     try:
-        if SESION_MAC.exists():
+        # La sesion guardada en fichero ya no se intenta con navegador propio: Oracle no la acepta en otro
+        # navegador y acaba en un cierre de sesion SAML ("Incorrect request"), comprobado el 16/11/2026.
+        # En el Chrome compartido este primer intento es una entrada normal (el perfil ya tiene la sesion).
+        if SESION_MAC.exists() and getattr(browser, "compartido", False):
             ctx = browser.new_context(viewport={"width": 1600, "height": 1000}, storage_state=str(SESION_MAC))
             page = ctx.new_page()
             try:
@@ -148,7 +152,7 @@ def main(manana=False):
     correo, clave = consola_sso.leer_credenciales_sso()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
+        browser = chrome_compartido.lanzar(p)
         ctx = None
         try:
             ctx, page, reutilizada = _entrar(browser, correo, clave)
@@ -188,6 +192,11 @@ def main(manana=False):
                     os.chmod(SESION_MAC, 0o600)
                 except Exception:
                     pass
+                if not getattr(browser, "compartido", False):
+                    try:
+                        consola_sso.cerrar_sesion(page)   # con navegador propio no se deja la sesion abierta
+                    except Exception:
+                        pass
             browser.close()
 
     minutos = round((datetime.now() - inicio).total_seconds() / 60)

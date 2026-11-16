@@ -133,22 +133,22 @@ def main():
         print(f"[vivo] fuera de horario ({ahora:%a %H:%M}): no se hace nada")
         return
     hoy = ahora.date().isoformat()
-    ruta = CARPETA_BASE / "sesion_consola.json"
-    _sesion(ruta)
+    # Entrada nueva en cada pasada y "Cerrar sesión" al acabar (16/11/2026). La sesion guardada en S3 nunca
+    # llego a funcionar (sin permiso en el bucket) y Oracle tampoco acepta una sesion copiada a otro navegador:
+    # cada pasada abria una sesion nueva y la dejaba abierta, 33 al dia, y Oracle (3 por usuario) echaba a las
+    # tareas del Mac a mitad de lectura.
     correo, clave = consola_sso.leer_credenciales_sso()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=LAUNCH_ARGS)
+        page = None
         try:
-            context = browser.new_context(viewport={"width": 1600, "height": 1000},
-                                          storage_state=str(ruta) if ruta.exists() else None)
-            page = context.new_page()
+            page = browser.new_context(viewport={"width": 1600, "height": 1000}).new_page()
             consola_sso.entrar_a_consola(page, correo, clave)
             csvs = consola_sso.descargar_csv_grupos(page, hoy)
-            context.storage_state(path=str(ruta))
-            os.chmod(ruta, 0o600)
         finally:
+            if page is not None:
+                consola_sso.cerrar_sesion(page)
             browser.close()
-    _sesion(ruta, subir=True)
     est = estados(csvs)
     if len(csvs) < 10 or len(est) < 100:
         raise RuntimeError(f"descarga incompleta de la consola: {len(csvs)} grupos, {len(est)} mantenimientos")
