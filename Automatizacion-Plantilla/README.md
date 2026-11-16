@@ -203,7 +203,7 @@ uno por cada fila (región eu-south-2):
 | Nombre | Cron (UTC no — usa el campo Timezone) | Timezone | Input |
 |---|---|---|---|
 | `ofs-manana` | `cron(30 7 ? * MON-SAT *)` | `Europe/Madrid` | `{"tarea": "manana"}` |
-| `ofs-mediodia` | `cron(0 14 ? * MON-SAT *)` | `Europe/Madrid` | `{"tarea": "mediodia"}` |
+| `ofs-mediodia` | `cron(0 16 ? * MON-FRI *)` (desde el 13/11/2026; antes a las 14:00) | `Europe/Madrid` | `{"tarea": "mediodia"}` |
 | `ofs-tarde` | `cron(30 17 ? * MON-SAT *)` | `Europe/Madrid` | `{"tarea": "tarde"}` |
 
 `ofs-manana` vuelve a la hora original que pediste (7:30am) en vez del

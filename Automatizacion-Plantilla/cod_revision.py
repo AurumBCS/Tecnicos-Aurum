@@ -61,15 +61,19 @@ def leer(fecha_iso, grupo=""):
             print(f"[cod] {len(filas)} mantenimientos el {fecha_iso} ({grupo or 'todos'})", flush=True)
             if hechas:
                 print(f"[cod] {len(hechas)} ya leidos en el intento anterior", flush=True)
-            for i, f in enumerate(filas, 1):
-                if f["numero"] in hechas:
-                    datos.append(hechas[f["numero"]])
-                    continue
-                ficha = ofs_rm_prueba._leer(page, f["numero"], capturas, errores)
-                datos.append(dict(f, ficha=ficha if isinstance(ficha, dict) else None))
-                if i % 10 == 0:
-                    print(f"[cod] {i}/{len(filas)}", flush=True)
-                    parcial.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
+            def _datos(res):
+                return [hechas[f["numero"]] if f["numero"] in hechas
+                        else dict(f, ficha=res[f["numero"]] if isinstance(res.get(f["numero"]), dict) else None)
+                        for f in filas if f["numero"] in hechas or f["numero"] in res]
+
+            def _avance(res):
+                print(f"[cod] {len(hechas) + len(res)}/{len(filas)}", flush=True)
+                parcial.write_text(json.dumps(_datos(res), ensure_ascii=False), encoding="utf-8")
+
+            res = ofs_rm_prueba.leer_varias(page, [f["numero"] for f in filas if f["numero"] not in hechas],
+                                            capturas, errores, cada=_avance)
+            datos = _datos(res)
+            parcial.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
             ctx.storage_state(path=str(SESION_MAC))
         finally:
             browser.close()

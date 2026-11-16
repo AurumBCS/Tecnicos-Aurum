@@ -114,15 +114,16 @@ def _proxima_ruta(page, fechas_iso, errores, capturas, reutilizar=False):
             ya.update(_fichas_ya_leidas(f))
     nuevas = [f for f in filas if f["numero"] not in ya]
     print(f"[mac] ruta {', '.join(fechas_iso)}: {len(filas)} mantenimientos, {len(nuevas)} por leer")
+    res = ofs_rm_prueba.leer_varias(
+        page, [f["numero"] for f in nuevas], capturas, errores,
+        cada=lambda r: len(r) % 50 < 10 and print(f"[mac] {len(r)}/{len(nuevas)}", flush=True))
     datos = []
-    for i, f in enumerate(filas, 1):
+    for f in filas:
         ficha = ya.get(f["numero"])
         if ficha is None:
-            ficha = ofs_rm_prueba._leer(page, f["numero"], capturas, errores)
+            ficha = res.get(f["numero"])
             ficha = ficha if isinstance(ficha, dict) else None
         datos.append(dict(f, ficha=ficha))
-        if i % 50 == 0:
-            print(f"[mac] {i}/{len(filas)}")
     ruta_sugerencias.CARPETA_SALIDA.mkdir(parents=True, exist_ok=True)
     sufijo = "manana" if reutilizar else "todos"
     (ruta_sugerencias.CARPETA_SALIDA / f"ruta_{'_'.join(fechas_iso)}_{sufijo}.json").write_text(

@@ -160,24 +160,213 @@ def _reanudar_si_corte(page):
     return True
 
 
+# Sesion de Oracle caida a mitad de lectura (visto 2026-11-13: 288 fallos seguidos durante 1 h 20 min
+# porque la consola dejo de mostrar el buscador): se vuelve a entrar en la misma pagina y se sigue.
+FALLOS_PARA_REENTRAR = 3
+MAX_REENTRADAS = 2
+_fallos_seguidos = 0
+_reentradas = 0
+
+
+def _sesion_caida(page):
+    """True si la pagina ya no es la consola: pantalla de entrada de Oracle o de Microsoft."""
+    try:
+        from comun_ofs import es_pagina_microsoft
+        if es_pagina_microsoft(page):
+            return True
+        if page.get_by_text("Sign in with SSO").count() > 0:
+            return True
+        return page.locator(BOTON_BUSCADOR).count() == 0 and page.locator(CAMPO_BUSCADOR).count() == 0
+    except Exception:
+        return False
+
+
+def _reentrar(page, motivo):
+    """Vuelve a entrar en la consola con la misma pagina. True si se pudo."""
+    global _fallos_seguidos, _reentradas
+    if _reentradas >= MAX_REENTRADAS:
+        return False
+    _reentradas += 1
+    _fallos_seguidos = 0
+    print(f"[rm] sesion de Oracle caida ({motivo}): se vuelve a entrar ({_reentradas}/{MAX_REENTRADAS})", flush=True)
+    try:
+        import consola_sso
+        correo, clave = consola_sso.leer_credenciales_sso()
+        consola_sso.entrar_a_consola(page, correo, clave)
+        print("[rm] de nuevo dentro de la consola", flush=True)
+        return True
+    except Exception as e:
+        print(f"[rm] no se pudo volver a entrar: {e.__class__.__name__}: {e}", flush=True)
+        registrar_error("ofs_rm_prueba", f"no se pudo volver a entrar en la consola: {e}")
+        return False
+
+
 def _leer(page, numero, capturas, errores, reintento=True):
     """Ficha filtrada, "no visible" si no sale en la busqueda, o None si fallo."""
+    global _fallos_seguidos
     try:
         ficha = _buscar_mantenimiento(page, numero, capturas)
+        _fallos_seguidos = 0
         print(f"[rm] {numero}: ficha leida")
         return ficha
     except NoVisible:
         # Sin internet la busqueda tampoco encuentra nada: no confundirlo con "otra empresa"
         if reintento and _reanudar_si_corte(page):
             return _leer(page, numero, capturas, errores, reintento=False)
+        if _sesion_caida(page):
+            # Con la sesion caida nada sale en la busqueda: no es "otra empresa"
+            if reintento and _reentrar(page, "pantalla de entrada"):
+                return _leer(page, numero, capturas, errores, reintento=False)
+            errores.append(f"{numero}: sesion de Oracle caida")
+            return None
         print(f"[rm] {numero}: no sale en la busqueda (otra empresa)")
         return "no visible"
     except Exception as e:
         if reintento and _reanudar_si_corte(page):
             return _leer(page, numero, capturas, errores, reintento=False)
+        _fallos_seguidos += 1
+        if reintento:
+            motivo = "pantalla de entrada" if _sesion_caida(page) else (
+                f"{_fallos_seguidos} fallos seguidos" if _fallos_seguidos >= FALLOS_PARA_REENTRAR else "")
+            if motivo and _reentrar(page, motivo):
+                return _leer(page, numero, capturas, errores, reintento=False)
         errores.append(f"{numero}: {e}")
         registrar_error("ofs_rm_prueba", f"{numero}: {e}")
         return None
+
+
+def _buscar_lote(paginas, numeros, capturas):
+    """Una ficha por pestaña, todas a la vez: se lanza la busqueda en cada pestaña y despues se recogen,
+    asi las esperas de Oracle se solapan. Devuelve una lista con la ficha (dict) o None por cada numero;
+    lo que queda en None lo relee despues la pagina principal con _leer (que distingue "otra empresa",
+    cortes de internet y sesion caida)."""
+    n = len(numeros)
+    vivo = [True] * n
+    campos = [None] * n
+    for i in range(n):
+        try:
+            pg = paginas[i]
+            campo = pg.locator(CAMPO_BUSCADOR + ":visible").first
+            if not campo.count():
+                pg.locator(BOTON_BUSCADOR + ":visible").first.click(timeout=15000)
+                campo = pg.locator(CAMPO_BUSCADOR + ":visible").first
+            campo.wait_for(timeout=10000)
+            campo.click()
+            campo.fill("")
+            campo.type(numeros[i], delay=60)
+            campo.press("Enter")
+            campos[i] = campo
+        except Exception:
+            vivo[i] = False
+    for i in range(n):
+        if not vivo[i]:
+            continue
+        try:
+            r = paginas[i].locator(RESULTADO + ":visible", has_text=f"Mto:{numeros[i]}").first
+            r.wait_for(timeout=20000)
+            r.click()
+        except Exception:
+            vivo[i] = False
+            try:
+                campos[i].fill("")
+                paginas[i].keyboard.press("Escape")
+            except Exception:
+                pass
+    for i in range(n):
+        if not vivo[i]:
+            continue
+        try:
+            paginas[i].wait_for_function(
+                "n => document.body.innerText.includes('DETALLES MANTENIMIENTO')"
+                " && document.body.innerText.includes('Número de Mantenimiento\\n' + n)",
+                arg=numeros[i], timeout=20000)
+        except Exception:
+            pass
+    if any(vivo):
+        paginas[0].wait_for_timeout(1000)
+    fichas = [None] * n
+    for i in range(n):
+        if not vivo[i]:
+            continue
+        ficha = ficha_ofs.extraer_ficha(_texto(paginas[i]))
+        if ficha and ficha.get("numero") == numeros[i]:
+            fichas[i] = ficha
+    return fichas
+
+
+def _abrir_pestanas(page, cuantas):
+    """Pestañas extra en el MISMO navegador y contexto (misma sesion de Oracle, como un usuario con varias
+    pestañas). Con otro navegador y las cookies copiadas Oracle tira la sesion (probado 2026-11-16)."""
+    import consola_sso
+    extras = []
+    for _ in range(cuantas):
+        pg = None
+        try:
+            pg = page.context.new_page()
+            pg.goto(consola_sso.URL_CONSOLA, wait_until="domcontentloaded")
+            pg.wait_for_selector(BOTON_BUSCADOR + ":visible, " + CAMPO_BUSCADOR + ":visible", timeout=60000)
+            pg.wait_for_timeout(3000)
+            extras.append(pg)
+        except Exception as e:
+            print(f"[rm] no se pudo abrir otra pestaña ({e.__class__.__name__})", flush=True)
+            try:
+                pg and pg.close()
+            except Exception:
+                pass
+            break
+    return extras
+
+
+def leer_varias(page, numeros, capturas, errores, cada=None, hilos=None):
+    """Lee muchas fichas con varias pestañas a la vez en la misma sesion de Oracle.
+    Devuelve {numero: ficha | "no visible" | None}. cada(resultados) se llama cada 10 fichas o mas
+    (avance, guardado parcial). FICHAS_HILOS=1 lo deja como antes, de una en una (asi va en la Lambda)."""
+    if hilos is None:
+        hilos = int(os.environ.get("FICHAS_HILOS") or (1 if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else 3))
+    pendientes = list(dict.fromkeys(numeros))
+    resultados, extras, avisado, lotes_malos = {}, [], 0, 0
+    if hilos > 1 and len(pendientes) >= 20:
+        extras = _abrir_pestanas(page, hilos - 1)
+        if extras:
+            print(f"[rm] {len(pendientes)} fichas con {1 + len(extras)} pestañas en la misma sesion", flush=True)
+    try:
+        while pendientes:
+            if extras:
+                lote, pendientes = pendientes[:1 + len(extras)], pendientes[1 + len(extras):]
+                try:
+                    fichas = _buscar_lote([page] + extras, lote, capturas)
+                except Exception:
+                    fichas = [None] * len(lote)
+                antes = _reentradas
+                for numero, ficha in zip(lote, fichas):
+                    if isinstance(ficha, dict):
+                        print(f"[rm] {numero}: ficha leida")
+                        resultados[numero] = ficha
+                    else:
+                        resultados[numero] = _leer(page, numero, capturas, errores)
+                # Si casi nada sale en paralelo (o hubo que reentrar), se sigue de una en una
+                lotes_malos = lotes_malos + 1 if sum(isinstance(f, dict) for f in fichas) <= len(lote) // 2 else 0
+                if lotes_malos >= 3 or _reentradas != antes:
+                    print("[rm] las pestañas extra no van bien: se sigue de una en una", flush=True)
+                    for pg in extras:
+                        try:
+                            pg.close()
+                        except Exception:
+                            pass
+                    extras = []
+            else:
+                numero = pendientes.pop(0)
+                resultados[numero] = _leer(page, numero, capturas, errores)
+            if cada and len(resultados) - avisado >= 10:
+                avisado = len(resultados)
+                cada(dict(resultados))
+    finally:
+        for pg in extras:
+            try:
+                pg.close()
+            except Exception:
+                pass
+    return resultados
 
 
 def main(parejas=None):

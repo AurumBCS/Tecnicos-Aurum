@@ -5,7 +5,7 @@ correr, replicando el mismo dispatch que ya tenia
 .github/workflows/ofs-automation.yml segun github.event.schedule.
 
 Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
-  {"tarea": "mediodia"}  -> 14:00, ruta del dia siguiente
+  {"tarea": "mediodia"}  -> 16:00 (desde el 13/11/2026; antes 14:00), ruta del dia siguiente
   {"tarea": "tarde"}     -> 17:30, ruta del dia siguiente; martes y jueves, ademas, analisis de las RM
                             nuevas del mes con la misma sesion (ver rm_analizar.tras_ruta)
   {"tarea": "ov_prueba"} -> prueba de entrada a la app OV de inventario (manual, sin horario)
@@ -164,7 +164,7 @@ def handler(event, context):
 
         _correr(lambda: forms_upselling.main(context), "forms_upselling")
     else:
-        # "mediodia" (14:00) y "tarde" (17:30) hacen lo mismo: descargar la ruta
+        # "mediodia" (16:00) y "tarde" (17:50) hacen lo mismo: descargar la ruta
         # del dia siguiente y subirla a confirmaciones-sms. La tarde de martes y
         # jueves (dias del Excel de RM) aprovecha la misma sesion de Oracle para
         # analizar las RM nuevas del mes, si ya llego el correo.
