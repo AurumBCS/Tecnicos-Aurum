@@ -142,6 +142,9 @@
       background: rgba(201,168,76,.14); color: var(--gold2); border: 1px solid rgba(201,168,76,.4);
       flex: 1; padding: 9px; font-size: .74rem; text-decoration: none;
     }
+    .caja-nopuede { background: rgba(192,57,43,.07); border: 1px solid rgba(192,57,43,.35); border-radius: 9px; padding: 9px 10px; margin-top: 8px; }
+    .caja-nopuede .caja-titulo { font-size: .72rem; color: var(--red2); font-weight: 600; margin-bottom: 6px; }
+    .caja-nopuede .caja-texto { font-size: .8rem; line-height: 1.45; margin-bottom: 8px; user-select: text; -webkit-user-select: text; }
     .aviso-llamar {
       background: rgba(212,131,26,.1); border: 1px solid rgba(212,131,26,.35); color: #e0a050;
       border-radius: 9px; padding: 8px 10px; font-size: .76rem; line-height: 1.4; margin-bottom: 8px;
@@ -211,7 +214,7 @@
 
 <div id="toast"></div>
 
-<script src="mensaje-wa.js?v=20261116"></script>
+<script src="mensaje-wa.js?v=20261117"></script>
 <script>
   let citas = [];
   let refreshTimer = null;
@@ -330,6 +333,7 @@
           <button class="btn btn-yes" onclick="marcar(${c.id},'confirmado')">✅ Sí</button>
           <button class="btn btn-no" onclick="marcar(${c.id},'no_confirmado')">❌ No</button>
         </div>
+        ${c.status === 'no_confirmado' ? cajaNoPuede(c) : ''}
         ${sinWa ? '' : `<div class="card-actions">
           <button class="btn btn-sec" onclick="sinWhatsApp(${c.id})">📵 No tiene WhatsApp</button>
           <a class="btn btn-sec" href="tel:+34${tel}">📞 Llamar</a>
