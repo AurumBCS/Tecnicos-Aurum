@@ -17,7 +17,7 @@ const { spawn, execSync } = require('child_process');
 const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
-const VERSION = '2026.11.13b';
+const VERSION = '2026.11.17a';
 const RENDER = (process.env.RENDER_URL || 'https://tecnicos-aurum.onrender.com').replace(/\/$/, '');
 const PORT = Number(process.env.PORT || 3131);
 const ES_WIN = process.platform === 'win32';
@@ -88,9 +88,17 @@ const PLANTILLAS_DEF = {
     '¡Muchas gracias!',
   porTipo: {},
   respuestaSi: '¡Perfecto, muchas gracias por confirmar! ✅\n\nNos vemos {cuando} en el horario de *{tramo}h*. 😊',
-  respuestaNo: 'Entendido, gracias por avisar.\n\nTe llamaremos para buscar otro momento para la visita. 🙏'
+  // Texto de Gustavo (17/11/2026), el mismo que sale en la web al marcar "No" (mensaje-wa.js)
+  respuestaNo: 'Gracias por su respuesta, en caso de no poder atender su cita, llame al 910121122 ' +
+    'para concretar nueva fecha y hora con uno de nuestros agentes.\n\nFeliz tarde.'
 };
-function plantillas() { return { ...PLANTILLAS_DEF, ...leer(F_PLANTILLAS, {}) }; }
+// Respuesta al NO de antes del 17/11: quien guardó las plantillas sin cambiarla pasa a la nueva
+const RESPUESTA_NO_ANTIGUA = 'Entendido, gracias por avisar.\n\nTe llamaremos para buscar otro momento para la visita. 🙏';
+function plantillas() {
+  const p = { ...PLANTILLAS_DEF, ...leer(F_PLANTILLAS, {}) };
+  if (p.respuestaNo === RESPUESTA_NO_ANTIGUA) p.respuestaNo = PLANTILLAS_DEF.respuestaNo;
+  return p;
+}
 function cuando(fecha) {
   const m = String(fecha || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (!m) return fecha ? 'el ' + fecha : 'pronto';
