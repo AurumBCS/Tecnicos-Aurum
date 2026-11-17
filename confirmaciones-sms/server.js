@@ -1312,6 +1312,9 @@ iniciarPersistencia();
 setInterval(purgarYGuardar, 60 * 60 * 1000);
 programarLimpiezaMedianoche();
 
+// ── Avisos push a técnicos y JE (ver push.js) ──
+require('./push').montar(app, { verificarDNI: verificarDNIConRecarga, registrarUso });
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, (err) => {
   if (err) {

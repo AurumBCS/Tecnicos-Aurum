@@ -1,6 +1,9 @@
 # Node (confirmaciones-sms)
 node_modules/
 confirmaciones-sms/sesion.json
+confirmaciones-sms/push_altas.json
+confirmaciones-sms/push_enviados.json
+confirmaciones-sms/push_vapid.json
 
 # Automatizacion-Plantilla (Python/Playwright) — nunca commitear sesiones ni salidas
 Automatizacion-Plantilla/sesion_ofs_*.json

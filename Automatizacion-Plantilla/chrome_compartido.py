@@ -101,6 +101,13 @@ class _Navegador:
         self._b = browser
         self._ctx = browser.contexts[0]
         self._paginas = []
+        # Pestañas muertas de Oracle ("The application could not load") que hayan quedado de otra ejecucion
+        for pg in list(self._ctx.pages):
+            try:
+                if pg.title().startswith("The application could not load"):
+                    pg.close()
+            except Exception:
+                pass
 
     def new_context(self, **_):
         return _Contexto(self)

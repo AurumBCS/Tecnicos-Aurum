@@ -65,6 +65,28 @@ BOTON_MENU = "button[aria-label^='Menú']:visible, button[aria-label^='Menu']:vi
 ENLACE_ACTIVIDADES = "a.global-navigation-item--activities"
 
 
+def _recargar_si_no_cargo(page, veces=3):
+    """Oracle a veces responde "The application could not load" al abrir la consola (visto 2026-11-16, una de
+    cada dos cargas en el Chrome compartido). Recarga hasta que entre. True si hubo que recargar."""
+    hubo = False
+    for _ in range(veces):
+        try:
+            # (por el titulo: el texto del aviso esta siempre en la pagina, oculto)
+            if not page.title().startswith("The application could not load"):
+                break
+        except Exception:
+            break
+        hubo = True
+        print("[consola] la consola no cargo: se recarga", flush=True)
+        page.wait_for_timeout(3000)
+        try:
+            page.goto(URL_CONSOLA, wait_until="domcontentloaded")
+        except Exception:
+            pass
+        page.wait_for_timeout(4000)
+    return hubo
+
+
 def volver_a_actividades(page, espera_ms=20000):
     """Deja la consola en Actividades (la pantalla de los tecnicos). True si se ve el arbol de grupos.
     Se usa al terminar una tarea en el Chrome compartido, para que Gustavo no se encuentre la ultima ficha."""
@@ -83,10 +105,21 @@ def volver_a_actividades(page, espera_ms=20000):
                           || document.querySelector(sel);
                 if (a) a.click();
             }""", ENLACE_ACTIVIDADES)
-        page.wait_for_selector(SELECTOR_GRUPOS + ":visible", timeout=espera_ms)
+        page.wait_for_selector(SELECTOR_GRUPOS + ":visible", timeout=min(espera_ms, 8000))
         return True
     except Exception:
-        return False
+        pass
+    # Con una ficha abierta el menu no cambia de pantalla (visto 2026-11-16): la ficha esta "encima" de la
+    # consola en el historial de la pagina, y con Atras se vuelve a ella.
+    for _ in range(3):
+        try:
+            page.go_back(wait_until="domcontentloaded", timeout=15000)
+            page.wait_for_selector(SELECTOR_GRUPOS + ":visible", timeout=8000)
+            return True
+        except Exception:
+            if page.locator(SELECTOR_GRUPOS + ":visible").count() > 0:
+                return True
+    return False
 
 
 def cerrar_sesion(page):
@@ -115,11 +148,16 @@ def entrar_a_consola(page, correo, clave):
     # igual que haria cualquier navegador sin soporte.
     # (en la pagina y no en el contexto: en el Chrome compartido el contexto es tambien el de Gustavo)
     page.add_init_script(
+        # Solo en las paginas de Microsoft: aplicado tambien a Oracle, la consola no carga ("The application
+        # could not load") cuando arranca en "Detalles de actividad" (visto 2026-11-16).
+        "if (/(microsoftonline|microsoft|live)\\.com$/.test(location.hostname)) {"
         "try { delete window.PublicKeyCredential; } catch (e) {}"
         "try { Object.defineProperty(navigator, 'credentials', { get: () => undefined }); } catch (e) {}"
+        "}"
     )
     page.goto(URL_CONSOLA, wait_until="domcontentloaded")
     page.wait_for_timeout(2000)
+    _recargar_si_no_cargo(page)
 
     if not es_pagina_microsoft(page) and page.locator(SELECTOR_GRUPOS).count() == 0:
         # Con red lenta (internet del movil) el primer clic puede perderse si la pagina aun
@@ -150,8 +188,16 @@ def entrar_a_consola(page, correo, clave):
     # primero esta escondido, y el enlace es a.global-navigation-item--activities
     # (no depende del idioma).
     enlace = "a.global-navigation-item--activities"
-    page.wait_for_selector(BOTON_MENU + ", "
-                           + enlace + ":visible, " + SELECTOR_GRUPOS + ":visible", timeout=90000)
+    listo = (BOTON_MENU + ", " + enlace + ":visible, " + SELECTOR_GRUPOS + ":visible")
+    for intento in range(3):
+        try:
+            page.wait_for_selector(listo, timeout=30000)
+            break
+        except Exception:
+            # "The application could not load": pasa a veces al cargar la consola; con recargar entra
+            if intento == 2 or not _recargar_si_no_cargo(page):
+                if intento == 2:
+                    raise
     # Dejar que "Mi ruta" termine de cargar: un clic demasiado pronto se ignora
     # (visto en vivo 2026-10-16: se quedo en "Lista de actividades").
     try:
@@ -185,7 +231,10 @@ def entrar_a_consola(page, correo, clave):
             page.wait_for_selector(SELECTOR_GRUPOS + ":visible", timeout=25000)
             break
         except Exception:
-            print(f"[consola] Actividades no se abrio todavia (titulo: {page.title()!r})")
+            # (sin el titulo: en "Detalles de actividad" lleva el nombre del tecnico o del cliente)
+            print(f"[consola] Actividades no se abrio todavia (pantalla: {page.title().split('.')[0][:30]!r})")
+            if volver_a_actividades(page, espera_ms=8000):
+                break
     # Ultimo recurso: para descargar solo hacen falta los identificadores de los
     # grupos, que estan en la pagina aunque el panel no se vea.
     page.wait_for_selector(SELECTOR_GRUPOS, state="attached", timeout=30000)

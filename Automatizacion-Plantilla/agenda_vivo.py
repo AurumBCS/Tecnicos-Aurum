@@ -105,6 +105,99 @@ def estados(csvs):
     return out
 
 
+# ── Avisos push (17/11/2026) ─────────────────────────────────────────────────
+# Con los estados de cada pasada se deciden los avisos y se mandan a Render (confirmaciones-sms/push.js),
+# que los entrega a quien los tenga activados en la app y no repite ninguno en el día:
+#  - técnico: mantenimiento Iniciado que tiene sugerencias de RM (las de la ruta, ?type=ruta-sugerencias);
+#  - JE: mantenimiento Pendiente de su equipo en riesgo (Oracle prevé empezar después del fin de la franja)
+#    o fuera de franja (ya pasó el fin y sigue sin empezar). Mismo criterio que "Cumplimiento de hoy".
+# Sin datos de clientes. Si algo falla aquí, el Cumplimiento en vivo sigue igual.
+PUSH_URL = os.environ.get("PUSH_URL", "https://tecnicos-aurum.onrender.com/push/avisos")
+# Prueba con Gustavo (17/11/2026): los avisos del equipo de 302154 (que lleva él) le llegan también a GD5381
+PUSH_COPIAS = {"302154": "GD5381"}
+
+
+def sugerencias_rm(dia_iso):
+    """{numero: (alertas, hacer)} de los mantenimientos de ese día con alertas de RM."""
+    url = _url() + "?type=ruta-sugerencias&token=" + os.environ["RECUENTOS_APP_TOKEN"].strip()
+    with urllib.request.urlopen(url, timeout=120) as r:
+        filas = csv.DictReader(io.StringIO(r.read().decode()))
+        return {f["numero"].strip(): (f.get("alertas") or "", f.get("hacer") or "")
+                for f in filas if f.get("fecha") == dia_iso and (f.get("alertas") or "").strip()}
+
+
+def _franja(ts):
+    import re
+    m = re.search(r"(\d{1,2})\D+(\d{1,2})", str(ts or ""))
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def _min(h):
+    import re
+    m = re.match(r"^(\d{1,2}):(\d{2})", str(h or ""))
+    return int(m.group(1)) * 60 + int(m.group(2)) if m else None
+
+
+def _corta(texto, n):
+    partes = [p.strip() for p in str(texto or "").split("||") if p.strip()]
+    t = "; ".join(partes[:2]) + (f" (+{len(partes) - 2})" if len(partes) > 2 else "")
+    return t if len(t) <= n else t[:n - 1] + "…"
+
+
+def avisos(csvs, gente, sugerencias, ahora):
+    """Lista de avisos [{mat, id, titulo, cuerpo}] para esta pasada."""
+    out = []
+    ahora_min = ahora.hour * 60 + ahora.minute
+    for n, r in _filas(csvs):
+        e = ESTADOS.get(str(r.get("Estado TOA") or "").strip(), "?")
+        mat = str(r.get("Técnico") or "").strip().upper()
+        tipo = str(r.get("Tipo de Actividad") or "").strip()
+        ts = str(r.get("Timeslot") or r.get("Ventana de Servicio") or "").strip()
+        if not mat:
+            continue
+        g = gente.get(mat) or {}
+        je = str(g.get("JDE") or "").strip().upper()
+        nombre = f"{g.get('Nombre(S)', '')} {g.get('Apellidos(S)', '')}".strip() or mat
+        copia = PUSH_COPIAS.get(je)
+        if e == "I" and n in sugerencias:
+            alertas, hacer = sugerencias[n]
+            out.append({"mat": mat, "id": "rm:" + n, "titulo": f"⚠️ Riesgo de RM · {tipo or 'Mto'} {n}",
+                        "cuerpo": _corta(alertas, 140).rstrip(".") + (f". Revisa: {_corta(hacer, 140)}" if hacer.strip() else "")})
+            if copia:
+                out.append(dict(out[-1], mat=copia, id="copia-rm:" + n, titulo=f"⚠️ RM · {nombre} · {tipo or 'Mto'} {n}"))
+        f = _franja(ts)
+        if e != "P" or not f or not je:
+            continue
+        ini = _min(str(r.get("Hora de Inicio") or "")[:5])
+        antes = len(out)
+        if ahora_min >= f[1] * 60:
+            out.append({"mat": je, "id": "fuera:" + n, "titulo": f"🔴 Fuera de franja · {nombre}",
+                        "cuerpo": f"{tipo or 'Mto'} {n}, franja {f[0]}-{f[1]}h, sin empezar a las {ahora:%H:%M}."})
+        elif ini is not None and ini >= f[1] * 60:
+            out.append({"mat": je, "id": "riesgo:" + n, "titulo": f"🟠 En riesgo · {nombre}",
+                        "cuerpo": f"{tipo or 'Mto'} {n}, franja {f[0]}-{f[1]}h: Oracle prevé empezar a las {str(r.get('Hora de Inicio'))[:5]}."})
+        if copia and len(out) > antes:
+            out.append(dict(out[-1], mat=copia, id="copia-" + out[-1]["id"]))
+    return out
+
+
+def _vapid():
+    """Clave privada de los avisos, derivada de RECUENTOS_KEY (ver confirmaciones-sms/push.js)."""
+    import base64
+    import hashlib
+    d = hashlib.sha256(("aurum-vapid|" + _clave()).encode()).digest()
+    return base64.urlsafe_b64encode(d).decode().rstrip("=")
+
+
+def enviar_avisos(lista):
+    # Se llama aunque no haya avisos: así Render recupera la clave tras un redespliegue y no se duerme
+    req = urllib.request.Request(PUSH_URL, data=json.dumps({"key": _clave(), "vapid": _vapid(), "avisos": lista}).encode(),
+                                 headers={"Content-Type": "application/json"})
+    # Render gratis se duerme: la primera petición puede tardar ~1 min en despertarlo
+    with urllib.request.urlopen(req, timeout=90) as r:
+        return json.loads(r.read().decode())
+
+
 def _sesion(ruta, subir=False):
     """Sesión de la consola guardada en S3 (como la de la app OV), para no entrar con Microsoft cada 20 min."""
     from ov_comun import _s3
@@ -155,6 +248,14 @@ def main():
     hora = datetime.now(TZ).strftime("%H:%M")
     res = _post("agenda-vivo", {"key": _clave(), "dia": hoy, "hora": hora, "estados": est})
     print(f"[vivo] {hoy} {hora}: {res.get('guardados')} estados subidos")
+    try:
+        lista = avisos(csvs, cuadrante(), sugerencias_rm(hoy), ahora)
+        r = enviar_avisos(lista)
+        print(f"[vivo] avisos: {len(lista)} posibles; {r.get('entregados', 0)} entregados, "
+              f"{r.get('repetidos', 0)} ya avisados, {r.get('sinAparato', 0)} sin avisos activados"
+              + (f" ({r.get('error')})" if r.get("error") else ""))
+    except Exception as e:
+        print(f"[vivo] avisos no enviados: {type(e).__name__}: {e}")
     # Si a las 8:00 el Mac no pudo subir la lista, la sube la primera pasada de la mañana
     if not res.get("lista_hoy") and ahora.hour < 9:
         lista = lista_8(csvs, cuadrante())

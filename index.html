@@ -501,6 +501,7 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
     <div style="display:flex;gap:6px">
       <button class="topbar-logout" id="btnCargaExcel" onclick="abrirCargaExcel()" style="display:none;color:#0a0a0a;background:linear-gradient(135deg,#7a5c10,#c9a84c,#e8c96a);border:none;font-weight:700">📂 Cargar Excel</button>
       <button class="topbar-logout" id="fichajeBtn" style="color:var(--gold);border-color:var(--gold3);font-weight:700">🕐 Empezar jornada</button>
+      <button class="topbar-logout" id="avisosBtn" style="display:none;color:var(--gold);border-color:var(--gold3)" onclick="abrirAvisos()" aria-label="Avisos" title="Avisos en este aparato">🔕</button>
       <button class="topbar-logout" id="refreshBtn" aria-label="Actualizar datos" title="Actualizar datos" style="color:var(--gold);border-color:var(--gold3)">🔄</button>
       <button class="topbar-logout" id="logoutBtn">Salir</button>
     </div>
@@ -7350,6 +7351,8 @@ async function doLogin(){
 
   recordarAcceso(mat, dni);
   CUMPH_DNI = dni;
+  AVISOS_MAT = mat; AVISOS_DNI = dni;
+  setTimeout(avisosAlEntrar, 1500);
   const found=findUser(mat);
   if(!found){
     document.getElementById('loginError').style.display='block';
@@ -8011,6 +8014,106 @@ async function upsAnular(btn){
   catch(e){ btn.disabled=false; alert('❌ '+e.message); }
 }
 
+// ══════════════════════════════════════════════
+//  AVISOS PUSH (17/11/2026)
+//  Técnico: sugerencias de RM al empezar en Oracle un mantenimiento que las tiene.
+//  JE: citas de su equipo en riesgo de salirse de la franja o ya fuera.
+//  Los decide la Lambda cada 20 min (agenda_vivo.py) y los envía Render (confirmaciones-sms/push.js).
+//  Llegan aunque la app esté cerrada. En iPhone solo con la app añadida a la pantalla de inicio (iOS 16.4+).
+// ══════════════════════════════════════════════
+let AVISOS_MAT = '', AVISOS_DNI = '';
+const AVISOS_URL = SMS_CONFIRMACIONES_URL.replace(/\/$/, '') + '/push/';
+const avisosSoportados = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const esIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent);
+const esAppInstalada = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function avisosB64(b){ const p='='.repeat((4-b.length%4)%4); const r=atob((b+p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from([...r].map(c=>c.charCodeAt(0))); }
+async function avisosPost(ruta, extra){
+  const r = await fetch(AVISOS_URL + ruta, {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(Object.assign({mat: AVISOS_MAT, dni: AVISOS_DNI}, extra||{}))});
+  return r.json();
+}
+async function avisosSuscripcion(){
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+function avisosPintarBoton(activos){
+  const b = document.getElementById('avisosBtn');
+  if(!b) return;
+  b.style.display = AVISOS_MAT ? '' : 'none';
+  b.textContent = activos ? '🔔' : '🔕';
+  b.title = activos ? 'Avisos activados en este aparato' : 'Activar avisos en este aparato';
+}
+// Al entrar: si este aparato ya tenía los avisos, se renueva el alta (el servidor la pierde al redesplegarse)
+async function avisosAlEntrar(){
+  avisosPintarBoton(false);
+  if(!avisosSoportados() || Notification.permission !== 'granted') return;
+  try{
+    const sub = await avisosSuscripcion();
+    if(!sub) return;
+    const d = await avisosPost('alta', {sub: sub.toJSON(), ua: navigator.userAgent.slice(0,40)});
+    avisosPintarBoton(!!d.ok);
+  }catch(e){}
+}
+async function avisosActivar(){
+  if(!avisosSoportados()){
+    alert(esIOS() && !esAppInstalada()
+      ? 'En iPhone los avisos solo funcionan con la app añadida a la pantalla de inicio: en Safari pulsa Compartir → «Añadir a pantalla de inicio», abre la app desde ese icono y vuelve a pulsar 🔕.'
+      : 'Este navegador no admite avisos. Prueba con Chrome, Edge o Safari actualizados.');
+    return false;
+  }
+  const permiso = await Notification.requestPermission();
+  if(permiso !== 'granted'){
+    alert('Sin permiso no se pueden mandar avisos. Si lo has bloqueado, actívalo en los ajustes del navegador para esta página (el candado junto a la dirección).');
+    return false;
+  }
+  const c = await (await fetch(AVISOS_URL + 'clave')).json();
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if(!sub) sub = await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: avisosB64(c.clave)});
+  const d = await avisosPost('alta', {sub: sub.toJSON(), ua: navigator.userAgent.slice(0,40), primera: true});
+  if(!d.ok){ alert('No se pudieron activar los avisos: ' + (d.error||'error')); return false; }
+  avisosPintarBoton(true);
+  return true;
+}
+async function avisosDesactivar(){
+  try{
+    const sub = await avisosSuscripcion();
+    if(sub){ await avisosPost('baja', {sub: sub.toJSON()}); await sub.unsubscribe(); }
+  }catch(e){}
+  avisosPintarBoton(false);
+}
+async function abrirAvisos(){
+  let activos = false;
+  try{ activos = avisosSoportados() && Notification.permission === 'granted' && !!(await avisosSuscripcion()); }catch(e){}
+  const tipo = CURRENT_USER_TYPE === 'tecnico' ? 'tecnico' : 'je';
+  const que = tipo === 'tecnico'
+    ? 'Te avisaremos cuando empieces en Oracle un mantenimiento con <b>sugerencias para evitar RM</b>.'
+    : 'Te avisaremos cuando una cita de tu equipo esté <b>en riesgo de salirse de la franja</b> o ya se haya salido.';
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = `<div style="background:var(--s1,#141414);border:1px solid var(--border2,#333);border-radius:14px;max-width:380px;width:100%;padding:18px;font-family:'Outfit',sans-serif">
+    <div style="font-weight:800;color:var(--gold2);font-size:1rem;margin-bottom:8px">${activos?'🔔 Avisos activados':'🔕 Avisos'}</div>
+    <div style="color:var(--text);font-size:.82rem;line-height:1.5;margin-bottom:6px">${que}</div>
+    <div style="color:var(--muted);font-size:.72rem;line-height:1.5;margin-bottom:14px">Llegan aunque la app esté cerrada. Oracle se revisa cada 20 minutos, así que el aviso puede tardar hasta 20 min. Se activa en cada aparato (móvil, ordenador) por separado.${esIOS()?' En iPhone, solo con la app añadida a la pantalla de inicio.':''}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${activos
+        ? `<button id="avPrueba" class="topbar-logout" style="flex:1;color:var(--gold);border-color:var(--gold3)">Probar aviso</button>
+           <button id="avOff" class="topbar-logout" style="flex:1">Desactivar</button>`
+        : `<button id="avOn" class="topbar-logout" style="flex:1;color:#0a0a0a;background:linear-gradient(135deg,#7a5c10,#c9a84c);border:none;font-weight:800">Activar avisos</button>`}
+      <button id="avCerrar" class="topbar-logout" style="flex:1">Cerrar</button>
+    </div>
+    <div id="avMsg" style="color:var(--muted);font-size:.72rem;margin-top:10px;min-height:1em"></div>
+  </div>`;
+  document.body.appendChild(ov);
+  const msg = t => { const m = ov.querySelector('#avMsg'); if(m) m.textContent = t; };
+  ov.addEventListener('click', e => { if(e.target === ov) ov.remove(); });
+  ov.querySelector('#avCerrar').onclick = () => ov.remove();
+  const on = ov.querySelector('#avOn'), off = ov.querySelector('#avOff'), pr = ov.querySelector('#avPrueba');
+  if(on) on.onclick = async () => { msg('Activando…'); try{ if(await avisosActivar()){ ov.remove(); abrirAvisos(); } else msg(''); }catch(e){ msg('Error: ' + e.message); } };
+  if(off) off.onclick = async () => { await avisosDesactivar(); ov.remove(); };
+  if(pr) pr.onclick = async () => { msg('Enviando…'); try{ const d = await avisosPost('prueba'); msg(d.ok ? '✓ Enviado. Debería salirte el aviso en unos segundos.' : (d.error||'No se pudo enviar')); }catch(e){ msg('Error: ' + e.message); } };
+}
+
 function doLogout(){
   document.getElementById('appScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
@@ -8023,6 +8126,7 @@ function doLogout(){
   CURRENT_USER_TYPE=null; CURRENT_TEC=null; CURRENT_JE_ID=null;
   FICHAJE_ID=null; FICHAJE_NOMBRE=null; FICHAJE_HOY={}; FICHAJE_HOY_CARGADO=false;
   CUMPH_DNI=''; Object.keys(CUMPH_CACHE).forEach(k=>delete CUMPH_CACHE[k]);
+  AVISOS_MAT=''; AVISOS_DNI=''; document.getElementById('avisosBtn').style.display='none';
   CF={mat:'',dni:'',datos:null,filtro:'nofichan',motivo:'',busca:'',cambios:{},hoy:null};
   CF_EDITAR.clear();
   cfCerrarAsistente();
@@ -8096,11 +8200,20 @@ document.addEventListener('keydown', e => {
   if(el && el.matches && el.matches(SEL_CLICABLE)){ e.preventDefault(); el.click(); }
 });
 
-// Auto-logout 5 min
+// Cierre por inactividad: 30 min sin tocar la app, salvo L-V de 8:00 a 19:00 (hora de Madrid), en que la
+// sesión se mantiene abierta toda la jornada (Gustavo, 17/11/2026). A las 19:00 vuelve a contar la inactividad.
 let autoLogout;
+function enJornada(){
+  const a = new Date(new Date().toLocaleString('en-US',{timeZone:'Europe/Madrid'}));
+  return a.getDay() >= 1 && a.getDay() <= 5 && a.getHours() >= 8 && a.getHours() < 19;
+}
 function resetTimer(){
   clearTimeout(autoLogout);
-  autoLogout=setTimeout(()=>{doLogout();alert('Sesión cerrada por inactividad.');},30*60*1000);
+  autoLogout=setTimeout(()=>{
+    if(enJornada()){ resetTimer(); return; }
+    if(document.getElementById('appScreen').style.display==='none') return;
+    doLogout(); alert('Sesión cerrada por inactividad.');
+  },30*60*1000);
 }
 document.addEventListener('click',resetTimer);
 document.addEventListener('touchstart',resetTimer);
