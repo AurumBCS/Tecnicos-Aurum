@@ -312,6 +312,8 @@ def _abrir_pestanas(page, cuantas):
             if page.viewport_size:
                 pg.set_viewport_size(page.viewport_size)
             pg.goto(consola_sso.URL_CONSOLA, wait_until="domcontentloaded")
+            pg.wait_for_timeout(2000)
+            consola_sso._recargar_si_no_cargo(pg)
             pg.wait_for_selector(BOTON_BUSCADOR + ":visible, " + CAMPO_BUSCADOR + ":visible", timeout=60000)
             pg.wait_for_timeout(3000)
             extras.append(pg)
@@ -322,6 +324,13 @@ def _abrir_pestanas(page, cuantas):
             except Exception:
                 pass
             break
+    # En el Chrome sin ventana solo una pestaña tiene el foco y las demas van a medio gas (17/11/2026:
+    # 3,7 s por ficha con 3 pestañas, como con una). Con el foco emulado en todas vuelven a ir a la vez.
+    for pg in [page] + extras:
+        try:
+            pg.context.new_cdp_session(pg).send("Emulation.setFocusEmulationEnabled", {"enabled": True})
+        except Exception:
+            pass
     return extras
 
 

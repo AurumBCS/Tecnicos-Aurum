@@ -1,10 +1,11 @@
 """
-Chrome compartido del Mac para Oracle (16/11/2026): una sola sesion de Oracle para Gustavo y para las tareas.
+Chrome de Oracle de las tareas del Mac (16/11/2026; invisible desde el 17/11): una sola sesion de Oracle
+para todas las tareas, que se conserva entre una y otra. Gustavo usa Oracle en su Chrome normal (otra sesion).
 
 Oracle solo deja 3 sesiones por usuario y tira la sesion si se copia a otro navegador (por eso la "sesion
 guardada" fallaba casi siempre). En vez de abrir un navegador propio en cada tarea, las tareas del Mac se
-conectan a un Chrome normal, con perfil aparte (~/.aurum-chrome-oracle), y abren sus pestañas en el: la
-sesion es la misma que usa Gustavo en esa ventana.
+conectan a un Chrome sin ventana (headless), con perfil aparte (~/.aurum-chrome-oracle), que se queda
+abierto entre tareas, y abren sus pestañas en el: la misma sesion para todas. No se ve nada en pantalla.
 
 Se activa con ORACLE_CHROME=1 (lo pone tarde_mac.sh). Sin la variable, o en la Lambda, o si Chrome no
 arranca, todo sigue como antes (navegador propio sin ventana). Para volver atras: quitar esa linea.
@@ -39,16 +40,55 @@ def _escucha():
         return False
 
 
+def _es_invisible():
+    """True si el Chrome de Oracle que esta abierto es el invisible (headless). El User-Agent del modo
+    headless nuevo ya no lo dice, asi que se mira la linea de comandos del proceso."""
+    try:
+        out = subprocess.run(["ps", "-axo", "command"], capture_output=True, text=True, timeout=10).stdout
+    except Exception:
+        return True   # si no se puede saber, no se toca
+    return any(f"--user-data-dir={PERFIL}" in l and "--headless" in l for l in out.splitlines())
+
+
+def _cerrar_visible():
+    """Cierra el Chrome de Oracle con ventana (el de la prueba del 16/11) para abrirlo invisible.
+    Solo el que usa el perfil de las tareas: el Chrome normal de Gustavo no se toca."""
+    import signal
+    try:
+        out = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True, timeout=10).stdout
+    except Exception:
+        return False
+    for l in out.splitlines():
+        pid, _, cmd = l.strip().partition(" ")
+        if f"--user-data-dir={PERFIL}" in cmd and "--headless" not in cmd and "--type=" not in cmd:
+            try:
+                os.kill(int(pid), signal.SIGTERM)
+            except Exception:
+                pass
+    for _ in range(20):
+        if not _escucha():
+            time.sleep(2)
+            return True
+        time.sleep(1)
+    return False
+
+
 def arrancar():
-    """Abre el Chrome de Oracle si no esta abierto. True si queda escuchando."""
+    """Abre el Chrome de Oracle de las tareas si no esta abierto. True si queda escuchando.
+    Desde el 17/11/2026 es INVISIBLE (sin ventana): Gustavo no quiere ver las tareas y usa Oracle en su
+    Chrome normal, con su propia sesion. Las tareas comparten entre ellas esta sesion (una sola)."""
+    if _escucha() and not _es_invisible():
+        print("[chrome] se cierra el Chrome de Oracle con ventana para abrirlo invisible", flush=True)
+        _cerrar_visible()
     if _escucha():
         return True
     if not os.path.exists(CHROME):
         return False
     PERFIL.mkdir(mode=0o700, exist_ok=True)
     subprocess.Popen(
-        [CHROME, f"--user-data-dir={PERFIL}", f"--remote-debugging-port={PUERTO}",
-         "--no-first-run", "--no-default-browser-check", "--window-size=1700,1100",
+        [CHROME, "--headless=new", f"--user-data-dir={PERFIL}", f"--remote-debugging-port={PUERTO}",
+         "--remote-debugging-address=127.0.0.1",
+         "--no-first-run", "--no-default-browser-check", "--window-size=1600,1000",
          # las pestañas de las tareas trabajan aunque la ventana este tapada o minimizada
          "--disable-background-timer-throttling", "--disable-backgrounding-occluded-windows",
          "--disable-renderer-backgrounding", URL_INICIO],

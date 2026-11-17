@@ -87,6 +87,24 @@ def _recargar_si_no_cargo(page, veces=3):
     return hubo
 
 
+def _salir_de_cierre_fallido(page, forzar=False):
+    """Microsoft a veces deja la pagina en "Lo sentimos, tenemos problemas para cerrar su sesión"
+    (AADSTS50070), p. ej. cuando Oracle cierra la sesion por su cuenta (visto 2026-11-17 a las 8:00). Esa
+    pantalla no es de entrar: se vuelve a la consola, que lleva otra vez al inicio de sesion normal."""
+    try:
+        texto = page.locator("body").inner_text(timeout=5000)
+    except Exception:
+        texto = ""
+    if forzar or "AADSTS50070" in texto or "cerrar su sesión" in texto or "signing you out" in texto.lower():
+        print("[consola] Microsoft se quedó en un cierre de sesión: se vuelve a la consola", flush=True)
+        try:
+            page.goto(URL_CONSOLA, wait_until="domcontentloaded")
+        except Exception:
+            pass
+        page.wait_for_timeout(5000)
+        _recargar_si_no_cargo(page)
+
+
 def volver_a_actividades(page, espera_ms=20000):
     """Deja la consola en Actividades (la pantalla de los tecnicos). True si se ve el arbol de grupos.
     Se usa al terminar una tarea en el Chrome compartido, para que Gustavo no se encuentre la ultima ficha."""
@@ -181,6 +199,8 @@ def entrar_a_consola(page, correo, clave):
                 break
 
     if es_pagina_microsoft(page):
+        _salir_de_cierre_fallido(page)
+    if es_pagina_microsoft(page):
         iniciar_sesion_microsoft(page, correo, clave)
 
     # Tras el login se abre "Mi ruta" (Lista de actividades); la consola esta en
@@ -194,10 +214,20 @@ def entrar_a_consola(page, correo, clave):
             page.wait_for_selector(listo, timeout=30000)
             break
         except Exception:
+            if intento == 2:
+                raise
             # "The application could not load": pasa a veces al cargar la consola; con recargar entra
-            if intento == 2 or not _recargar_si_no_cargo(page):
-                if intento == 2:
-                    raise
+            if _recargar_si_no_cargo(page):
+                continue
+            # La sesion de Oracle se cerro mientras tanto y la pagina acabo en Microsoft (17/11/2026):
+            # se vuelve a la consola y, si pide entrar, se entra
+            print(f"[consola] no se ve la consola (pantalla: {page.title().split('.')[0][:30]!r}): se vuelve a intentar", flush=True)
+            _salir_de_cierre_fallido(page, forzar=True)
+            if not es_pagina_microsoft(page) and page.get_by_text("Sign in with SSO").count():
+                page.get_by_text("Sign in with SSO").first.click()
+                page.wait_for_timeout(5000)
+            if es_pagina_microsoft(page):
+                iniciar_sesion_microsoft(page, correo, clave)
     # Dejar que "Mi ruta" termine de cargar: un clic demasiado pronto se ignora
     # (visto en vivo 2026-10-16: se quedo en "Lista de actividades").
     try:
