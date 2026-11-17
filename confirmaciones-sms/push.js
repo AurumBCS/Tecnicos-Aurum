@@ -11,8 +11,10 @@
 // los avisos vuelven a funcionar con la siguiente pasada de la Lambda (cada 20 min, L-V de 8 a 19).
 // La Lambda se identifica con RECUENTOS_KEY; aquí solo está su huella SHA-256.
 //
-// Las altas se guardan en push_altas.json (disco de Render: se pierde al redesplegar). Por eso la app
-// vuelve a mandar su alta cada vez que se abre, y la lista se rehace sola.
+// Las altas se guardan en push_altas.json (disco de Render: se pierde al redesplegar y cuando Render se
+// duerme por la noche). Por eso también se anotan, cifradas, en la pestaña "Uso" de la hoja de
+// confirmaciones (filas con mat "~PUSH", que no cuentan como uso) y se recuperan de ahí en cuanto el
+// servidor tiene la clave privada (18/11/2026). Además la app renueva su alta al abrirse y al volver a ella.
 // Sin datos de clientes: los avisos llevan número de mantenimiento, tipo, franja y nombre del técnico.
 
 const crypto = require('crypto');
@@ -42,12 +44,13 @@ function ponerClavePrivada(priv) {
     if (ecdh.getPublicKey().toString('base64url') !== VAPID_PUBLICA) return false;
     libreria.setVapidDetails('mailto:avisos@aurumbcs.com', VAPID_PUBLICA, priv);
     webpush = libreria;
+    clavePriv = priv;
     return true;
   } catch (e) {
     return false;
   }
 }
-ponerClavePrivada(process.env.VAPID_PRIVATE || (leer(F_VAPID, {}) || {}).priv);
+let clavePriv = '';
 
 // { MATRICULA: [ {endpoint, keys, ua, alta} ] }
 let altas = leer(F_ALTAS, {});
@@ -94,6 +97,89 @@ async function claveFijaApp(mat, dni) {
   return !!fijasApp.hash[mat] && huella(d) === String(fijasApp.hash[mat]).toLowerCase();
 }
 
+// ── Copia de las altas en la hoja (pestaña Uso) ──────────────────────────────
+// sub:<cifrado> = alta { m, e, k, u, a }   ·   baja:<sha256 del endpoint> = baja
+// Cifrado AES-256-GCM con una clave derivada de la clave privada VAPID (la hoja se puede leer con la URL).
+const MAT_HOJA = '~PUSH';
+let hoja = { registrar: null, leer: null };
+let enHoja = {};          // endpoint -> 'MAT|p256dh' tal como está anotado en la hoja
+let pendientesHoja = [];  // anotaciones hechas antes de tener la clave
+let restaurada = null;    // promesa de la recuperación (una vez por arranque)
+let hojaLista = false;    // true cuando ya se leyó la hoja
+const claveHoja = () => crypto.createHash('sha256').update('aurum-push-altas|' + clavePriv).digest();
+function cifrar(obj) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', claveHoja(), iv);
+  const ct = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]);
+  return Buffer.concat([iv, c.getAuthTag(), ct]).toString('base64url');
+}
+function descifrar(t) {
+  try {
+    const b = Buffer.from(t, 'base64url');
+    const d = crypto.createDecipheriv('aes-256-gcm', claveHoja(), b.subarray(0, 12));
+    d.setAuthTag(b.subarray(12, 28));
+    return JSON.parse(Buffer.concat([d.update(b.subarray(28)), d.final()]).toString('utf8'));
+  } catch (e) { return null; }
+}
+function anotarEnHoja(tipo, mat, s) {
+  if (!hoja.registrar) return;
+  if (!clavePriv || !hojaLista) { pendientesHoja.push([tipo, mat, s]); return; }
+  if (tipo === 'sub') {
+    const marca = mat + '|' + s.keys.p256dh;
+    if (enHoja[s.endpoint] === marca) return;
+    enHoja[s.endpoint] = marca;
+    hoja.registrar(MAT_HOJA, 'push-sub', 'sub:' + cifrar({ m: mat, e: s.endpoint, k: s.keys, u: s.ua, a: s.alta }));
+  } else {
+    if (!enHoja[s.endpoint]) return;
+    delete enHoja[s.endpoint];
+    hoja.registrar(MAT_HOJA, 'push-sub', 'baja:' + huella(s.endpoint));
+  }
+}
+function quitarEndpoint(endpoint) {
+  Object.keys(altas).forEach(m => {
+    altas[m] = altas[m].filter(s => s.endpoint !== endpoint);
+    if (!altas[m].length) delete altas[m];
+  });
+}
+// Rehace las altas desde la hoja; las que ya hay en memoria (más recientes) mandan
+function restaurarDeHoja() {
+  if (restaurada || !clavePriv || !hoja.leer) return restaurada || Promise.resolve();
+  restaurada = (async () => {
+    try {
+      const desde = new Date(Date.now() - 120 * 864e5).toISOString().slice(0, 10);
+      const eventos = (await hoja.leer(desde)).filter(e => e.mat === MAT_HOJA && e.rol === 'push-sub');
+      const porEndpoint = {};   // endpoint -> { mat, sub }
+      for (const ev of eventos) {
+        const a = String(ev.accion || '');
+        if (a.startsWith('sub:')) {
+          const o = descifrar(a.slice(4));
+          if (o && o.m && validaAlta({ endpoint: o.e, keys: o.k })) porEndpoint[o.e] = { mat: o.m, sub: { endpoint: o.e, keys: o.k, ua: o.u || '', alta: o.a || '' } };
+        } else if (a.startsWith('baja:')) {
+          const h = a.slice(5);
+          Object.keys(porEndpoint).forEach(e => { if (huella(e) === h) delete porEndpoint[e]; });
+        }
+      }
+      let recuperadas = 0;
+      const enMemoria = new Set(Object.values(altas).flat().map(s => s.endpoint));
+      for (const [e, { mat, sub }] of Object.entries(porEndpoint)) {
+        enHoja[e] = mat + '|' + sub.keys.p256dh;
+        if (enMemoria.has(e)) continue;
+        (altas[mat] = altas[mat] || []).push(sub);
+        altas[mat] = altas[mat].slice(-5);
+        recuperadas++;
+      }
+      guardar(F_ALTAS, altas);
+      console.log(`[push] altas recuperadas de la hoja: ${recuperadas} (en total ${Object.keys(altas).length} personas)`);
+    } catch (e) {
+      console.error('[push] no se pudieron recuperar las altas de la hoja:', e.message);
+    }
+    hojaLista = true;
+    const p = pendientesHoja; pendientesHoja = [];
+    p.forEach(x => anotarEnHoja(...x));
+  })();
+  return restaurada;
+}
+
 function validaAlta(s) {
   return s && typeof s.endpoint === 'string' && /^https:\/\//.test(s.endpoint) && s.endpoint.length < 1000
     && s.keys && typeof s.keys.p256dh === 'string' && typeof s.keys.auth === 'string';
@@ -116,12 +202,15 @@ async function enviarA(mat, aviso) {
   if (muertas.length) {
     altas[mat] = lista.filter(s => !muertas.includes(s.endpoint));
     if (!altas[mat].length) delete altas[mat];
+    muertas.forEach(endpoint => anotarEnHoja('baja', mat, { endpoint }));
     guardar(F_ALTAS, altas);
   }
   return ok;
 }
 
-function montar(app, { verificarDNI: dniCuadrante, registrarUso }) {
+function montar(app, { verificarDNI: dniCuadrante, registrarUso, leerUso }) {
+  hoja = { registrar: registrarUso, leer: leerUso };
+  if (ponerClavePrivada(process.env.VAPID_PRIVATE || (leer(F_VAPID, {}) || {}).priv)) restaurarDeHoja();
   const verificarDNI = async (mat, dni) => (await dniCuadrante(mat, dni)) || claveFijaApp(String(mat || '').toUpperCase(), dni);
 
   app.options('/push/*', (req, res) => { cors(req, res); res.sendStatus(204); });
@@ -139,14 +228,13 @@ function montar(app, { verificarDNI: dniCuadrante, registrarUso }) {
     if (!(await verificarDNI(mat, req.body.dni))) return res.json({ ok: false, error: 'Matrícula o DNI incorrectos' });
     if (!validaAlta(sub)) return res.json({ ok: false, error: 'Alta no válida' });
     // Un navegador solo puede estar a nombre de una persona (el último que entró en ese móvil)
-    Object.keys(altas).forEach(m => {
-      altas[m] = altas[m].filter(s => s.endpoint !== sub.endpoint);
-      if (!altas[m].length) delete altas[m];
-    });
-    (altas[mat] = altas[mat] || []).push({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
-      ua: String(req.body.ua || '').slice(0, 40), alta: new Date().toISOString() });
+    quitarEndpoint(sub.endpoint);
+    const nueva = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+      ua: String(req.body.ua || '').slice(0, 40), alta: new Date().toISOString() };
+    (altas[mat] = altas[mat] || []).push(nueva);
     altas[mat] = altas[mat].slice(-5);
     guardar(F_ALTAS, altas);
+    anotarEnHoja('sub', mat, nueva);
     if (req.body.primera) registrarUso(mat, 'push', 'alta-avisos');
     res.json({ ok: true, activo: !!webpush, aparatos: altas[mat].length });
   });
@@ -161,6 +249,7 @@ function montar(app, { verificarDNI: dniCuadrante, registrarUso }) {
       if (!altas[mat].length) delete altas[mat];
       guardar(F_ALTAS, altas);
     }
+    if (endpoint) anotarEnHoja('baja', mat, { endpoint });
     res.json({ ok: true });
   });
 
@@ -181,6 +270,7 @@ function montar(app, { verificarDNI: dniCuadrante, registrarUso }) {
       if (!ponerClavePrivada(req.body.vapid)) return res.json({ ok: false, error: 'Clave de avisos no válida' });
       guardar(F_VAPID, { priv: req.body.vapid });
     }
+    await restaurarDeHoja();
     const hoy = hoyMadrid();
     if (enviados.dia !== hoy) enviados = { dia: hoy, ids: {} };
     const avisos = Array.isArray(req.body.avisos) ? req.body.avisos.slice(0, 2000) : [];

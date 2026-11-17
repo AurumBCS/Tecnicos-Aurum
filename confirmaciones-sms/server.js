@@ -1070,6 +1070,7 @@ app.get('/uso', async (req, res) => {
     console.error('[Uso] Error al leer el registro:', e.message);
   }
   eventos = eventos.concat(usoPendiente.filter(e => e.fecha >= desde)); // aún sin guardar
+  eventos = eventos.filter(e => e.mat !== '~PUSH'); // altas de avisos guardadas en la hoja, no son uso
 
   // Resumen diario guardado (quién usó / no usó cada día), si se pide
   let resumen = [];
@@ -1313,7 +1314,15 @@ setInterval(purgarYGuardar, 60 * 60 * 1000);
 programarLimpiezaMedianoche();
 
 // ── Avisos push a técnicos y JE (ver push.js) ──
-require('./push').montar(app, { verificarDNI: verificarDNIConRecarga, registrarUso });
+require('./push').montar(app, {
+  verificarDNI: verificarDNIConRecarga, registrarUso,
+  // Para recuperar las altas de avisos guardadas en la pestaña Uso
+  leerUso: async desde => {
+    const d = JSON.parse(await fetchCSV(CITAS_SHEET_URL + '?action=leerUso&desde=' + encodeURIComponent(desde)));
+    if (!d.ok || !Array.isArray(d.eventos)) throw new Error('respuesta inesperada de la hoja');
+    return d.eventos.concat(usoPendiente);
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, (err) => {

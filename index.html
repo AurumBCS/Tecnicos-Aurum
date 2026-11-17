@@ -8044,8 +8044,14 @@ function avisosPintarBoton(activos){
   b.title = activos ? 'Avisos activados en este aparato' : 'Activar avisos en este aparato';
 }
 // Al entrar: si este aparato ya tenía los avisos, se renueva el alta (el servidor la pierde al redesplegarse)
-async function avisosAlEntrar(){
-  avisosPintarBoton(false);
+// También al volver a la app (como máximo cada 30 min), por si el servidor se reinició con la app abierta
+let _avisosUltimaAlta = 0;
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && AVISOS_MAT && Date.now() - _avisosUltimaAlta > 30*60*1000) avisosAlEntrar(true);
+});
+async function avisosAlEntrar(renovar){
+  _avisosUltimaAlta = Date.now();
+  if(!renovar) avisosPintarBoton(false);
   if(!avisosSoportados() || Notification.permission !== 'granted') return;
   try{
     const sub = await avisosSuscripcion();
