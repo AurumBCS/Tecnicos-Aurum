@@ -68,6 +68,32 @@ function cors(req, res) {
   }
 }
 
+// Quien entra en la app con contraseña fija (AUTH_FIJAS / AUTH_HASH de index.html, p. ej. GD5381 o César)
+// no la tiene en el cuadrante, que es lo que mira verificarDNI. Se comprueba también contra la app
+// publicada, leída de GitHub Pages cada 15 min: así no se copia ninguna contraseña aquí (17/11/2026).
+const URL_APP = 'https://aurumbcs.github.io/Tecnicos-Aurum/index.html';
+let fijasApp = { t: 0, fijas: {}, hash: {} };
+async function claveFijaApp(mat, dni) {
+  if (Date.now() - fijasApp.t > 15 * 60e3) {
+    try {
+      const html = await (await fetch(URL_APP + '?_=' + Date.now())).text();
+      const objeto = nombre => {
+        const m = html.match(new RegExp('const ' + nombre + '\\s*=\\s*\\{([\\s\\S]*?)\\};'));
+        const out = {};
+        if (m) for (const x of m[1].matchAll(/['"]?([A-Za-z0-9._-]+)['"]?\s*:\s*['"]([^'"]+)['"]/g)) out[x[1].toUpperCase()] = x[2];
+        return out;
+      };
+      fijasApp = { t: Date.now(), fijas: objeto('AUTH_FIJAS'), hash: objeto('AUTH_HASH') };
+    } catch (e) {
+      console.error('[push] no se pudo leer la app para las contraseñas fijas:', e.message);
+    }
+  }
+  const d = String(dni || '').trim().toUpperCase();
+  if (!mat || !d) return false;
+  if (fijasApp.fijas[mat] && String(fijasApp.fijas[mat]).trim().toUpperCase() === d) return true;
+  return !!fijasApp.hash[mat] && huella(d) === String(fijasApp.hash[mat]).toLowerCase();
+}
+
 function validaAlta(s) {
   return s && typeof s.endpoint === 'string' && /^https:\/\//.test(s.endpoint) && s.endpoint.length < 1000
     && s.keys && typeof s.keys.p256dh === 'string' && typeof s.keys.auth === 'string';
@@ -95,7 +121,9 @@ async function enviarA(mat, aviso) {
   return ok;
 }
 
-function montar(app, { verificarDNI, registrarUso }) {
+function montar(app, { verificarDNI: dniCuadrante, registrarUso }) {
+  const verificarDNI = async (mat, dni) => (await dniCuadrante(mat, dni)) || claveFijaApp(String(mat || '').toUpperCase(), dni);
+
   app.options('/push/*', (req, res) => { cors(req, res); res.sendStatus(204); });
 
   app.get('/push/clave', (req, res) => {
