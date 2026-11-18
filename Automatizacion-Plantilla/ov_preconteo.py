@@ -95,8 +95,19 @@ def pendientes_por_tecnico(page):
     return p
 
 
-def stock_tecnico(page, org, mat):
-    """Lineas del informe Valor Stock: [{sub, item, cant, importe}]."""
+def stock_tecnico(page, org, mat, intentos=2):
+    """Lineas del informe Valor Stock: [{sub, item, cant, importe}]. Si OV va lento y se agota el tiempo,
+    lo vuelve a intentar una vez desde el principio (18/11/2026: 334371 falló en la Lambda y en el Mac entró a la primera)."""
+    for i in range(intentos):
+        try:
+            return _stock_tecnico(page, org, mat)
+        except Exception as e:
+            if i == intentos - 1 or "Timeout" not in str(e):
+                raise
+            print(f"[preconteo] {mat} ({org}): OV no respondió a tiempo, se reintenta")
+
+
+def _stock_tecnico(page, org, mat):
     from ov_comun import URL_OV
     page.goto(URL_OV + "home", wait_until="domcontentloaded")
     page.wait_for_load_state("networkidle")
@@ -113,10 +124,10 @@ def stock_tecnico(page, org, mat):
     page.wait_for_timeout(600)
     page.get_by_role("button", name="Buscar").click()
     # Hay dos enlaces "stock_value" y solo uno trae el importe: esperar a ese y pulsarlo
-    page.wait_for_function("() => [...document.querySelectorAll('a.stock_value')].some(a => a.innerText.trim() !== '')", timeout=60000)
+    page.wait_for_function("() => [...document.querySelectorAll('a.stock_value')].some(a => a.innerText.trim() !== '')", timeout=120000)
     valor = page.evaluate("""() => { const a = [...document.querySelectorAll('a.stock_value')].find(a => a.innerText.trim() !== '');
                                       a.click(); return a.innerText.trim(); }""")
-    page.wait_for_selector(".a-IRR-container tbody tr td", timeout=60000)
+    page.wait_for_selector(".a-IRR-container tbody tr td", timeout=120000)
     page.wait_for_load_state("networkidle")
     page.locator(".a-IRR-container .a-IRR-button--actions").first.click()
     page.locator(".icon-irr-download").first.click()
@@ -198,7 +209,7 @@ def cargar_lista(mats, modo="subir"):
                             if mat in reales:
                                 raise
                             c["org"] = "PESIAT"  # sin conteo no se sabe la organización: Tenerife si no sale en la península
-                            c["lineas"], c["valor"] = stock_tecnico(page, c["org"], mat)
+                            c["lineas"], c["valor"] = stock_tecnico(page, c["org"], mat, intentos=1)
                         c["je"], c["pendientes"] = jefes[mat], pend.get(mat, [])
                         for l in c["lineas"]:
                             l["desc"] = catalogo.get(l["item"], {}).get("d", "")
