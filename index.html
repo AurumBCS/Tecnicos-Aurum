@@ -532,7 +532,7 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
     <button class="tab-btn" id="tabUso" onclick="switchTab(&#39;uso&#39;)">Uso de la app</button>
     <button class="tab-btn" id="tabUsoSms" style="display:none" onclick="switchTab(&#39;usoSms&#39;)">📲 Uso confirmaciones</button>
     <button class="tab-btn" id="tabAgenda" style="display:none" onclick="switchTab(&#39;agenda&#39;)">🕗 Agenda 8:00</button>
-    <button class="tab-btn" id="tabAnexos" style="display:none" onclick="switchTab(&#39;anexos&#39;)">📤 Anexos y Altas NNII</button>
+    <button class="tab-btn" id="tabAnexos" style="display:none" onclick="switchTab(&#39;anexos&#39;)">📤 Anexos, altas y bajas</button>
   </div>
 
   <!-- Panel técnico normal -->
@@ -709,6 +709,17 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
         <div style="font-size:.68rem;color:var(--muted);margin-bottom:10px">Crea la ficha de alta de cada nuevo ingreso (7 NI) del Cuadrante que aún no la tenga y la guarda en la carpeta Altas NNII del Drive. Sexo: Hombre por defecto, revísalo.</div>
         <button class="cf-btn prim" id="nniiBtn" onclick="nniiGenerar()" style="width:100%;padding:11px">Generar altas NNII</button>
         <div id="nniiRes" style="margin-top:10px"></div>
+        <!-- Baja del seguro ASISA (18/11): matrícula + fecha → Excel en la carpeta Bajas Seguro -->
+        <div style="border-top:1px solid var(--border2);margin-top:14px;padding-top:12px">
+          <div style="font-size:.8rem;font-weight:700;color:var(--gold2);margin-bottom:4px">🩺 Baja del seguro</div>
+          <div style="font-size:.68rem;color:var(--muted);margin-bottom:10px">Saca nombre, apellidos y DNI del Cuadrante y la póliza de la pestaña ASISA_AURUM, y guarda el Excel de baja en la carpeta Bajas Seguro del Drive.</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input id="bajaMat" class="cf-input" placeholder="Matrícula" autocomplete="off" style="flex:1;min-width:0;text-transform:uppercase">
+            <input id="bajaFecha" class="cf-input" type="date" style="flex:1;min-width:0">
+          </div>
+          <button class="cf-btn prim" id="bajaBtn" onclick="bajaGenerar()" style="width:100%;padding:11px">Generar baja del seguro</button>
+          <div id="bajaRes" style="margin-top:10px"></div>
+        </div>
       </div>
       <div class="data-banner" style="margin-bottom:14px">
         <div class="sync-dot"></div>
@@ -7786,7 +7797,28 @@ function upsIr(donde){
 
 function upsSalir(){ upsParar(); UPS={datos:null,previa:null,lote:'',timer:null,ocupado:false};
   const n=document.getElementById('nniiCaja'); if(n) n.style.display='none';
-  const r=document.getElementById('nniiRes'); if(r) r.innerHTML=''; }
+  const r=document.getElementById('nniiRes'); if(r) r.innerHTML='';
+  const b=document.getElementById('bajaRes'); if(b) b.innerHTML=''; }
+
+// Baja del seguro: el servidor (AltasNNII.js, baja_generar_) rellena la plantilla de ASISA
+async function bajaGenerar(){
+  const btn=document.getElementById('bajaBtn'), out=document.getElementById('bajaRes');
+  const mat=document.getElementById('bajaMat').value.trim().toUpperCase();
+  const fecha=document.getElementById('bajaFecha').value;
+  if(!mat||!fecha){ out.innerHTML='<div class="cf-vacio">Escribe la matrícula y la fecha de baja.</div>'; return; }
+  btn.disabled=true; btn.textContent='⏳ Generando…'; out.innerHTML='';
+  try{
+    const d=await upsLlamar('nnii-baja',{matBaja:mat,fechaBaja:fecha},1);
+    out.innerHTML=`<div style="font-size:.72rem;font-weight:700;margin:4px 0">✅ Baja de ${cfEsc(d.nombre)} · ${cfEsc(d.fecha)}${d.reemplazada?' <span style="color:var(--muted);font-weight:400">(sustituye a la anterior)</span>':''}</div>
+      <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border2);font-size:.7rem"><span>${cfEsc(d.archivo)}</span><a href="${cfEsc(d.url)}" target="_blank" style="color:var(--gold2);white-space:nowrap">Abrir</a></div>
+      <a href="${cfEsc(d.carpeta)}" target="_blank" style="display:block;text-align:center;margin-top:8px;font-size:.7rem;color:var(--gold2)">📁 Abrir carpeta Bajas Seguro</a>`;
+    document.getElementById('bajaMat').value='';
+  }catch(e){
+    out.innerHTML=`<div class="cf-vacio">❌ ${cfEsc(e.message)}</div>`;
+  }finally{
+    btn.disabled=false; btn.textContent='Generar baja del seguro';
+  }
+}
 
 // Altas NNII: el servidor (AltasNNII.js) genera las fichas que falten y devuelve los enlaces
 async function nniiGenerar(){
