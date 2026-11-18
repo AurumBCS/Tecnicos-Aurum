@@ -215,6 +215,53 @@ def _sesion(ruta, subir=False):
         print(f"[vivo] sesión en S3 ({'subir' if subir else 'bajar'}): {type(e).__name__}")
 
 
+# ── Hoja de Anna (PETICIONADOR ANNA), 18/11/2026 ─────────────────────────────
+# En cada pasada, con los estados ya descargados, se pone el ESTADO de las filas de hoy: Iniciado -> INICIADO,
+# Completado -> FINALIZADO, Suspendido/Cancelado/No completado -> SUSPENDIDO. INICIADO se cambia en una pasada
+# posterior; lo que haya escrito Anna no se pisa (lo decide el script de la hoja). Las de días anteriores las sigue
+# cerrando el barrido de las 8:00 del Mac (huecos/barrido_huecos.py). URL y clave en variables de la Lambda.
+ESTADO_HOJA = {"I": "INICIADO", "C": "FINALIZADO", "S": "SUSPENDIDO", "X": "SUSPENDIDO", "N": "SUSPENDIDO"}
+
+
+def _hoja_anna(datos):
+    url, clave = os.environ.get("HUECOS_HOJA_URL", "").strip(), os.environ.get("HUECOS_HOJA_CLAVE", "").strip()
+    if not url or not clave:
+        return None
+    req = urllib.request.Request(url, data=json.dumps(dict(datos, clave=clave)).encode(),
+                                 headers={"Content-Type": "text/plain"})
+    with urllib.request.urlopen(req, timeout=90) as r:
+        res = json.loads(r.read().decode())
+    if not res.get("ok"):
+        raise RuntimeError(f"hoja de Anna: {res.get('error')}")
+    return res
+
+
+def cambios_hoja(filas, est, hoy):
+    """Filas de hoy de la hoja (sin ESTADO o con INICIADO) -> cambios a escribir según el estado en Oracle.
+    Solo las de hoy: los estados son los de hoy (y un script de la hoja anterior a esta versión devuelve otras)."""
+    cambios = []
+    for f in filas:
+        if f.get("fecha") != hoy:
+            continue
+        nuevo = ESTADO_HOJA.get((est.get(str(f.get("mto", "")).strip()) or ["?"])[0])
+        if nuevo:
+            cambios.append({"hoja": f["hoja"], "fila": f["fila"], "mto": f["mto"], "estado": nuevo})
+    return cambios
+
+
+def estados_a_hoja(est, hoy):
+    j = _hoja_anna({"accion": "pendientes", "hoy": True})
+    if j is None:
+        return "sin configurar (HUECOS_HOJA_URL / HUECOS_HOJA_CLAVE)"
+    filas = [f for f in j.get("filas", []) if f.get("fecha") == hoy]
+    cambios = cambios_hoja(filas, est, hoy)
+    if not cambios:
+        return f"{len(filas)} filas de hoy abiertas, ningún cambio"
+    r = _hoja_anna({"accion": "estados", "cambios": cambios})
+    return (f"{len(filas)} filas de hoy abiertas, {r.get('escritas', 0)} escritas"
+            + (f", errores: {'; '.join(r.get('errores', [])[:5])}" if r.get("errores") else ""))
+
+
 def main():
     from playwright.sync_api import sync_playwright
 
@@ -256,6 +303,10 @@ def main():
               + (f" ({r.get('error')})" if r.get("error") else ""))
     except Exception as e:
         print(f"[vivo] avisos no enviados: {type(e).__name__}: {e}")
+    try:
+        print(f"[vivo] hoja de Anna: {estados_a_hoja(est, hoy)}")
+    except Exception as e:
+        print(f"[vivo] hoja de Anna no actualizada: {type(e).__name__}: {e}")
     # Si a las 8:00 el Mac no pudo subir la lista, la sube la primera pasada de la mañana
     if not res.get("lista_hoy") and ahora.hour < 9:
         lista = lista_8(csvs, cuadrante())
