@@ -709,6 +709,13 @@ a,button,input,select,textarea,label,summary,[onclick],[role="button"]{touch-act
         <div style="font-size:.68rem;color:var(--muted);margin-bottom:10px">Crea la ficha de alta de cada nuevo ingreso (7 NI) del Cuadrante que aún no la tenga y la guarda en la carpeta Altas NNII del Drive. Sexo: Hombre por defecto, revísalo.</div>
         <button class="cf-btn prim" id="nniiBtn" onclick="nniiGenerar()" style="width:100%;padding:11px">Generar altas NNII</button>
         <div id="nniiRes" style="margin-top:10px"></div>
+        <!-- Excel API por territorial (18/11): todos los 7 NI del Cuadrante, un Excel por territorial -->
+        <div style="border-top:1px solid var(--border2);margin-top:14px;padding-top:12px">
+          <div style="font-size:.8rem;font-weight:700;color:var(--gold2);margin-bottom:4px">📑 API por territorial</div>
+          <div style="font-size:.68rem;color:var(--muted);margin-bottom:10px">Un Excel por territorial con todos los nuevos ingresos (7 NI) del Cuadrante, con la fecha de hoy. Falta poner a mano la oficina de envío (TRL, columna AW).</div>
+          <button class="cf-btn prim" id="apiBtn" onclick="apiGenerar()" style="width:100%;padding:11px">Generar API por territorial</button>
+          <div id="apiRes" style="margin-top:10px"></div>
+        </div>
         <!-- Baja del seguro ASISA (18/11): matrícula + fecha → Excel en la carpeta Bajas Seguro -->
         <div style="border-top:1px solid var(--border2);margin-top:14px;padding-top:12px">
           <div style="font-size:.8rem;font-weight:700;color:var(--gold2);margin-bottom:4px">🩺 Baja del seguro</div>
@@ -7798,7 +7805,27 @@ function upsIr(donde){
 function upsSalir(){ upsParar(); UPS={datos:null,previa:null,lote:'',timer:null,ocupado:false};
   const n=document.getElementById('nniiCaja'); if(n) n.style.display='none';
   const r=document.getElementById('nniiRes'); if(r) r.innerHTML='';
-  const b=document.getElementById('bajaRes'); if(b) b.innerHTML=''; }
+  const b=document.getElementById('bajaRes'); if(b) b.innerHTML='';
+  const a=document.getElementById('apiRes'); if(a) a.innerHTML=''; }
+
+// Excel API por territorial: el servidor (AltasNNII.js, api_generar_) hace uno por territorial
+async function apiGenerar(){
+  const btn=document.getElementById('apiBtn'), out=document.getElementById('apiRes');
+  btn.disabled=true; btn.textContent='⏳ Generando… (unos segundos por territorial)'; out.innerHTML='';
+  try{
+    const d=await upsLlamar('nnii-api',{},1);
+    const fila=(nom,extra,url)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border2);font-size:.7rem"><span>${cfEsc(nom)}${extra||''}</span>${url?`<a href="${cfEsc(url)}" target="_blank" style="color:var(--gold2);white-space:nowrap">Abrir</a>`:''}</div>`;
+    let h=`<div style="font-size:.72rem;font-weight:700;margin:4px 0">${d.archivos.length?'✅ '+d.archivos.length+' Excel generado(s)':'No hay nuevos ingresos (7 NI) en el Cuadrante'}</div>`;
+    h+=d.archivos.map(x=>fila(x.archivo,` <span style="color:var(--muted)">· ${x.personas} persona(s)</span>`,x.url)).join('');
+    if(d.errores.length) h+=`<div style="font-size:.72rem;font-weight:700;margin:10px 0 4px;color:#e67e22">⚠️ Sin generar (${d.errores.length})</div>`+d.errores.map(x=>fila(x.nombre,` <span style="color:#e67e22">· ${cfEsc(x.error)}</span>`)).join('');
+    h+=`<a href="${cfEsc(d.carpeta)}" target="_blank" style="display:block;text-align:center;margin-top:8px;font-size:.7rem;color:var(--gold2)">📁 Abrir carpeta Altas NNII</a>`;
+    out.innerHTML=h;
+  }catch(e){
+    out.innerHTML=`<div class="cf-vacio">❌ ${cfEsc(e.message)}</div>`;
+  }finally{
+    btn.disabled=false; btn.textContent='Generar API por territorial';
+  }
+}
 
 // Baja del seguro: el servidor (AltasNNII.js, baja_generar_) rellena la plantilla de ASISA
 async function bajaGenerar(){
