@@ -20,7 +20,7 @@ Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "ofs_rm_prueba"} -> prueba (manual): buscar mantenimientos repetidos en Oracle (ver ofs_rm_prueba.py)
   {"tarea": "rm_analizar", "mes": "Septiembre"} -> analiza las RM del mes para el dashboard de la app y se
                                   relanza sola hasta acabar (ver rm_analizar.py)
-  {"tarea": "agenda_vivo"} -> L-V cada 20 min de 8:10 a 18:50: estados de los mantenimientos de hoy en la
+  {"tarea": "agenda_vivo"} -> L-V cada 20 min de 8:10 a 18:50 (sábado de 8:10 a 14:50): estados de los mantenimientos de hoy en la
                                   consola de Oracle para los avisos del "Cumplimiento de hoy" del JE (ver agenda_vivo.py)
   {"tarea": "upselling_envio"} -> SIN horario: envia al Microsoft Form los lotes de Upselling aprobados en
                                   la app (ver forms_upselling.py). Lo arranca la URL de funcion (ver _desde_url).

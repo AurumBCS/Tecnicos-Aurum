@@ -5,7 +5,7 @@
    mac_tarde.py --manana con los CSV que ya descarga para la ruta (type=agenda-hoy), sin
    depender del correo de Verisure (el 12/11 no llegó). agenda_cruce.py la compara después
    con el Excel de Verisure de las 8:00 y, si el Mac no pudo subirla, sube la de Verisure.
-2. Estados en vivo (main): la Lambda, cada 20 minutos de 8:10 a 18:50 (L-V), descarga la
+2. Estados en vivo (main): la Lambda, cada 20 minutos de 8:10 a 18:50 (L-V; sábado de 8:10 a 14:50), descarga la
    consola y sube el estado de cada mantenimiento de hoy (type=agenda-vivo). La app avisa al JE
    de los que van a quedar fuera de su franja ("en riesgo": Oracle prevé empezarlos después de
    que acabe) o ya lo están ("fuera de franja").
@@ -269,7 +269,9 @@ def main():
     from comun_ofs import CARPETA_BASE, LAUNCH_ARGS
 
     ahora = datetime.now(TZ)
-    if ahora.weekday() > 4 or not (8 <= ahora.hour < 19):
+    # Sábado (Gustavo, 19/11/2026): también, de 8:10 a 14:50 (el horario más común es de 9 a 14)
+    sabado = ahora.weekday() == 5
+    if ahora.weekday() == 6 or not (8 <= ahora.hour < (15 if sabado else 19)):
         print(f"[vivo] fuera de horario ({ahora:%a %H:%M}): no se hace nada")
         return
     hoy = ahora.date().isoformat()
@@ -290,7 +292,7 @@ def main():
                 consola_sso.cerrar_sesion(page)
             browser.close()
     est = estados(csvs)
-    if len(csvs) < 10 or len(est) < 100:
+    if len(csvs) < 10 or len(est) < (20 if sabado else 100):   # el sábado hay muchos menos
         raise RuntimeError(f"descarga incompleta de la consola: {len(csvs)} grupos, {len(est)} mantenimientos")
     hora = datetime.now(TZ).strftime("%H:%M")
     res = _post("agenda-vivo", {"key": _clave(), "dia": hoy, "hora": hora, "estados": est})
