@@ -14,8 +14,10 @@ Pre-conteo: stock del sistema de cada técnico con un conteo PERIÓDICO pendient
      (items_catalogo.json, sacado de los conteos ya hechos) y el jefe de equipo de cada técnico.
   6. Resumen a Gustavo.
 
-Conteos no planificados: cargar_lista(mats) hace lo mismo con una lista de matrículas (Gustavo la pega en la
-app, tarjeta Pre-conteo). Con conteo creado usa su código; si no, uno provisional MANUAL-<matrícula>.
+Conteos no planificados: cargar_lista(mats, je=...) hace lo mismo con una lista de matrículas (la pega en la
+app, tarjeta Pre-conteo, Gustavo/CM9651 o, desde el 24/11/2026, cualquier JE con los de su equipo). Con conteo
+creado usa su código; si no, uno provisional MANUAL-<matrícula>. Una carga a la vez (turno en el Apps Script) y,
+al terminar, aviso push al JE que la pidió.
 
 Uso local:  python3 ov_preconteo.py [--modo prueba] [--mat 318921 --org PESIAU]   (prueba: no sube nada)
             python3 ov_preconteo.py [--modo prueba] --lista "356444 LQ1546"
@@ -40,6 +42,7 @@ from comun_ofs import CARPETA_BASE, enviar_aviso, registrar_error
 AQUI = Path(__file__).parent
 CARPETA = CARPETA_BASE / "preconteo"
 REASIGNAR_JDE = {"302154": "GD5381"}  # técnicos de Nicola Morsa -> Gustavo Pérez
+CARGAN_TODO = {"GD5381", "CM9651"}  # conteos no planificados de cualquier técnico; el resto de JE, solo su equipo
 GRID = """async () => {
     const id = document.querySelector('.a-IG').id.replace(/_ig$/, '');
     const m = apex.region(id).call('getViews', 'grid').model;
@@ -177,65 +180,116 @@ def _nombre_tecnico(mat):
     return ""
 
 
-def cargar_lista(mats, modo="subir"):
-    """Pre-conteo de las matrículas pedidas. Una que falle no para las demás; cada una se sube al terminarla."""
+def _de_su_equipo(je, jefe_tecnico):
+    """El técnico es del equipo del JE que lo pide (con la reasignación de 302154 -> GD5381 en los dos sentidos)."""
+    return jefe_tecnico == je or REASIGNAR_JDE.get(je) == jefe_tecnico
+
+
+def _avisar_je(je, bien, mal, total):
+    """Aviso push al JE que pidió la carga (24/11/2026). Sin datos de clientes: solo matrículas de técnicos."""
+    from agenda_vivo import enviar_avisos
+
+    titulo = f"🧮 Pre-conteo cargado: {len(bien)} de {total}" if bien else "🧮 Pre-conteo: no se pudo cargar"
+    cuerpo = ("Ábrelo en Mi equipo → Pre-conteo." if bien else "") + \
+        ((" No se cargaron: " + ", ".join(m for m, _ in mal)) if mal else "")
+    try:
+        r = enviar_avisos([{"mat": je, "id": "preconteo-" + datetime.now(ZoneInfo("Europe/Madrid")).strftime("%H%M%S"),
+                            "titulo": titulo, "cuerpo": cuerpo.strip(), "url": "./"}])
+        print(f"[preconteo] aviso a {je}: {r}")
+    except Exception as e:  # sin aviso el stock ya está subido; el JE lo ve al actualizar
+        print(f"[preconteo] aviso a {je}: {type(e).__name__}: {e}")
+
+
+def _liberar_turno():
+    """Deja libre el turno de cargas (una a la vez, lo guarda el Apps Script en ?type=preconteo-lista)."""
+    try:
+        req = urllib.request.Request(os.environ["RECUENTOS_SCRIPT_URL"].strip() + "?type=preconteo-lista-fin",
+                                     data=json.dumps({"key": os.environ["RECUENTOS_KEY"].strip()}).encode(),
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            print("[preconteo] turno liberado:", r.read().decode()[:100])
+    except Exception as e:  # si no, caduca solo (Apps Script: PC_TURNO_MIN por técnico)
+        print(f"[preconteo] liberar turno: {type(e).__name__}: {e}")
+
+
+def cargar_lista(mats, modo="subir", je=None):
+    """Pre-conteo de las matrículas pedidas. Una que falle no para las demás; cada una se sube al terminarla.
+    je: quien lo pide desde la app (24/11/2026: también los JE). Si no es coordinador (CARGAN_TODO), solo se
+    cargan los técnicos de su equipo según el cuadrante. Al terminar le llega un aviso push."""
     from playwright.sync_api import sync_playwright
     from ov_comun import abrir_ov
 
     hoy = datetime.now(ZoneInfo("Europe/Madrid")).strftime("%Y-%m-%d")
     mats = list(dict.fromkeys(str(m).strip().upper() for m in mats if str(m).strip()))
+    je = str(je or "").strip().upper() or None
     CARPETA.mkdir(parents=True, exist_ok=True)
-    bien, mal = [], []
+    bien, mal, mal_mats = [], [], []
     try:
         catalogo = json.loads((AQUI / "items_catalogo.json").read_text(encoding="utf-8"))
         cat = {k: {"d": v.get("d", ""), "p": v.get("p", 0)} for k, v in catalogo.items()}
         jefes, bajas = _cuadrante()
-        with sync_playwright() as p:
-            browser, context, page = abrir_ov(p, ver="--ver" in sys.argv)
-            try:
-                reales = {c["mat"]: c for c in conteos_pendientes(page)}
-                pend = pendientes_por_tecnico(page)
-                for mat in mats:
-                    try:
-                        if not jefes.get(mat):
-                            raise RuntimeError("no tiene jefe de equipo en el cuadrante")
-                        if mat in bajas:
-                            raise RuntimeError("está de baja en el cuadrante")
-                        c = reales.get(mat) or {"conteo": f"MANUAL-{mat}", "org": "PESIAU", "mat": mat,
-                                                "nombre": _nombre_tecnico(mat), "creado": hoy}
+        if je and je not in CARGAN_TODO:
+            ajenos = [m for m in mats if not _de_su_equipo(je, jefes.get(m))]
+            for m in ajenos:
+                mal.append(f"- {m}: no es de tu equipo en el cuadrante")
+                mal_mats.append((m, "no es de su equipo"))
+            mats = [m for m in mats if m not in ajenos]
+        if mats:  # si ninguna es de su equipo, no se entra en OV
+            with sync_playwright() as p:
+                browser, context, page = abrir_ov(p, ver="--ver" in sys.argv)
+                try:
+                    reales = {c["mat"]: c for c in conteos_pendientes(page)}
+                    pend = pendientes_por_tecnico(page)
+                    for mat in mats:
                         try:
-                            c["lineas"], c["valor"] = stock_tecnico(page, c["org"], mat)
-                        except Exception:
-                            if mat in reales:
-                                raise
-                            c["org"] = "PESIAT"  # sin conteo no se sabe la organización: Tenerife si no sale en la península
-                            c["lineas"], c["valor"] = stock_tecnico(page, c["org"], mat, intentos=1)
-                        c["je"], c["pendientes"] = jefes[mat], pend.get(mat, [])
-                        for l in c["lineas"]:
-                            l["desc"] = catalogo.get(l["item"], {}).get("d", "")
-                            if l["cant"]:
-                                cat.setdefault(l["item"], {"d": l["desc"], "p": 0})["p"] = round(l["importe"] / l["cant"], 4)
-                        if modo != "prueba":
-                            _subir(hoy, [c], cat)
-                        bien.append(f"- {c['conteo']} {mat} {c['nombre']} (JE {c['je']}): {len(c['lineas'])} líneas, "
-                                    f"valor {c['valor']}; pendientes: {len(c['pendientes'])}")
-                    except Exception as e:
-                        print(f"[preconteo] {mat}: {e}")
-                        mal.append(f"- {mat}: {str(e).splitlines()[0][:150]}")
-            finally:
-                browser.close()
-        texto = (("Stock subido a la app (Mi equipo -> Pre-conteo), visible solo hoy:\n\n" + "\n".join(bien)) if bien else "No se cargó ninguna.") \
-            + (("\n\nNo se pudieron cargar:\n" + "\n".join(mal)) if mal else "")
+                            if not jefes.get(mat):
+                                raise RuntimeError("no tiene jefe de equipo en el cuadrante")
+                            if mat in bajas:
+                                raise RuntimeError("está de baja en el cuadrante")
+                            c = reales.get(mat) or {"conteo": f"MANUAL-{mat}", "org": "PESIAU", "mat": mat,
+                                                    "nombre": _nombre_tecnico(mat), "creado": hoy}
+                            try:
+                                c["lineas"], c["valor"] = stock_tecnico(page, c["org"], mat)
+                            except Exception:
+                                if mat in reales:
+                                    raise
+                                c["org"] = "PESIAT"  # sin conteo no se sabe la organización: Tenerife si no sale en la península
+                                c["lineas"], c["valor"] = stock_tecnico(page, c["org"], mat, intentos=1)
+                            c["je"], c["pendientes"] = jefes[mat], pend.get(mat, [])
+                            for l in c["lineas"]:
+                                l["desc"] = catalogo.get(l["item"], {}).get("d", "")
+                                if l["cant"]:
+                                    cat.setdefault(l["item"], {"d": l["desc"], "p": 0})["p"] = round(l["importe"] / l["cant"], 4)
+                            if modo != "prueba":
+                                _subir(hoy, [c], cat)
+                            bien.append(f"- {c['conteo']} {mat} {c['nombre']} (JE {c['je']}): {len(c['lineas'])} líneas, "
+                                        f"valor {c['valor']}; pendientes: {len(c['pendientes'])}")
+                        except Exception as e:
+                            print(f"[preconteo] {mat}: {e}")
+                            mal.append(f"- {mat}: {str(e).splitlines()[0][:150]}")
+                            mal_mats.append((mat, str(e)))
+                finally:
+                    browser.close()
+        total = len(bien) + len(mal)
+        texto = ((f"Pedido por {je}.\n\n" if je else "")
+                 + (("Stock subido a la app (Mi equipo -> Pre-conteo), visible solo hoy:\n\n" + "\n".join(bien)) if bien else "No se cargó ninguna.")
+                 + (("\n\nNo se pudieron cargar:\n" + "\n".join(mal)) if mal else ""))
         if modo == "prueba":
             print(texto)
             return
-        enviar_aviso(("⚠️ " if mal else "") + f"Pre-conteo no planificado: {len(bien)} de {len(mats)} cargados", texto)
+        enviar_aviso(("⚠️ " if mal else "") + f"Pre-conteo no planificado{' (' + je + ')' if je else ''}: {len(bien)} de {total} cargados", texto)
+        if je:
+            _avisar_je(je, bien, mal_mats, total)
     except Exception as e:
         registrar_error("ov_preconteo", str(e))
-        enviar_aviso("Pre-conteo no planificado: fallo", f"No se pudo cargar la lista {', '.join(mats)}:\n\n{e}")
+        enviar_aviso("Pre-conteo no planificado: fallo", f"No se pudo cargar la lista {', '.join(mats)}{' (' + je + ')' if je else ''}:\n\n{e}")
+        if je and modo != "prueba":
+            _avisar_je(je, [], [(m, "") for m in mats], len(mats))
         raise
     finally:
         shutil.rmtree(CARPETA, ignore_errors=True)
+        if modo != "prueba":
+            _liberar_turno()
 
 
 def main(modo=None):

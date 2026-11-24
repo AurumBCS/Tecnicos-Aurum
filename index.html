@@ -4235,7 +4235,8 @@ let PC_DATOS = {}, PC_ACTUAL = null, PC_EXTRA = {};
 // que entran como coordinadores y nunca llegan a "Mi equipo".
 let PC_CONT = 'equipoPreconteo';
 const PC_COORD_VEN = ['GD5381', 'CM9651'];          // coordinadores con la tarjeta en su vista
-const PC_CARGAN_APP = ['GD5381', 'CM9651'];          // pueden pedir conteos no planificados (en el Apps Script: PC_CARGAN)
+const PC_CARGAN_APP = ['GD5381', 'CM9651'];          // conteos no planificados de cualquiera, hasta 30 (en el Apps Script: PC_CARGAN)
+const PC_MAX_JE = 10;                                 // el resto de JE (24/11/2026): solo los de su equipo, hasta 10
 function pcUsuario(){ return String(CURRENT_JE_ID || USUARIO_TRACK_ID || '').toUpperCase(); }
 
 function pcEur(v, signo=true){ const s = Math.round(v).toLocaleString('es-ES'); return (signo && v>0 ? '+' : '') + s + ' €'; }
@@ -4269,8 +4270,9 @@ async function renderPreconteo(jeId, recargar){
   el.innerHTML = cab + `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:12px 14px">
     <div style="font-size:.78rem;color:var(--text2)">Cuenta el coche del técnico <b>antes</b> del conteo periódico: te digo el descuadre y qué dejarle o quitarle para quedar en ±${PC_OBJETIVO} €.</div>
     ${lista || '<div style="font-size:.8rem;margin-top:8px">No hay conteos periódicos pendientes en tu equipo.</div>'}
-    ${PC_CARGAN_APP.includes(pcUsuario()) ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border2)">
+    ${pcUsuario() ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border2)">
       <div style="font-size:.78rem;font-weight:700;margin-bottom:4px">Conteo no planificado</div>
+      <div style="font-size:.7rem;color:var(--text2);margin-bottom:4px">Carga el stock del sistema de los técnicos que vas a contar${PC_CARGAN_APP.includes(pcUsuario())?'':` (solo los de tu equipo, hasta ${PC_MAX_JE})`}. Al terminar te llega un aviso en la app.</div>
       <textarea id="pcLista" rows="3" aria-label="Matrículas" spellcheck="false" placeholder="Pega las matrículas (una por línea, o separadas por espacios o comas)…" style="width:100%;box-sizing:border-box;padding:8px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:.8rem;font-family:inherit"></textarea>
       <button id="pcListaBtn" onclick="pcCargarLista()" style="margin-top:6px;width:100%;padding:8px;background:var(--gold);border:none;border-radius:8px;color:#000;font-weight:700;font-size:.78rem;cursor:pointer">Cargar lista</button>
       <div id="pcListaEstado" style="font-size:.72rem;color:var(--text2);margin-top:6px"></div>
@@ -4287,7 +4289,8 @@ async function pcCargarLista(){
   const est = document.getElementById('pcListaEstado'), btn = document.getElementById('pcListaBtn');
   const mats = pcMatriculasDe(document.getElementById('pcLista').value);
   if(!mats.length){ est.textContent = 'No veo ninguna matrícula en la lista.'; return; }
-  if(mats.length > 30){ est.textContent = `Son ${mats.length} matrículas; el máximo son 30 de una vez.`; return; }
+  const max = PC_CARGAN_APP.includes(pcUsuario()) ? 30 : PC_MAX_JE;
+  if(mats.length > max){ est.textContent = `Son ${mats.length} matrículas; el máximo son ${max} de una vez.`; return; }
   btn.disabled = true;
   est.textContent = 'Pidiendo…';
   try{
@@ -4295,7 +4298,7 @@ async function pcCargarLista(){
     const r = await res.json();
     if(!r.ok) throw new Error(r.error);
     document.getElementById('pcLista').value = '';
-    est.textContent = `Pedidas ${r.mats.length}: ${r.mats.join(', ')}. Tarda 1-2 min por técnico; te llega un correo al terminar y luego pulsa actualizar.`;
+    est.textContent = `Pedidas ${r.mats.length}: ${r.mats.join(', ')}. Tarda 1-2 min por técnico; al terminar te llega un aviso en la app (si tienes los avisos activados). Después pulsa ↻ Actualizar.`;
   }catch(e){ est.textContent = 'No se pudo pedir: ' + e.message; }
   btn.disabled = false;
 }
@@ -4400,9 +4403,14 @@ function pcCalcular(jeId){
     let resto = Math.abs(total);
     const aFavor = total > 0;
     // Quitar: solo lo que está en el coche, primero lo que le sobra (coche > sistema). Dejar: primero lo que le falta.
-    const propias = lineas.filter(l => l.sub===t.mat && l.precio>0 && (aFavor ? (l.dif>0 && l.fis>0) : l.dif<0)).sort((a,b)=>b.precio-a.precio);
-    const otras = lineas.filter(l => l.sub===t.mat && l.precio>=15 && l.precio<=200 && !propias.includes(l) && (aFavor ? l.fis>0 : l.sis>0)).sort((a,b)=>b.precio-a.precio);
-    [[propias, l=>aFavor ? Math.min(l.dif, l.fis) : -l.dif], [otras, l=>aFavor ? l.fis : 3]].forEach(([grupo, maxUd]) => {
+    // Al quitar, primero el DF y luego el bueno, que es el que usan cada día (Gustavo, 24/11/2026). Dejar: solo bueno.
+    const esDF = l => l.sub!==t.mat;
+    const subs = aFavor ? [esDF, l=>!esDF(l)] : [l=>!esDF(l)];
+    const porPrecio = (a,b)=>b.precio-a.precio;
+    const propias = subs.map(f => lineas.filter(l => f(l) && l.precio>0 && (aFavor ? (l.dif>0 && l.fis>0) : l.dif<0)).sort(porPrecio));
+    const usadas = propias.flat();
+    const otras = subs.map(f => lineas.filter(l => f(l) && l.precio>=15 && l.precio<=200 && !usadas.includes(l) && (aFavor ? l.fis>0 : l.sis>0)).sort(porPrecio));
+    [...propias.map(g=>[g, l=>aFavor ? Math.min(l.dif, l.fis) : -l.dif]), ...otras.map(g=>[g, l=>aFavor ? l.fis : 3])].forEach(([grupo, maxUd]) => {
       grupo.forEach(l => {
         if(resto <= PC_OBJETIVO*0.5) return;
         const n = Math.min(maxUd(l), Math.floor((resto + PC_OBJETIVO*0.3) / l.precio));
@@ -4423,7 +4431,7 @@ function pcCalcular(jeId){
     <div style="font-size:.82rem;font-weight:800;margin:12px 0 4px">Qué hacer</div>
     ${Math.abs(total)<=PC_OBJETIVO ? `<div style="font-size:.8rem;color:var(--green)">✅ Dentro de ±${PC_OBJETIVO} €: no hace falta dejarle ni quitarle nada.</div>` :
       `<div style="font-size:.8rem">${verbo} ${total>0?'del coche':'de tu excedente'}:</div>
-       <ul style="font-size:.8rem;margin:4px 0 0 18px;padding:0">${plan.map(p=>`<li>${p.n} × <b>${pcEsc(p.l.item)}</b> ${pcEsc(p.l.desc)} (${pcEur(p.n*p.l.precio,false)})</li>`).join('')}</ul>
+       <ul style="font-size:.8rem;margin:4px 0 0 18px;padding:0">${plan.map(p=>`<li>${p.n} × <b>${pcEsc(p.l.item)}</b>${p.l.sub!==t.mat?' <span style="color:var(--gold2);font-size:.7rem">DF</span>':''} ${pcEsc(p.l.desc)} (${pcEur(p.n*p.l.precio,false)})</li>`).join('')}</ul>
        <div style="font-size:.8rem;margin-top:4px">Con eso quedaría en <b>${pcEur(tras)}</b>.</div>`}
     ${comp.length ? `<div style="font-size:.82rem;font-weight:800;margin:12px 0 4px">Se compensan (no tocar)</div><div style="font-size:.74rem;color:var(--text2)">${comp.map(pcEsc).join('<br>')}</div>` : ''}
     <div style="font-size:.82rem;font-weight:800;margin:12px 0 4px">Diferencias (${difs.length})</div>

@@ -142,7 +142,7 @@ def handler(event, context):
     elif tarea == "preconteo_lista":
         import ov_preconteo
 
-        _correr(lambda: ov_preconteo.cargar_lista(event.get("mats") or []), "ov_preconteo")
+        _correr(lambda: ov_preconteo.cargar_lista(event.get("mats") or [], je=event.get("je")), "ov_preconteo")
     elif tarea == "ofs_rm_prueba":
         # Busca unos mantenimientos repetidos en Oracle y manda capturas/observaciones/historial.
         import ofs_rm_prueba
