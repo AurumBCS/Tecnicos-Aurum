@@ -3386,8 +3386,10 @@ function rmHtmlAurum(reps, ID){
       <div style="color:var(--muted);font-size:.7rem">${quien} el ${rmEsc(String(r.fechaPost).slice(0,5))}${r.motivoPost?' · motivo: '+rmEsc(r.motivoPost):''}</div></div>
       <div style="font-size:.7rem;color:#e05a4a;white-space:nowrap">${rmEsc(String(r.dias))} días</div></div>`;
   }).join('');
+  const n = reps.length;
   return `<div class="detail-section">⚠️ Repetidos este mes dentro de Aurum</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><span style="font-size:1.5rem;font-weight:700;color:#e05a4a">${n}</span><span style="font-size:.8rem;color:var(--text)">repetido${n===1?'':'s'} este mes</span></div>
       <div style="font-size:.7rem;color:var(--muted);margin-bottom:4px">Mantenimientos tuyos de este mes a los que Aurum ha vuelto en menos de 30 días. Todavía no salen en el informe de Verisure.</div>
       ${filas}</div>`;
 }
