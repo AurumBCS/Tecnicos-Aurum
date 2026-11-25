@@ -1080,6 +1080,12 @@ function buildKpiAlertBadges(t){
 function avg(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0; }
 
 // ── Obtener técnicos de un JE ──
+// Total de la empresa (vista del coordinador): cada fila del Resumen una vez, esté o no en un equipo
+function tecnicosTotales(){
+  const vistos=new Set();
+  return (CURRENT_DATA.tecnicos||[]).filter(t=>{ const k=String(t.raw||t.id).toUpperCase(); if(vistos.has(k)) return false; vistos.add(k); return true; });
+}
+
 function getTecnicosOfJE(jeId){
   const ids = (JERARQUIA[jeId]||[]).map(id=>id.toUpperCase());
   return CURRENT_DATA.tecnicos.filter(t=>ids.includes(t.id.toUpperCase()));
@@ -2226,8 +2232,9 @@ function renderJRPanel(soloZonas){
     });
   }
 
-  // Resumen global
-  const allTecs=jeIds.flatMap(id=>getTecnicosOfJE(id));
+  // Resumen global: todas las filas del Resumen, haga quien haga el mantenimiento (también los JE y los
+  // técnicos que aún no están en el Cuadrante), para que cuadre con el informe de Verisure (Gustavo, 25/11/2026)
+  const allTecs=tecnicosTotales();
   const globalAv=calcAvg(allTecs);
   const glvG=getGrade(globalAv.mlv||0);
   const gmabG=getGrade(globalAv.mab||0);
@@ -3382,8 +3389,7 @@ function showJRDash(type){
   _dashBackPanel='jrPanel';
   _dashType=type;
   _dashJeId=null;
-  const jeIds=JERARQUIA['JR9426']||[];
-  const tecs=jeIds.flatMap(id=>getTecnicosOfJE(id));
+  const tecs=tecnicosTotales();
   _renderDashRanking(type, tecs);
 }
 
