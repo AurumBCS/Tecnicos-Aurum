@@ -3315,7 +3315,9 @@ async function rmPintarEvolucion(id, mes){
   c.innerHTML = rmHtmlEvolucion(fotos, mes, esActual) + rmHtmlAurum(reps, ID);
 }
 function rmHtmlEvolucion(fotos, mes, esActual){
-  const caja = inner => `<div class="detail-section">Evolución del % de RM · informes de ${rmEsc(mes)}</div>
+  const MESES_RM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const iMes=MESES_RM.indexOf(mes), mesMant = iMes>=0 ? MESES_RM[(iMes+11)%12].toLowerCase() : mes;
+  const caja = inner => `<div class="detail-section">RM de los mantenimientos de ${rmEsc(mesMant)}</div>
     <div style="background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:16px">${inner}</div>`;
   if(!fotos.length) return caja('<div style="color:var(--muted);font-size:.75rem">Todavía no hay informes guardados de este mes. Se irán añadiendo cada martes y jueves.</div>');
   const OBJ=87.5, VERDE='#3daa6e', ROJO='#e05a4a', ORO='#e8c96a';
