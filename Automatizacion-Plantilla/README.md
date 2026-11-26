@@ -255,6 +255,10 @@ de Gustavo: `ov_comun.py` usa el mismo login de Microsoft + Authenticator (el n�
 | `{"tarea": "devoluciones_diario", "respaldo": true}` | `ofs-devoluciones-respaldo`: `cron(0 13 ? * MON-FRI *)`, Europe/Madrid | Igual que el respaldo de recuentos |
 | `{"tarea": "traspasos_diario"}` | `ofs-traspasos`: `cron(0 8 ? * MON-FRI *)`, Europe/Madrid | `ov_traspasos.py`: Transferencia InterWorker "A la espera Aceptación" de días anteriores → un correo por traspaso con la captura de su ficha; Para los dos técnicos, CC sus jefes, CCO José Luis y César (todo resuelto en el Apps Script desde el cuadrante) |
 | `{"tarea": "traspasos_diario", "respaldo": true}` | `ofs-traspasos-respaldo`: `cron(30 9 ? * MON-FRI *)`, Europe/Madrid | Igual que los otros respaldos |
+| `{"tarea": "conteos_diario"}` | `ofs-conteos`: `cron(0 13 ? * MON-FRI *)`, Europe/Madrid (antes en el Mac, `com.aurum.conteos`) | `ov_conteos.py`: un correo al JE por cada conteo periódico aprobado aún no enviado. Registro de enviados en `s3://<SESION_BUCKET>/conteos_enviados.json` (el rol necesita leer y escribir ese objeto); si no se puede leer, no envía nada y avisa |
+
+El cruce de los correos de agenda a la apertura y al cierre (`agenda_cruce.py`, pestaña "Agenda 8:00") va dentro de
+`agenda_vivo`: lo hace la primera pasada de antes de las 12:00 en que ya esté el correo de la apertura de hoy (llega a las 7:58).
 
 Variables de entorno extra (valores en `config_recuentos.json` y `recuentos_clave.txt` de la carpeta
 "Correo Recuentos" del Mac — no pegarlos en el chat):

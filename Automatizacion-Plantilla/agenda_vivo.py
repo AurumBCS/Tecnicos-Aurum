@@ -314,3 +314,18 @@ def main():
         lista = lista_8(csvs, cuadrante())
         subir_lista(hoy, lista)
         print(f"[vivo] la lista de hoy no estaba: subida desde Oracle ({len(lista)} mantenimientos)")
+    # Cruce de los correos de agenda a la apertura y al cierre (pestaña "Agenda 8:00"; antes en el Mac a las 8:00).
+    # Verisure los manda a las 7:58: se hace en la primera pasada en que estén, hasta las 12:00, una vez al día.
+    if ahora.hour < 12:
+        try:
+            import agenda_cruce
+            if agenda_cruce.subido_hoy():
+                print("[vivo] cruce de agenda: ya subido hoy")
+            elif agenda_cruce.main([], solo_con_hoy=True):
+                print("[vivo] cruce de agenda subido")
+        except Exception as e:
+            print(f"[vivo] cruce de agenda no hecho: {type(e).__name__}: {e}")
+            if ahora.hour == 11 and ahora.minute >= 40:   # última pasada de la mañana
+                from comun_ofs import enviar_aviso
+                enviar_aviso("⚠️ Cruce de agenda de hoy sin hacer",
+                             f"La pestaña «Agenda 8:00» no se ha actualizado hoy: {type(e).__name__}: {e}")

@@ -17,6 +17,10 @@ Uso:
   python3 ov_conteos.py --codigos C26103643 C26103488 --modo prueba
   python3 ov_conteos.py --excluir C26102603
 Variables: RECUENTOS_SCRIPT_URL, RECUENTOS_APP_TOKEN, RECUENTOS_KEY, CONTEOS_MODO y las del login.
+
+En la Lambda (tarea "conteos_diario", L-V 13:00) el registro de enviados vive en
+s3://<SESION_BUCKET>/conteos_enviados.json. Si no se puede leer, no se envia nada (asi no se
+repiten correos de conteos ya enviados) y se avisa a Gustavo.
 """
 
 import argparse
@@ -31,11 +35,30 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import conteos_codificacion as cc
-from comun_ofs import CARPETA_BASE, enviar_aviso, registrar_error
+from comun_ofs import CARPETA_BASE, EN_LAMBDA, enviar_aviso, registrar_error
 
 CARPETA = Path(os.environ.get("CONTEOS_DIR", CARPETA_BASE / "conteos"))
 REGISTRO = CARPETA / "enviados.json"   # codigos ya enviados (o descartados): no se repiten
 DESDE = date(2026, 10, 12)             # no se miran conteos anteriores
+
+
+CLAVE_S3_REGISTRO = "conteos_enviados.json"
+
+
+def _bajar_registro():
+    """Lambda: trae el registro de S3. Lanza error si no puede (mejor no enviar que repetir correos)."""
+    from ov_comun import _s3
+    cliente, bucket = _s3()
+    if not cliente:
+        raise RuntimeError("sin SESION_BUCKET: no hay registro de conteos enviados")
+    cliente.download_file(bucket, CLAVE_S3_REGISTRO, str(REGISTRO))
+    print(f"[conteos] registro de S3: {len(_registro())} conteos ya enviados")
+
+
+def _subir_registro():
+    from ov_comun import _s3
+    cliente, bucket = _s3()
+    cliente.upload_file(str(REGISTRO), bucket, CLAVE_S3_REGISTRO, ExtraArgs={"ServerSideEncryption": "AES256"})
 
 
 def _registro():
@@ -51,6 +74,14 @@ def _apuntar(codigos, estado):
     for c in codigos:
         reg[c] = f"{estado} {hoy}"
     REGISTRO.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
+    if EN_LAMBDA:
+        try:
+            _subir_registro()
+        except Exception as e:
+            enviar_aviso("⚠️ Conteos: registro de enviados no guardado",
+                         f"No se pudo guardar en S3 que se enviaron {', '.join(codigos)} ({e}). "
+                         "Mañana se volverían a enviar: hay que apuntarlos a mano.")
+            raise
 
 
 def _fecha(v):
@@ -146,6 +177,14 @@ def main(fecha=None, codigos=None, excluir=(), modo=None):
     modo = modo or os.environ.get("CONTEOS_MODO", "enviar")
     fecha = fecha or datetime.now(ZoneInfo("Europe/Madrid")).date()
     CARPETA.mkdir(parents=True, exist_ok=True)
+    if EN_LAMBDA and not codigos:
+        try:
+            _bajar_registro()
+        except Exception as e:
+            enviar_aviso("⚠️ Conteos periódicos: no se ha enviado nada",
+                         f"No se pudo leer el registro de conteos ya enviados en S3 ({type(e).__name__}: {e}). "
+                         "Para no repetir correos, hoy no se ha enviado ninguno.")
+            raise
     jer = _jerarquia()
     resumen, errores, jefes = [], [], []
     with sync_playwright() as p:

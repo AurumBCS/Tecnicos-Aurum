@@ -13,6 +13,8 @@ Evento esperado (lo manda el "Input" de cada regla de EventBridge Scheduler):
   {"tarea": "recuentos_semanal", "respaldo": true} -> martes 12:00, solo si el de las 10:00 no salio
   {"tarea": "devoluciones_diario"} -> L-V 11:00, control de devoluciones por jefe (ver ov_devoluciones.py)
   {"tarea": "devoluciones_diario", "respaldo": true} -> L-V 13:00, solo si el de las 11:00 no salio
+  {"tarea": "conteos_diario"} -> L-V 13:00 (desde el 26/11/2026; antes en el Mac): correo al JE por cada conteo
+                                  periodico aprobado aun no enviado (ver ov_conteos.py; registro en S3)
   {"tarea": "traspasos_diario"} -> L-V 8:00, aviso de traspasos InterWorker sin completar (ver ov_traspasos.py)
   {"tarea": "traspasos_diario", "respaldo": true} -> L-V 9:30, solo si el de las 8:00 no salio
       (despues de traspasos, con la misma sesion: pre-conteo, ver ov_preconteo.py)
@@ -85,9 +87,9 @@ def handler(event, context):
     if isinstance(event, dict) and "requestContext" in event:
         return _desde_url(event, context)
     tarea = (event or {}).get("tarea")
-    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "preconteo", "preconteo_lista", "ofs_rm_prueba", "rm_analizar", "upselling_envio", "agenda_vivo"):
+    if tarea not in ("mediodia", "tarde", "listar_buckets", "ov_prueba", "recuentos_semanal", "devoluciones_diario", "traspasos_diario", "preconteo", "preconteo_lista", "ofs_rm_prueba", "rm_analizar", "upselling_envio", "agenda_vivo", "conteos_diario"):
         raise ValueError(
-            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/preconteo/preconteo_lista/ofs_rm_prueba/rm_analizar/upselling_envio/agenda_vivo): {event}"
+            f"Evento invalido, falta 'tarea' (mediodia/tarde/listar_buckets/ov_prueba/recuentos_semanal/devoluciones_diario/traspasos_diario/preconteo/preconteo_lista/ofs_rm_prueba/rm_analizar/upselling_envio/agenda_vivo/conteos_diario): {event}"
         )
 
     if (event or {}).get("respaldo"):
@@ -135,6 +137,11 @@ def handler(event, context):
             print(f"[lambda] pre-conteo fallo: {e}")
         if error:
             raise error
+    elif tarea == "conteos_diario":
+        # Fallos de codificacion de los conteos periodicos aprobados, un correo por conteo al JE.
+        import ov_conteos
+
+        _correr(lambda: ov_conteos.main(modo=event.get("modo")), "ov_conteos")
     elif tarea == "preconteo":
         import ov_preconteo
 
